@@ -1,0 +1,180 @@
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Settings } from '../types';
+import { STYLE_CONFIGS, getCurrentNarration, getFinishLine } from '../data/narrations';
+import CircularTimer from '../components/CircularTimer';
+import NarrationText from '../components/NarrationText';
+import WaveAnimation from '../components/WaveAnimation';
+import BackgroundEffect from '../components/BackgroundEffect';
+import FlashOverlay from '../components/FlashOverlay';
+import Confetti from '../components/Confetti';
+
+interface CountdownPageProps {
+  settings: Settings;
+  onFinish: () => void;
+}
+
+export default function CountdownPage({ settings, onFinish }: CountdownPageProps) {
+  const { totalSeconds, dishName, style } = settings;
+  const [timeLeft, setTimeLeft] = useState(totalSeconds);
+  const [narrationText, setNarrationText] = useState('');
+  const [isFlashing, setIsFlashing] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const prevNarrationRef = useRef('');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const styleConfig = STYLE_CONFIGS.find((s) => s.id === style)!;
+  const isDanger = timeLeft <= 10 && timeLeft > 0;
+
+  const updateNarration = useCallback((tl: number, tt: number) => {
+    if (tl <= 0) return;
+    const text = getCurrentNarration(tl, tt, style, dishName);
+    if (text !== prevNarrationRef.current) {
+      prevNarrationRef.current = text;
+      setNarrationText(text);
+    }
+  }, [style, dishName]);
+
+  useEffect(() => {
+    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName);
+    prevNarrationRef.current = initial;
+    setNarrationText(initial);
+  }, [totalSeconds, style, dishName]);
+
+  useEffect(() => {
+    if (isPaused || isFinished) return;
+
+    intervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          clearInterval(intervalRef.current!);
+          setIsFinished(true);
+          setIsFlashing(true);
+          setShowConfetti(true);
+          const finishText = getFinishLine(style, dishName);
+          prevNarrationRef.current = finishText;
+          setNarrationText(finishText);
+          setTimeout(() => setIsFlashing(false), 600);
+          setTimeout(() => onFinish(), 4000);
+          return 0;
+        }
+        updateNarration(next, totalSeconds);
+        return next;
+      });
+    }, 1000);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish]);
+
+  const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
+
+  return (
+    <div
+      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${styleConfig.bgGradient}`}
+    >
+      <BackgroundEffect style={style} isDanger={isDanger} />
+      <FlashOverlay visible={isFlashing} />
+      {showConfetti && <Confetti />}
+
+      {isDanger && !isFinished && (
+        <div
+          className="absolute inset-0 pointer-events-none z-10"
+          style={{
+            background: `radial-gradient(ellipse at center, transparent 40%, ${styleConfig.accentColor}15 100%)`,
+            animation: 'vignettePulse 0.5s ease-in-out infinite',
+          }}
+        />
+      )}
+
+      <div className="relative z-20 flex flex-col min-h-screen">
+        <div className="flex items-center justify-between px-4 pt-safe pt-4 pb-3 border-b border-white/5">
+          <div className="flex flex-col">
+            <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
+              {styleConfig.emoji} {styleConfig.label}
+            </span>
+            <span
+              className="text-sm font-bold mt-0.5"
+              style={{ color: styleConfig.accentColor }}
+            >
+              {dishName}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setIsPaused((p) => !p)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs font-bold text-slate-400"
+          >
+            {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-8">
+          <div className="flex flex-col items-center gap-2">
+            <CircularTimer
+              timeLeft={timeLeft}
+              totalTime={totalSeconds}
+              style={style}
+              isDanger={isDanger}
+            />
+
+            <div className="w-full max-w-xs mt-2">
+              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${progressPercent}%`,
+                    background: `linear-gradient(90deg, ${styleConfig.accentColor}80, ${styleConfig.accentColor})`,
+                    boxShadow: `0 0 8px ${styleConfig.accentColor}60`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <WaveAnimation style={style} active={!isPaused && !isFinished} />
+
+          <div className="w-full max-w-sm">
+            <NarrationText text={narrationText} style={style} />
+          </div>
+
+          {isDanger && !isFinished && (
+            <div
+              className={`text-center font-display text-lg font-bold tracking-widest uppercase ${styleConfig.textShadowClass}`}
+              style={{
+                animation: 'dangerPulse 0.5s ease-in-out infinite',
+                textShadow: `0 0 15px ${styleConfig.accentColor}`,
+              }}
+            >
+              もうすぐ チーン！
+            </div>
+          )}
+
+          {isFinished && (
+            <div
+              className="text-center font-display text-4xl font-bold animate-scale-in"
+              style={{
+                background: `linear-gradient(135deg, #fff, ${styleConfig.accentColor})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                filter: `drop-shadow(0 0 20px ${styleConfig.accentColor})`,
+              }}
+            >
+              チーン！！！
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 pb-6 text-center">
+          <p className="text-xs text-slate-600">
+            {totalSeconds - timeLeft} 秒経過 / {totalSeconds} 秒
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
