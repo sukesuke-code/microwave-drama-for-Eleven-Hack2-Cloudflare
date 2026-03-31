@@ -13,7 +13,10 @@ export default function AudioWaveVisualizer({
   const delayMultiplier = intensity === 'high' ? 0.06 : intensity === 'low' ? 0.12 : 0.08;
 
   return (
-    <div className="flex items-end justify-center gap-1 h-12 px-2">
+    <div
+      className="flex items-end justify-center gap-1 h-12 px-2"
+      style={{ transform: 'scaleY(-1)' }}
+    >
       {bars.map((_, i) => (
         <div
           key={i}
