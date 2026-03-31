@@ -45,8 +45,8 @@ export default function FloatingSpheres() {
         opacity,
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
-        duration: Math.floor(Math.random() * 15) + 20,
-        delay: Math.random() * 3,
+        duration: Math.floor(Math.random() * 10) + 12,
+        delay: Math.random() * 2,
       });
     }
 
