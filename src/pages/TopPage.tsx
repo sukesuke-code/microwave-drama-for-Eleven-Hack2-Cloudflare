@@ -1,5 +1,6 @@
 import { Zap, Waves } from 'lucide-react';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
+import FloatingSpheres from '../components/FloatingSpheres';
 
 interface TopPageProps {
   onStart: () => void;
@@ -8,6 +9,8 @@ interface TopPageProps {
 export default function TopPage({ onStart }: TopPageProps) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#0a0a0a] noise-bg">
+      <FloatingSpheres />
+
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
