@@ -45,8 +45,8 @@ export default function FloatingSpheres() {
         opacity,
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
-        duration: Math.floor(Math.random() * 30) + 40,
-        delay: Math.floor(Math.random() * 5),
+        duration: Math.floor(Math.random() * 15) + 20,
+        delay: Math.random() * 3,
       });
     }
 
@@ -119,30 +119,30 @@ export default function FloatingSpheres() {
       <style>{`
         @keyframes floatSphere0 {
           0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(20px, -30px); }
-          50% { transform: translate(-10px, 20px); }
-          75% { transform: translate(15px, 25px); }
+          25% { transform: translate(40px, -50px); }
+          50% { transform: translate(-30px, 40px); }
+          75% { transform: translate(35px, 45px); }
         }
 
         @keyframes floatSphere1 {
           0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(-25px, 15px); }
-          50% { transform: translate(20px, -20px); }
-          75% { transform: translate(-15px, -25px); }
+          25% { transform: translate(-45px, 35px); }
+          50% { transform: translate(40px, -40px); }
+          75% { transform: translate(-35px, -45px); }
         }
 
         @keyframes floatSphere2 {
           0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(30px, 10px); }
-          50% { transform: translate(-20px, -15px); }
-          75% { transform: translate(10px, 30px); }
+          25% { transform: translate(50px, 30px); }
+          50% { transform: translate(-40px, -35px); }
+          75% { transform: translate(30px, 50px); }
         }
 
         @keyframes floatSphere3 {
           0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(-15px, -20px); }
-          50% { transform: translate(25px, 15px); }
-          75% { transform: translate(-20px, 20px); }
+          25% { transform: translate(-35px, -40px); }
+          50% { transform: translate(45px, 35px); }
+          75% { transform: translate(-40px, 40px); }
         }
       `}</style>
     </div>
