@@ -189,25 +189,42 @@
   0%, 100% {
     opacity: 1;
     filter: brightness(1.1) saturate(1.1);
-    color: rgb(226 232 240 / 0.9);
+    color: var(--hero-copy-color-base, rgb(226 232 240 / 0.9));
     text-shadow:
-      0 0 8px rgba(255, 255, 255, 0.24),
-      0 0 18px rgba(249, 115, 22, 0.26);
+      var(--hero-copy-shadow-base-1, 0 0 8px rgba(255, 255, 255, 0.24)),
+      var(--hero-copy-shadow-base-2, 0 0 18px rgba(249, 115, 22, 0.26));
   }
   50% {
     opacity: 1;
     filter: brightness(1.26) saturate(1.24);
-    color: rgb(254 215 170 / 0.98);
+    color: var(--hero-copy-color-peak, rgb(254 215 170 / 0.98));
     text-shadow:
-      0 0 14px rgba(255, 255, 255, 0.44),
-      0 0 30px rgba(249, 115, 22, 0.5),
-      0 0 52px rgba(249, 115, 22, 0.26);
+      var(--hero-copy-shadow-peak-1, 0 0 14px rgba(255, 255, 255, 0.44)),
+      var(--hero-copy-shadow-peak-2, 0 0 30px rgba(249, 115, 22, 0.5)),
+      var(--hero-copy-shadow-peak-3, 0 0 52px rgba(249, 115, 22, 0.26));
   }
 }
 
 .hero-copy-blink {
+  --hero-copy-color-base: rgb(226 232 240 / 0.9);
+  --hero-copy-color-peak: rgb(254 215 170 / 0.98);
+  --hero-copy-shadow-base-1: 0 0 8px rgba(255, 255, 255, 0.24);
+  --hero-copy-shadow-base-2: 0 0 18px rgba(249, 115, 22, 0.26);
+  --hero-copy-shadow-peak-1: 0 0 14px rgba(255, 255, 255, 0.44);
+  --hero-copy-shadow-peak-2: 0 0 30px rgba(249, 115, 22, 0.5);
+  --hero-copy-shadow-peak-3: 0 0 52px rgba(249, 115, 22, 0.26);
   animation: heroCopyBlink 2.5s ease-in-out infinite;
   will-change: color, filter, text-shadow;
+}
+
+.hero-copy-light {
+  --hero-copy-color-base: rgb(15 23 42 / 0.9);
+  --hero-copy-color-peak: rgb(2 6 23 / 0.98);
+  --hero-copy-shadow-base-1: 0 0 7px rgba(15, 23, 42, 0.14);
+  --hero-copy-shadow-base-2: 0 0 14px rgba(15, 23, 42, 0.1);
+  --hero-copy-shadow-peak-1: 0 0 10px rgba(15, 23, 42, 0.22);
+  --hero-copy-shadow-peak-2: 0 0 20px rgba(15, 23, 42, 0.16);
+  --hero-copy-shadow-peak-3: 0 0 32px rgba(15, 23, 42, 0.12);
 }
 
 @keyframes heroSectionBlink {
