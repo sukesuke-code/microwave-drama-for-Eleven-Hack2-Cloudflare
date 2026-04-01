@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
@@ -15,6 +15,7 @@ interface CountdownPageProps {
   settings: Settings;
   themeMode: ThemeMode;
   onThemeModeChange: (themeMode: ThemeMode) => void;
+  onBack: () => void;
   onFinish: () => void;
 }
 
@@ -23,6 +24,7 @@ export default function CountdownPage({
   settings,
   themeMode,
   onThemeModeChange,
+  onBack,
   onFinish,
 }: CountdownPageProps) {
   const { totalSeconds, dishName, style } = settings;
@@ -39,6 +41,9 @@ export default function CountdownPage({
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
   const isLight = themeMode === 'light';
+  const lightBgGradient = style === 'sports'
+    ? 'from-sky-50 via-blue-50/80 to-slate-100'
+    : 'from-slate-50 via-orange-50/80 to-slate-100';
 
   const updateNarration = useCallback((tl: number, tt: number) => {
     if (tl <= 0) return;
@@ -86,8 +91,8 @@ export default function CountdownPage({
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
   return (
-    <div
-      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? 'from-slate-50 via-orange-50/80 to-slate-100' : styleConfig.bgGradient}`}
+      <div
+      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
     >
       <BackgroundEffect style={style} isDanger={isDanger} />
       <FlashOverlay visible={isFlashing} />
@@ -104,8 +109,15 @@ export default function CountdownPage({
       )}
 
       <div className="relative z-20 flex flex-col min-h-screen">
-        <div className={`flex items-center justify-between px-4 pt-safe pt-4 pb-3 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
-          <div className="flex flex-col">
+        <div className={`relative flex items-center justify-center px-4 pt-safe pt-4 pb-3 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
+          <button
+            onClick={onBack}
+            className={`absolute left-4 top-4 rounded-lg p-1 transition-colors ${isLight ? 'text-slate-700 hover:bg-slate-200' : 'text-slate-300 hover:bg-white/10'}`}
+            aria-label="Back to settings"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <div className="flex flex-col items-center text-center">
             <span className={`text-xs uppercase tracking-widest font-bold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               {styleConfig.emoji} {styleConfig.label}
             </span>
@@ -121,7 +133,7 @@ export default function CountdownPage({
         <div className="absolute right-4 top-4 z-30">
           <button
             onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-            className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
+            className={`flex items-center justify-center rounded-xl p-2 transition-colors ${
               isLight
                 ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                 : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
@@ -129,7 +141,6 @@ export default function CountdownPage({
             aria-label="Dark mode switcher"
           >
             {isLight ? <Moon size={14} /> : <Sun size={14} />}
-            {isLight ? 'Dark' : 'Light'}
           </button>
         </div>
 

@@ -23,7 +23,7 @@ function writeStorage(key: string, value: string): void {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<AppScreen>('top');
+  const [screen, setScreen] = useState<AppScreen>('settings');
   const [settings, setSettings] = useState<Settings | null>(null);
   const [locale, setLocale] = useState<Locale>(() => {
     const saved = readStorage('ching-drama-locale');
@@ -56,7 +56,7 @@ export default function App() {
     if (settings) setScreen('countdown');
   };
 
-  const handleHome = () => setScreen('top');
+  const handleHome = () => setScreen('settings');
 
   return (
     <div className="font-sans">
@@ -85,6 +85,7 @@ export default function App() {
             settings={settings}
             themeMode={themeMode}
             onThemeModeChange={setThemeMode}
+            onBack={() => setScreen('settings')}
             onFinish={handleFinish}
           />
         )}
