@@ -115,13 +115,13 @@ export default function TopPage({
         </div>
 
         <p
-          className={`steady-blink text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
+          className={`hero-copy-blink text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
           style={{ animationDelay: '0.35s' }}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`steady-blink text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
+          className={`hero-copy-blink text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
           style={{ animationDelay: '0.7s' }}
         >
           {t.topTagline2}
