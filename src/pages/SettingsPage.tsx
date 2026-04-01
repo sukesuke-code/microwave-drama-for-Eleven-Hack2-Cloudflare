@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
@@ -18,6 +18,8 @@ const QUICK_PRESETS = [
   { seconds: 180, label: '3Min' },
   { seconds: 300, label: '5Min' },
 ] as const;
+
+const SETTINGS_DRAFT_STORAGE_KEY = 'ching-drama-settings-draft';
 
 const STYLE_CARDS: Array<{
   id: NarrationStyle;
@@ -66,6 +68,29 @@ function clampDuration(value: number): number {
   return Math.max(1, Math.min(600, Math.floor(value)));
 }
 
+function readSettingsDraft(locale: Locale): { duration: number; dishName: string; style: NarrationStyle } {
+  const fallback = {
+    duration: 60,
+    dishName: locale === 'ja' ? '冷凍チャーハン' : '',
+    style: 'sports' as NarrationStyle,
+  };
+
+  try {
+    const raw = localStorage.getItem(SETTINGS_DRAFT_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<{ duration: number; dishName: string; style: NarrationStyle }>;
+    const style = parsed.style;
+    const isValidStyle = style === 'sports' || style === 'movie' || style === 'horror' || style === 'nature';
+    return {
+      duration: clampDuration(Number(parsed.duration ?? fallback.duration)),
+      dishName: typeof parsed.dishName === 'string' ? parsed.dishName : fallback.dishName,
+      style: isValidStyle ? style : fallback.style,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export default function SettingsPage({
   locale,
   themeMode,
@@ -73,9 +98,10 @@ export default function SettingsPage({
   onBack,
   onStart,
 }: SettingsPageProps) {
-  const [duration, setDuration] = useState(60);
-  const [dishName, setDishName] = useState(locale === 'ja' ? '冷凍チャーハン' : '');
-  const [style, setStyle] = useState<NarrationStyle>('sports');
+  const [draft] = useState(() => readSettingsDraft(locale));
+  const [duration, setDuration] = useState(draft.duration);
+  const [dishName, setDishName] = useState(draft.dishName);
+  const [style, setStyle] = useState<NarrationStyle>(draft.style);
 
   const t = UI_TEXT[locale];
   const isLight = themeMode === 'light';
@@ -103,6 +129,15 @@ export default function SettingsPage({
       style,
     });
   };
+
+  useEffect(() => {
+    const nextDraft = { duration, dishName, style };
+    try {
+      localStorage.setItem(SETTINGS_DRAFT_STORAGE_KEY, JSON.stringify(nextDraft));
+    } catch {
+      // no-op when storage is unavailable
+    }
+  }, [duration, dishName, style]);
 
   return (
     <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-gray-100 text-gray-900' : 'bg-gray-950 text-white'}`}>
