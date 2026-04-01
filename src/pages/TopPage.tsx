@@ -73,7 +73,7 @@ export default function TopPage({
 
       <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full">
         <h1
-          className="font-display text-7xl font-bold text-center mb-2 tracking-tight soft-glow-pulse"
+          className="font-display text-5xl md:text-6xl font-bold text-center mb-2 tracking-tight whitespace-nowrap soft-glow-pulse"
           style={{
             background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
             WebkitBackgroundClip: 'text',
