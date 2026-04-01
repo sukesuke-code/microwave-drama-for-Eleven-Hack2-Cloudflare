@@ -41,6 +41,9 @@ export default function CountdownPage({
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
   const isLight = themeMode === 'light';
+  const lightBgGradient = style === 'sports'
+    ? 'from-sky-50 via-blue-50/80 to-slate-100'
+    : 'from-slate-50 via-orange-50/80 to-slate-100';
 
   const updateNarration = useCallback((tl: number, tt: number) => {
     if (tl <= 0) return;
@@ -88,8 +91,8 @@ export default function CountdownPage({
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
   return (
-    <div
-      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? 'from-slate-50 via-orange-50/80 to-slate-100' : styleConfig.bgGradient}`}
+      <div
+      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
     >
       <BackgroundEffect style={style} isDanger={isDanger} />
       <FlashOverlay visible={isFlashing} />
