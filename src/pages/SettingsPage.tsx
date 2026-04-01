@@ -27,7 +27,7 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
   const styleConfig = STYLE_CONFIGS.find((s) => s.id === selectedStyle)!;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+    <div className="min-h-screen flex flex-col bg-[#00031a]">
       <div className="flex items-center gap-3 px-4 pt-safe pt-4 pb-4 border-b border-white/5">
         <button
           onClick={onBack}

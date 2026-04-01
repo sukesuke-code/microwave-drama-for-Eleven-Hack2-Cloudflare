@@ -33,7 +33,7 @@ export default function ResultPage({ settings, onReplay, onHome }: ResultPagePro
 
   return (
     <div
-      className={`min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${styleConfig.bgGradient} bg-[#0a0a0a]`}
+      className={`min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${styleConfig.bgGradient} bg-[#00031a]`}
     >
       <div
         className="absolute inset-0 pointer-events-none"

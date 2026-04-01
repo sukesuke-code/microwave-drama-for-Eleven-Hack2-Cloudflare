@@ -8,7 +8,7 @@ interface TopPageProps {
 
 export default function TopPage({ onStart }: TopPageProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#0a0a0a] noise-bg">
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#00031a] noise-bg">
       <FloatingSpheres />
 
       <div
