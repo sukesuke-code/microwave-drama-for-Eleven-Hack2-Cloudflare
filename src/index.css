@@ -474,3 +474,14 @@
   50% { transform: translate(45px, 35px); }
   75% { transform: translate(-40px, 40px); }
 }
+
+@keyframes confettiFall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--confetti-drift, 0px), 115vh, 0) rotate(720deg);
+  }
+}

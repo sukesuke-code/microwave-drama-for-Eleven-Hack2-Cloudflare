@@ -3,6 +3,7 @@ import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import FloatingSpheres from '../components/FloatingSpheres';
 import { Locale, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
+import microwaveShowIcon from '../assets/microwave-show-icon.svg';
 
 interface TopPageProps {
   onStart: () => void;
@@ -90,6 +91,11 @@ export default function TopPage({
 
       <div className="relative z-10 mt-60 md:mt-64 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8 hero-rise-in" style={{ animationDelay: '0.05s' }}>
+          <img
+            src={microwaveShowIcon}
+            alt="Microwave Show icon"
+            className="mx-auto mb-4 h-20 w-20 sm:h-24 sm:w-24 select-none drop-shadow-[0_0_20px_rgba(249,115,22,0.45)]"
+          />
           <h1
             className={`font-display ${isLight ? 'hero-light-step-blink' : 'hero-blink'} w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2`}
             style={{
