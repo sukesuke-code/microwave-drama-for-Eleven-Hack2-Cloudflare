@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 
-type ConfettiShape = 'circle' | 'square' | 'triangle';
+type ConfettiShape = 'circle' | 'rectangle' | 'triangle';
 
 interface ConfettiPiece {
   id: number;
   x: number;
-  drift: number;
   color: string;
   size: number;
   delay: number;
@@ -13,8 +12,8 @@ interface ConfettiPiece {
   shape: ConfettiShape;
 }
 
-const COLORS = ['#f97316', '#ef4444', '#fbbf24', '#ffffff'];
-const SHAPES: ConfettiShape[] = ['circle', 'square', 'triangle'];
+const COLORS = ['#f97316', '#ef4444', '#fbbf24', '#fb923c', '#fde68a', '#fff'];
+const SHAPES: ConfettiShape[] = ['circle', 'rectangle', 'triangle'];
 const PARTICLE_COUNT = 60;
 
 export default function Confetti() {
@@ -25,10 +24,9 @@ export default function Confetti() {
       Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
         id: i,
         x: Math.random() * 100,
-        drift: (Math.random() - 0.5) * 120,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        size: Math.random() * 8 + 8,
-        delay: Math.random() * 1.2,
+        size: Math.random() * 8 + 6,
+        delay: Math.random() * 0.5,
         duration: Math.random() * 1.5 + 1.5,
         shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
       })),
@@ -48,21 +46,26 @@ export default function Confetti() {
       {pieces.map((p) => {
         const baseStyle: CSSProperties = {
           left: `${p.x}%`,
-          top: '-8vh',
+          top: '-20px',
           width: `${p.size}px`,
           height: `${p.size}px`,
           backgroundColor: p.color,
-          transform: `translate3d(0, 0, 0) rotate(0deg)`,
-          animation: `confettiFall ${p.duration}s ease-in ${p.delay}s forwards`,
-          ['--confetti-drift' as string]: `${p.drift}px`,
+          opacity: 0.9,
+          transform: 'translateY(-20px) rotate(0deg)',
+          animation: `confetti-fall ${p.duration}s ease-in ${p.delay}s forwards`,
         };
 
         if (p.shape === 'circle') {
-          baseStyle.borderRadius = '9999px';
-        } else if (p.shape === 'square') {
-          baseStyle.borderRadius = '3px';
+          baseStyle.borderRadius = '50%';
+        } else if (p.shape === 'rectangle') {
+          baseStyle.height = `${p.size * 0.6}px`;
         } else {
-          baseStyle.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
+          baseStyle.width = '0';
+          baseStyle.height = '0';
+          baseStyle.backgroundColor = 'transparent';
+          baseStyle.borderLeft = `${p.size / 2}px solid transparent`;
+          baseStyle.borderRight = `${p.size / 2}px solid transparent`;
+          baseStyle.borderBottom = `${p.size}px solid ${p.color}`;
         }
 
         return <div key={p.id} className="absolute" style={baseStyle} />;
