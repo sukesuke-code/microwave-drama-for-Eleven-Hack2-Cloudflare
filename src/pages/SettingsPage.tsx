@@ -126,8 +126,8 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col justify-between gap-3 pt-3">
-          <section className="space-y-2">
+        <div className="flex flex-1 flex-col justify-between gap-4 pt-4">
+          <section className="mt-1 space-y-3">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
           <div className="grid grid-cols-5 gap-1">
@@ -197,7 +197,7 @@ export default function SettingsPage({
           </div>
           </section>
 
-          <section className="space-y-2">
+          <section className="space-y-3">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.optionalDish}</p>
             <input
               type="text"
@@ -209,7 +209,7 @@ export default function SettingsPage({
             />
           </section>
 
-          <section className="space-y-2">
+          <section className="space-y-3">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
             <div className="grid h-full max-h-[34vh] grid-cols-2 gap-2">
               {STYLE_CARDS.map((card) => {
