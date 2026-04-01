@@ -112,7 +112,7 @@ export default function TopPage({ onStart }: TopPageProps) {
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-600 text-xs text-center w-full max-w-xs">
         <div className="flex flex-col items-center gap-3">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
-          <span className="text-xs text-slate-500">START を押して始める</span>
+          <span className="text-xs text-slate-500">電子レンジのドラマが今始まる</span>
         </div>
       </div>
     </div>
