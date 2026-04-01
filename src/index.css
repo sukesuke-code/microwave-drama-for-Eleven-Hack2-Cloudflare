@@ -229,34 +229,29 @@
 
 @keyframes heroLightStepBlink {
   0%, 100% {
-    color: rgb(30 41 59 / 0.92);
+    color: var(--step-color-base, rgb(30 41 59 / 0.92));
     filter: brightness(1.02) saturate(1.04);
     text-shadow: none;
   }
   50% {
-    color: rgb(2 6 23 / 0.98);
+    color: var(--step-color-peak, rgb(2 6 23 / 0.98));
     filter: brightness(1.15) saturate(1.14);
     text-shadow: none;
   }
 }
 
 .hero-light-step-blink {
+  --step-color-base: rgb(30 41 59 / 0.92);
+  --step-color-peak: rgb(2 6 23 / 0.98);
   animation: heroLightStepBlink 2.4s ease-in-out infinite;
   will-change: color, filter;
 }
 
-@keyframes startButtonLightStep {
-  0%, 100% {
-    filter: brightness(1.08) saturate(1.08);
-  }
-  50% {
-    filter: brightness(1.2) saturate(1.18);
-  }
-}
-
 .start-button-light-step {
-  animation: startButtonLightStep 2.4s ease-in-out infinite;
-  will-change: filter;
+  --step-color-base: rgb(255 237 213 / 0.95);
+  --step-color-peak: rgb(255 255 255 / 1);
+  animation: heroLightStepBlink 2.4s ease-in-out infinite;
+  will-change: color, filter;
 }
 
 @keyframes heroSectionBlink {
