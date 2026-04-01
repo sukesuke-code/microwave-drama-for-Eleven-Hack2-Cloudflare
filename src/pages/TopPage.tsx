@@ -156,7 +156,7 @@ export default function TopPage({
           <span>{t.styleShort[3]}</span>
         </div>
 
-        <div className="mt-1 text-slate-600 text-xs text-center w-full max-w-xs">
+        <div className="mt-3 text-slate-600 text-xs text-center w-full max-w-xs">
           <div className="flex flex-col items-center gap-2">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
           <span className="text-xs text-slate-500">{t.startHint}</span>
