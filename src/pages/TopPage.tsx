@@ -127,6 +127,16 @@ export default function TopPage({
           {t.topTagline2}
         </p>
 
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+          <span>{t.styleShort[0]}</span>
+          <span className="text-slate-600">·</span>
+          <span>{t.styleShort[1]}</span>
+          <span className="text-slate-600">·</span>
+          <span>{t.styleShort[2]}</span>
+          <span className="text-slate-600">·</span>
+          <span>{t.styleShort[3]}</span>
+        </div>
+
         <button
           onClick={onStart}
           className="relative group w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden soft-glow-pulse"
@@ -145,16 +155,6 @@ export default function TopPage({
           />
           <div className="absolute inset-0 group-hover:animate-glow-pulse" />
         </button>
-
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
-          <span>{t.styleShort[0]}</span>
-          <span className="text-slate-600">·</span>
-          <span>{t.styleShort[1]}</span>
-          <span className="text-slate-600">·</span>
-          <span>{t.styleShort[2]}</span>
-          <span className="text-slate-600">·</span>
-          <span>{t.styleShort[3]}</span>
-        </div>
 
         <div className="mt-3 text-slate-600 text-xs text-center w-full max-w-xs">
           <div className="flex flex-col items-center gap-2">
