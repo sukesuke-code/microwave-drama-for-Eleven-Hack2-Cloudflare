@@ -160,3 +160,13 @@
   animation: softGlowPulse 3.8s ease-in-out infinite;
   will-change: opacity, filter, text-shadow;
 }
+
+@keyframes steadyBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.84; }
+}
+
+.steady-blink {
+  animation: steadyBlink 2.8s ease-in-out infinite;
+  will-change: opacity;
+}
