@@ -227,6 +227,38 @@
   --hero-copy-shadow-peak-3: 0 0 32px rgba(15, 23, 42, 0.12);
 }
 
+@keyframes heroLightStepBlink {
+  0%, 100% {
+    color: rgb(30 41 59 / 0.92);
+    filter: brightness(1.02) saturate(1.04);
+    text-shadow: none;
+  }
+  50% {
+    color: rgb(2 6 23 / 0.98);
+    filter: brightness(1.15) saturate(1.14);
+    text-shadow: none;
+  }
+}
+
+.hero-light-step-blink {
+  animation: heroLightStepBlink 2.4s ease-in-out infinite;
+  will-change: color, filter;
+}
+
+@keyframes startButtonLightStep {
+  0%, 100% {
+    filter: brightness(1.08) saturate(1.08);
+  }
+  50% {
+    filter: brightness(1.2) saturate(1.18);
+  }
+}
+
+.start-button-light-step {
+  animation: startButtonLightStep 2.4s ease-in-out infinite;
+  will-change: filter;
+}
+
 @keyframes heroSectionBlink {
   0%, 100% {
     color: rgb(148 163 184 / 0.9);

@@ -115,13 +115,13 @@ export default function TopPage({
         </div>
 
         <p
-          className={`hero-copy-blink ${isLight ? 'hero-copy-light' : ''} text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
+          className={`${isLight ? 'hero-light-step-blink' : 'hero-copy-blink'} text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
           style={{ animationDelay: '0.35s' }}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`hero-copy-blink ${isLight ? 'hero-copy-light' : ''} text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
+          className={`${isLight ? 'hero-light-step-blink' : 'hero-copy-blink'} text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
           style={{ animationDelay: '0.7s' }}
         >
           {t.topTagline2}
@@ -139,7 +139,7 @@ export default function TopPage({
 
         <button
           onClick={onStart}
-          className="relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden start-button-blink"
+          className={`relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden ${isLight ? 'start-button-light-step' : 'start-button-blink'}`}
           style={{
             background: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
             boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
