@@ -88,7 +88,7 @@ export default function TopPage({
         }}
       />
 
-      <div className="relative z-10 mt-36 md:mt-40 flex flex-col items-center px-6 max-w-2xl w-full">
+      <div className="relative z-10 mt-44 md:mt-48 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
             className="font-display steady-blink w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2"
@@ -139,14 +139,14 @@ export default function TopPage({
 
         <button
           onClick={onStart}
-          className="relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden soft-glow-pulse"
+          className="relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden steady-blink"
           style={{
             background: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
             boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
             animationDelay: '1.3s',
           }}
         >
-          <span className="relative z-10 soft-glow-pulse">{t.startButton}</span>
+          <span className="relative z-10">{t.startButton}</span>
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{
