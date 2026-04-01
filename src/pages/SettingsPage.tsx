@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
 
@@ -66,12 +66,19 @@ function clampDuration(value: number): number {
   return Math.max(1, Math.min(600, Math.floor(value)));
 }
 
-export default function SettingsPage({ locale, onBack, onStart }: SettingsPageProps) {
+export default function SettingsPage({
+  locale,
+  themeMode,
+  onThemeModeChange,
+  onBack,
+  onStart,
+}: SettingsPageProps) {
   const [duration, setDuration] = useState(60);
   const [dishName, setDishName] = useState(locale === 'ja' ? '冷凍チャーハン' : '');
   const [style, setStyle] = useState<NarrationStyle>('sports');
 
   const t = UI_TEXT[locale];
+  const isLight = themeMode === 'light';
 
   const { minutes, seconds } = useMemo(() => {
     const m = Math.floor(duration / 60);
@@ -98,18 +105,27 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
   };
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-gray-950 text-white">
+    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-gray-100 text-gray-900' : 'bg-gray-950 text-white'}`}>
       <div className="mx-auto flex h-full w-full max-w-md flex-col p-4">
-        <header className="mb-3 flex items-center gap-2">
+        <header className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className={`rounded-lg p-1 transition-colors ${isLight ? 'text-gray-700 hover:bg-gray-200' : 'text-white/80 hover:bg-white/10'}`}
+              aria-label="back"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <h1 className={`text-xl font-black ${isLight ? 'text-gray-900' : 'text-white'}`}>{t.settings}</h1>
+          </div>
           <button
             type="button"
-            onClick={onBack}
-            className="rounded-lg p-1 text-white/80 transition-colors hover:bg-white/10"
-            aria-label="back"
+            onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
+            className={`rounded-lg px-2 py-1 text-xs font-bold transition-colors ${isLight ? 'bg-gray-200 text-gray-700' : 'bg-gray-800 text-gray-200'}`}
           >
-            <ChevronLeft size={24} />
+            {isLight ? <Moon size={14} /> : <Sun size={14} />}
           </button>
-          <h1 className="text-xl font-black text-white">{t.settings}</h1>
         </header>
 
         <section className="mb-3 space-y-2">
@@ -124,7 +140,11 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   type="button"
                   onClick={() => setDuration(preset.seconds)}
                   className={`rounded-lg px-1 py-1.5 text-[10px] font-black leading-none transition-colors ${
-                    selected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    selected
+                      ? 'bg-orange-500 text-white'
+                      : isLight
+                        ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
                   {preset.label}
@@ -133,29 +153,29 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
             })}
           </div>
 
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-3">
+          <div className={`rounded-xl border p-3 ${isLight ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-900'}`}>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
               <div>
-                <p className="mb-1 text-xs text-gray-500">{t.minutes}</p>
+                <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.minutes}</p>
                 <input
                   type="number"
                   min={0}
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
-                  className="w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className={`w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
               <span className="text-3xl font-black text-orange-400">:</span>
               <div>
-                <p className="mb-1 text-xs text-gray-500">{t.seconds}</p>
+                <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.seconds}</p>
                 <input
                   type="number"
                   min={0}
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
-                  className="w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className={`w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
             </div>
@@ -171,7 +191,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
               onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
               className="h-2 w-full cursor-pointer accent-orange-500"
             />
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className={`flex justify-between text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
               <span>1{t.seconds}</span>
               <span>10{t.minutes}</span>
             </div>
@@ -186,7 +206,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
             onChange={(e) => setDishName(e.target.value)}
             maxLength={100}
             placeholder="e.g. Frozen fried rice, Bento..."
-            className="w-full rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500"
+            className={`w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
           />
         </section>
 
@@ -209,7 +229,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   {selected && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-orange-400" />}
                   <p className="mb-1 text-lg">{card.emoji}</p>
                   <p className="text-xs font-bold text-white">{card.title[locale]}</p>
-                  <p className="mt-1 text-[10px] text-gray-400">{card.description[locale]}</p>
+                  <p className="mt-1 text-[10px] text-gray-300">{card.description[locale]}</p>
                 </button>
               );
             })}
@@ -220,7 +240,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
           type="button"
           onClick={handleStart}
           disabled={duration < 1}
-          className="mt-auto w-full rounded-xl py-3 text-sm text-white font-black tracking-widest transition-opacity disabled:opacity-40"
+          className="mt-auto w-full rounded-xl py-3 text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40"
           style={{
             background: 'linear-gradient(135deg, #ea580c, #dc2626)',
             boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
