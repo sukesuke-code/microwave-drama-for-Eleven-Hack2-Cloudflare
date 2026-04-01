@@ -1,19 +1,29 @@
-import { RotateCcw, Share2, Trophy } from 'lucide-react';
-import { Locale, Settings } from '../types';
+import { Moon, RotateCcw, Share2, Sun, Trophy } from 'lucide-react';
+import { Locale, Settings, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
 import { RESULT_MESSAGES, UI_TEXT } from '../i18n';
 
 interface ResultPageProps {
   locale: Locale;
   settings: Settings;
+  themeMode: ThemeMode;
+  onThemeModeChange: (themeMode: ThemeMode) => void;
   onReplay: () => void;
   onHome: () => void;
 }
 
-export default function ResultPage({ locale, settings, onReplay, onHome }: ResultPageProps) {
+export default function ResultPage({
+  locale,
+  settings,
+  themeMode,
+  onThemeModeChange,
+  onReplay,
+  onHome,
+}: ResultPageProps) {
   const { dishName, style } = settings;
   const t = UI_TEXT[locale];
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
+  const isLight = themeMode === 'light';
 
   const handleShare = async () => {
     const text = locale === 'ja'
@@ -31,8 +41,24 @@ export default function ResultPage({ locale, settings, onReplay, onHome }: Resul
 
   return (
     <div
-      className={`min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${styleConfig.bgGradient} bg-[#00031a]`}
+      className={`min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
+        isLight ? 'from-slate-50 via-orange-50/70 to-slate-100' : `${styleConfig.bgGradient} bg-[#00031a]`
+      }`}
     >
+      <div className="absolute right-4 top-4 z-30">
+        <button
+          onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
+          className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
+            isLight
+              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+              : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
+          }`}
+          aria-label="Dark mode switcher"
+        >
+          {isLight ? <Moon size={14} /> : <Sun size={14} />}
+          {isLight ? 'Dark' : 'Light'}
+        </button>
+      </div>
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -55,7 +81,7 @@ export default function ResultPage({ locale, settings, onReplay, onHome }: Resul
           />
         </div>
 
-        <h1 className="font-display text-4xl font-bold text-white mb-2 animate-fade-up">
+        <h1 className={`font-display text-4xl font-bold mb-2 animate-fade-up ${isLight ? 'text-slate-900' : 'text-white'}`}>
           {t.dramaDone}
         </h1>
 
@@ -69,7 +95,7 @@ export default function ResultPage({ locale, settings, onReplay, onHome }: Resul
           {dishName}
         </p>
 
-        <p className="text-slate-400 text-sm mb-2 animate-fade-up" style={{ animationDelay: '0.15s' }}>
+        <p className={`text-sm mb-2 animate-fade-up ${isLight ? 'text-slate-500' : 'text-slate-400'}`} style={{ animationDelay: '0.15s' }}>
           {styleConfig.emoji} {styleConfig.label}
         </p>
 
@@ -104,7 +130,11 @@ export default function ResultPage({ locale, settings, onReplay, onHome }: Resul
 
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-bold text-slate-300 text-base bg-white/5 border border-white/10 transition-all hover:bg-white/8 active:scale-95"
+            className={`flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-bold text-base border transition-all active:scale-95 ${
+              isLight
+                ? 'text-slate-700 bg-white border-slate-200 hover:bg-slate-100'
+                : 'text-slate-300 bg-white/5 border-white/10 hover:bg-white/8'
+            }`}
           >
             <Share2 size={18} />
             {t.share}
@@ -112,7 +142,7 @@ export default function ResultPage({ locale, settings, onReplay, onHome }: Resul
 
           <button
             onClick={onHome}
-            className="text-slate-500 text-sm py-2 hover:text-slate-400 transition-colors"
+            className={`text-sm py-2 transition-colors ${isLight ? 'text-slate-600 hover:text-slate-700' : 'text-slate-500 hover:text-slate-400'}`}
           >
             {t.backTop}
           </button>

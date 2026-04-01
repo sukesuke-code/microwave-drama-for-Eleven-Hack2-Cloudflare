@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Locale, Settings } from '../types';
+import { Moon, Sun } from 'lucide-react';
+import { Locale, Settings, ThemeMode } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
@@ -12,10 +13,18 @@ import { UI_TEXT } from '../i18n';
 interface CountdownPageProps {
   locale: Locale;
   settings: Settings;
+  themeMode: ThemeMode;
+  onThemeModeChange: (themeMode: ThemeMode) => void;
   onFinish: () => void;
 }
 
-export default function CountdownPage({ locale, settings, onFinish }: CountdownPageProps) {
+export default function CountdownPage({
+  locale,
+  settings,
+  themeMode,
+  onThemeModeChange,
+  onFinish,
+}: CountdownPageProps) {
   const { totalSeconds, dishName, style } = settings;
   const t = UI_TEXT[locale];
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
@@ -29,6 +38,7 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
+  const isLight = themeMode === 'light';
 
   const updateNarration = useCallback((tl: number, tt: number) => {
     if (tl <= 0) return;
@@ -77,7 +87,7 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
 
   return (
     <div
-      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${styleConfig.bgGradient}`}
+      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? 'from-slate-50 via-orange-50/80 to-slate-100' : styleConfig.bgGradient}`}
     >
       <BackgroundEffect style={style} isDanger={isDanger} />
       <FlashOverlay visible={isFlashing} />
@@ -94,9 +104,9 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
       )}
 
       <div className="relative z-20 flex flex-col min-h-screen">
-        <div className="flex items-center justify-between px-4 pt-safe pt-4 pb-3 border-b border-white/5">
+        <div className={`flex items-center justify-between px-4 pt-safe pt-4 pb-3 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
           <div className="flex flex-col">
-            <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
+            <span className={`text-xs uppercase tracking-widest font-bold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               {styleConfig.emoji} {styleConfig.label}
             </span>
             <span
@@ -109,9 +119,28 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
 
           <button
             onClick={() => setIsPaused((p) => !p)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs font-bold text-slate-400"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-bold ${
+              isLight
+                ? 'bg-slate-200/90 hover:bg-slate-300 text-slate-700'
+                : 'bg-white/5 hover:bg-white/10 text-slate-400'
+            }`}
           >
             {isPaused ? t.resume : t.pause}
+          </button>
+        </div>
+
+        <div className="absolute right-4 top-4 z-30">
+          <button
+            onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
+            className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
+              isLight
+                ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
+            }`}
+            aria-label="Dark mode switcher"
+          >
+            {isLight ? <Moon size={14} /> : <Sun size={14} />}
+            {isLight ? 'Dark' : 'Light'}
           </button>
         </div>
 
@@ -126,7 +155,7 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
             />
 
             <div className="w-full max-w-xs mt-2">
-              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+              <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
                 <div
                   className="h-full rounded-full transition-all duration-1000"
                   style={{
@@ -174,7 +203,7 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
         </div>
 
         <div className="px-4 pb-6 text-center">
-          <p className="text-xs text-slate-600">
+          <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-600'}`}>
             {totalSeconds - timeLeft} {t.elapsed} / {totalSeconds} {t.seconds}
           </p>
         </div>
