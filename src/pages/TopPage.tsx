@@ -139,7 +139,7 @@ export default function TopPage({
 
         <button
           onClick={onStart}
-          className="relative group my-3 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden soft-glow-pulse"
+          className="relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden soft-glow-pulse"
           style={{
             background: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
             boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
