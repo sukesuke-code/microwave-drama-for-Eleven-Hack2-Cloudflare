@@ -201,10 +201,23 @@
   will-change: opacity, filter;
 }
 
+@keyframes startButtonBlinkMobile {
+  0%, 100% {
+    filter: brightness(1.06) saturate(1.08);
+    box-shadow: 0 0 28px rgba(249, 115, 22, 0.45), 0 0 52px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.22);
+    box-shadow: 0 0 36px rgba(249, 115, 22, 0.62), 0 0 70px rgba(249, 115, 22, 0.28);
+  }
+}
+
 @media (max-width: 640px) {
   .start-button-blink {
-    animation: none;
-    filter: brightness(1.1) saturate(1.1);
+    animation: startButtonBlinkMobile 2.8s ease-in-out infinite;
+    opacity: 1;
+    backface-visibility: hidden;
+    transform: translateZ(0);
   }
 }
 
