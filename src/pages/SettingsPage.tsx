@@ -199,13 +199,13 @@ export default function SettingsPage({
         </section>
 
         <section className="mb-3 space-y-2">
-          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">DISH NAME (OPTIONAL)</p>
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.optionalDish}</p>
           <input
             type="text"
             value={dishName}
             onChange={(e) => setDishName(e.target.value)}
             maxLength={100}
-            placeholder="e.g. Frozen fried rice, Bento..."
+            placeholder={locale === 'ja' ? '例: 冷凍チャーハン、お弁当...' : 'e.g. Frozen fried rice, Bento...'}
             className={`w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
           />
         </section>
