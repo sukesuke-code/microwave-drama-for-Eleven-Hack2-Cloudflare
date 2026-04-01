@@ -29,7 +29,7 @@ export default function ResultPage({
   const handleShare = async () => {
     const text = locale === 'ja'
       ? `チンドラマで「${dishName}」を完璧に温め直した！\n\n#チンドラマ #ChingDrama #電子レンジ`
-      : `I reheated "${dishName}" perfectly with Ching Drama!\n\n#ChingDrama #Microwave`;
+      : `I reheated "${dishName}" perfectly with Ching Show!\n\n#ChingShow #Microwave`;
     if (navigator.share) {
       await navigator.share({ text }).catch(() => null);
     } else {
