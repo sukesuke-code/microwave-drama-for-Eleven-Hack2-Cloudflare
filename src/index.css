@@ -245,25 +245,65 @@
 
 @keyframes completeOrbPulse {
   0%, 100% {
-    transform: scale(0.9);
-    background: radial-gradient(circle at 30% 30%, var(--orb-accent-strong), var(--orb-accent-soft) 68%);
+    transform: scale(0.94);
+    background: radial-gradient(
+      circle at 32% 30%,
+      rgba(255, 255, 255, 0.18) 0%,
+      var(--orb-accent-strong) 24%,
+      var(--orb-accent-base) 52%,
+      var(--orb-accent-soft) 100%
+    );
     box-shadow:
       0 0 20px var(--orb-accent-base),
       0 0 50px var(--orb-accent-soft),
       inset 0 0 14px rgba(255, 255, 255, 0.22);
   }
-  45% {
-    transform: scale(1.08);
-    background: radial-gradient(circle at 68% 32%, rgba(255, 255, 255, 0.55), var(--orb-accent-strong) 45%, var(--orb-accent-soft) 100%);
+  25% {
+    transform: scale(1);
+    background: radial-gradient(
+      circle at 44% 30%,
+      rgba(255, 255, 255, 0.24) 0%,
+      var(--orb-accent-strong) 30%,
+      var(--orb-accent-base) 58%,
+      var(--orb-accent-soft) 100%
+    );
+    box-shadow:
+      0 0 24px var(--orb-accent-base),
+      0 0 58px var(--orb-accent-soft),
+      inset 0 0 16px rgba(255, 255, 255, 0.24);
+  }
+  50% {
+    transform: scale(1.06);
+    background: radial-gradient(
+      circle at 60% 32%,
+      rgba(255, 255, 255, 0.35) 0%,
+      var(--orb-accent-strong) 34%,
+      var(--orb-accent-base) 62%,
+      var(--orb-accent-soft) 100%
+    );
     box-shadow:
       0 0 30px var(--orb-accent-strong),
       0 0 75px var(--orb-accent-base),
       inset 0 0 20px rgba(255, 255, 255, 0.28);
   }
+  75% {
+    transform: scale(1);
+    background: radial-gradient(
+      circle at 48% 34%,
+      rgba(255, 255, 255, 0.24) 0%,
+      var(--orb-accent-strong) 30%,
+      var(--orb-accent-base) 58%,
+      var(--orb-accent-soft) 100%
+    );
+    box-shadow:
+      0 0 24px var(--orb-accent-base),
+      0 0 58px var(--orb-accent-soft),
+      inset 0 0 16px rgba(255, 255, 255, 0.24);
+  }
 }
 
 .result-complete-orb {
-  animation: completeOrbPulse 2.8s ease-in-out infinite;
+  animation: completeOrbPulse 3.6s cubic-bezier(0.42, 0, 0.2, 1) infinite;
   will-change: transform, background, box-shadow;
 }
 
