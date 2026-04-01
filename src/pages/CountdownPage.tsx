@@ -116,17 +116,6 @@ export default function CountdownPage({
               {dishName}
             </span>
           </div>
-
-          <button
-            onClick={() => setIsPaused((p) => !p)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-bold ${
-              isLight
-                ? 'bg-slate-200/90 hover:bg-slate-300 text-slate-700'
-                : 'bg-white/5 hover:bg-white/10 text-slate-400'
-            }`}
-          >
-            {isPaused ? t.resume : t.pause}
-          </button>
         </div>
 
         <div className="absolute right-4 top-4 z-30">
@@ -203,6 +192,16 @@ export default function CountdownPage({
         </div>
 
         <div className="px-4 pb-6 text-center">
+          <button
+            onClick={() => setIsPaused((p) => !p)}
+            className={`mb-2 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+              isLight
+                ? 'bg-slate-200/90 text-slate-700 hover:bg-slate-300'
+                : 'bg-white/5 text-slate-400 hover:bg-white/10'
+            }`}
+          >
+            {isPaused ? t.resume : t.pause}
+          </button>
           <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-600'}`}>
             {totalSeconds - timeLeft} {t.elapsed} / {totalSeconds} {t.seconds}
           </p>
