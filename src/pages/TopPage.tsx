@@ -91,14 +91,18 @@ export default function TopPage({
       <div className="relative z-10 mt-60 md:mt-64 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
-            className={`font-display ${isLight ? 'hero-light-step-blink' : 'hero-blink'} w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2`}
+            className={`font-display ${isLight ? 'hero-blink hero-blink-light' : 'hero-blink'} w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2`}
             style={{
-              background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
+              background: isLight
+                ? 'linear-gradient(135deg, #fb923c 0%, #f97316 45%, #facc15 100%)'
+                : 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-              textShadow: '0 0 14px rgba(249,115,22,0.45)',
-              filter: 'drop-shadow(0 0 16px rgba(249,115,22,0.45))',
+              textShadow: isLight ? '0 0 10px rgba(251,146,60,0.4)' : '0 0 14px rgba(249,115,22,0.45)',
+              filter: isLight
+                ? 'drop-shadow(0 0 12px rgba(251,146,60,0.35))'
+                : 'drop-shadow(0 0 16px rgba(249,115,22,0.45))',
             }}
           >
             <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
@@ -115,19 +119,19 @@ export default function TopPage({
         </div>
 
         <p
-          className={`${isLight ? 'hero-light-step-blink' : 'hero-copy-blink'} text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
+          className={`${isLight ? 'hero-copy-blink hero-copy-light' : 'hero-copy-blink'} text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
           style={{ animationDelay: '0.35s' }}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`${isLight ? 'hero-light-step-blink' : 'hero-copy-blink'} text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
+          className={`${isLight ? 'hero-copy-blink hero-copy-light' : 'hero-copy-blink'} text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
           style={{ animationDelay: '0.7s' }}
         >
           {t.topTagline2}
         </p>
 
-        <div className="hero-section-blink mb-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+        <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} mb-4 flex flex-wrap items-center justify-center gap-2 text-xs`}>
           <span>{t.styleShort[0]}</span>
           <span className="text-slate-600">·</span>
           <span>{t.styleShort[1]}</span>
@@ -139,10 +143,14 @@ export default function TopPage({
 
         <button
           onClick={onStart}
-          className={`relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden ${isLight ? 'start-button-light-step' : 'start-button-blink'}`}
+          className={`relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden ${isLight ? 'start-button-blink start-button-blink-light' : 'start-button-blink'}`}
           style={{
-            background: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
-            boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
+            background: isLight
+              ? 'linear-gradient(135deg, #fb923c, #f97316, #facc15)'
+              : 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
+            boxShadow: isLight
+              ? '0 0 30px rgba(251,146,60,0.45), 0 0 60px rgba(250,204,21,0.18)'
+              : '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
             animationDelay: '1.3s',
           }}
         >
@@ -156,7 +164,7 @@ export default function TopPage({
           <div className="absolute inset-0 group-hover:animate-glow-pulse" />
         </button>
 
-        <div className="hero-section-blink mt-3 text-xs text-center w-full max-w-xs">
+        <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} mt-3 text-xs text-center w-full max-w-xs`}>
           <div className="flex flex-col items-center gap-2">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
           <span className="text-xs">{t.startHint}</span>
