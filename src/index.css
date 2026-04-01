@@ -164,51 +164,67 @@
 @keyframes heroBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.18) saturate(1.22);
+    filter: brightness(1.24) saturate(1.26);
+    text-shadow:
+      0 0 10px rgba(255, 255, 255, 0.35),
+      0 0 24px rgba(249, 115, 22, 0.62),
+      0 0 44px rgba(249, 115, 22, 0.5);
   }
   50% {
     opacity: 1;
-    filter: brightness(1.35) saturate(1.4);
+    filter: brightness(1.5) saturate(1.46);
+    text-shadow:
+      0 0 18px rgba(255, 255, 255, 0.58),
+      0 0 36px rgba(249, 115, 22, 0.86),
+      0 0 68px rgba(249, 115, 22, 0.7);
   }
 }
 
 .hero-blink {
   animation: heroBlink 2.4s ease-in-out infinite;
-  will-change: filter;
+  will-change: filter, text-shadow;
 }
 
 @keyframes heroCopyBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.02) saturate(1.04);
-    color: rgb(226 232 240 / 0.84);
+    filter: brightness(1.06) saturate(1.08);
+    color: rgb(226 232 240 / 0.9);
+    text-shadow: 0 0 8px rgba(249, 115, 22, 0.22);
   }
   50% {
     opacity: 1;
-    filter: brightness(1.1) saturate(1.14);
+    filter: brightness(1.2) saturate(1.22);
     color: rgb(254 215 170 / 0.98);
+    text-shadow:
+      0 0 14px rgba(255, 255, 255, 0.36),
+      0 0 24px rgba(249, 115, 22, 0.5);
   }
 }
 
 .hero-copy-blink {
   animation: heroCopyBlink 2.5s ease-in-out infinite;
-  will-change: color, filter;
+  will-change: color, filter, text-shadow;
 }
 
 @keyframes heroSectionBlink {
   0%, 100% {
     color: rgb(148 163 184 / 0.9);
-    filter: brightness(1) saturate(1);
+    filter: brightness(1.02) saturate(1.04);
+    text-shadow: 0 0 6px rgba(249, 115, 22, 0.18);
   }
   50% {
     color: rgb(251 146 60 / 0.95);
-    filter: brightness(1.08) saturate(1.12);
+    filter: brightness(1.18) saturate(1.22);
+    text-shadow:
+      0 0 12px rgba(255, 255, 255, 0.3),
+      0 0 20px rgba(249, 115, 22, 0.4);
   }
 }
 
 .hero-section-blink {
   animation: heroSectionBlink 2.5s ease-in-out infinite;
-  will-change: color, filter;
+  will-change: color, filter, text-shadow;
 }
 
 @keyframes heroBlinkMobile {
@@ -242,11 +258,13 @@
 @keyframes startButtonBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.08) saturate(1.08);
+    filter: brightness(1.1) saturate(1.1);
+    box-shadow: 0 0 30px rgba(249, 115, 22, 0.5), 0 0 60px rgba(249, 115, 22, 0.2);
   }
   50% {
-    opacity: 0.96;
-    filter: brightness(1.2) saturate(1.18);
+    opacity: 1;
+    filter: brightness(1.26) saturate(1.24);
+    box-shadow: 0 0 42px rgba(249, 115, 22, 0.72), 0 0 88px rgba(249, 115, 22, 0.36);
   }
 }
 
