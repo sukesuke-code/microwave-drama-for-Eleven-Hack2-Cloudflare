@@ -89,9 +89,10 @@ export default function TopPage({
       />
 
       <div className="relative z-10 mt-60 md:mt-64 flex flex-col items-center px-6 max-w-2xl w-full">
+        <div className="hero-background-blink pointer-events-none absolute -inset-x-6 -inset-y-10 -z-10 rounded-[2.5rem]" />
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
-            className="font-display hero-blink w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2"
+            className="font-display w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2"
             style={{
               background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
               WebkitBackgroundClip: 'text',
@@ -115,14 +116,12 @@ export default function TopPage({
         </div>
 
         <p
-          className={`hero-copy-blink text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
-          style={{ animationDelay: '0.35s' }}
+          className={`text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`hero-copy-blink text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
-          style={{ animationDelay: '0.7s' }}
+          className={`text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
         >
           {t.topTagline2}
         </p>
@@ -139,11 +138,10 @@ export default function TopPage({
 
         <button
           onClick={onStart}
-          className="relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden start-button-blink"
+          className="relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
             boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
-            animationDelay: '1.3s',
           }}
         >
           <span className="relative z-10">{t.startButton}</span>
