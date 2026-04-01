@@ -126,8 +126,9 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <section className="mb-3 space-y-2">
-          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
+        <div className="flex flex-1 flex-col justify-between gap-3">
+          <section className="space-y-2">
+            <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
           <div className="grid grid-cols-5 gap-1">
             {QUICK_PRESETS.map((preset) => {
@@ -194,58 +195,59 @@ export default function SettingsPage({
               <span>10{t.minutes}</span>
             </div>
           </div>
-        </section>
+          </section>
 
-        <section className="mb-3 space-y-2">
-          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.optionalDish}</p>
-          <input
-            type="text"
-            value={dishName}
-            onChange={(e) => setDishName(e.target.value)}
-            maxLength={100}
-            placeholder={locale === 'ja' ? '例: 冷凍チャーハン、お弁当...' : 'e.g. Frozen fried rice, Bento...'}
-            className={`w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
-          />
-        </section>
+          <section className="space-y-2">
+            <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.optionalDish}</p>
+            <input
+              type="text"
+              value={dishName}
+              onChange={(e) => setDishName(e.target.value)}
+              maxLength={100}
+              placeholder={locale === 'ja' ? '例: 冷凍チャーハン、お弁当...' : 'e.g. Frozen fried rice, Bento...'}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
+            />
+          </section>
 
-        <section className="mb-3 flex-1 space-y-2">
-          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
-          <div className="grid h-full max-h-[34vh] grid-cols-2 gap-2">
-            {STYLE_CARDS.map((card) => {
-              const selected = style === card.id;
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => setStyle(card.id)}
-                  className={`relative rounded-xl border bg-gradient-to-br p-3 text-left transition-all ${card.gradient} ${card.border} ${
-                    selected
-                      ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
-                      : 'opacity-70 hover:opacity-90'
-                  }`}
-                >
-                  {selected && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-orange-400" />}
-                  <p className="mb-1 text-lg">{card.emoji}</p>
-                  <p className="text-xs font-bold text-white">{card.title[locale]}</p>
-                  <p className="mt-1 text-[10px] text-gray-300">{card.description[locale]}</p>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+          <section className="space-y-2">
+            <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
+            <div className="grid h-full max-h-[34vh] grid-cols-2 gap-2">
+              {STYLE_CARDS.map((card) => {
+                const selected = style === card.id;
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => setStyle(card.id)}
+                    className={`relative rounded-xl border bg-gradient-to-br p-3 text-left transition-all ${card.gradient} ${card.border} ${
+                      selected
+                        ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
+                        : 'opacity-70 hover:opacity-90'
+                    }`}
+                  >
+                    {selected && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-orange-400" />}
+                    <p className="mb-1 text-lg">{card.emoji}</p>
+                    <p className="text-xs font-bold text-white">{card.title[locale]}</p>
+                    <p className="mt-1 text-[10px] text-gray-300">{card.description[locale]}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-        <button
-          type="button"
-          onClick={handleStart}
-          disabled={duration < 1}
-          className="mt-auto w-full rounded-xl py-3 text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40"
-          style={{
-            background: 'linear-gradient(135deg, #ea580c, #dc2626)',
-            boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
-          }}
-        >
-          {t.startNarration}
-        </button>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={duration < 1}
+            className="w-full rounded-xl py-3 text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40"
+            style={{
+              background: 'linear-gradient(135deg, #ea580c, #dc2626)',
+              boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
+            }}
+          >
+            {t.startNarration}
+          </button>
+        </div>
       </div>
     </div>
   );
