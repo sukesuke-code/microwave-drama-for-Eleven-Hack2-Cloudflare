@@ -104,8 +104,8 @@ export default function CountdownPage({
       )}
 
       <div className="relative z-20 flex flex-col min-h-screen">
-        <div className={`flex items-center justify-between px-4 pt-safe pt-4 pb-3 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
-          <div className="flex flex-col">
+        <div className={`flex items-center justify-center px-4 pt-safe pt-4 pb-3 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
+          <div className="flex flex-col items-center text-center">
             <span className={`text-xs uppercase tracking-widest font-bold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               {styleConfig.emoji} {styleConfig.label}
             </span>
