@@ -71,15 +71,14 @@ export default function ResultPage({
       <div className="absolute right-4 top-4 z-30">
         <button
           onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-          className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
+          className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${
             isLight
               ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
               : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
           }`}
-          aria-label="Dark mode switcher"
+          aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
         >
-          {isLight ? <Moon size={14} /> : <Sun size={14} />}
-          {isLight ? 'Dark' : 'Light'}
+          {isLight ? <Moon size={16} /> : <Sun size={16} />}
         </button>
       </div>
       <div
