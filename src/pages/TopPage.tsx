@@ -89,28 +89,30 @@ export default function TopPage({
       />
 
       <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full">
-        <h1
-          className="font-display text-5xl md:text-6xl font-bold text-center mb-2 tracking-tight whitespace-nowrap soft-glow-pulse inline-flex items-center gap-2"
-          style={{
-            background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textShadow: 'none',
-            filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
-          }}
-        >
-          <Zap size={34} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
-          <span>{t.topTitle}</span>
-          <Zap size={34} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
-        </h1>
+        <div className="inline-flex flex-col items-stretch mb-8">
+          <h1
+            className="font-display text-5xl md:text-6xl font-bold text-center mb-2 tracking-tight whitespace-nowrap soft-glow-pulse inline-flex items-center gap-2"
+            style={{
+              background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              textShadow: 'none',
+              filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
+            }}
+          >
+            <Zap size={44} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
+            <span>{t.topTitle}</span>
+            <Zap size={44} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
+          </h1>
 
-        <div
-          className="h-px w-24 mb-8"
-          style={{
-            background: 'linear-gradient(90deg, transparent, #f97316, transparent)',
-          }}
-        />
+          <div
+            className="h-px w-full"
+            style={{
+              background: 'linear-gradient(90deg, transparent, #f97316, transparent)',
+            }}
+          />
+        </div>
 
         <p
           className={`text-center text-base leading-relaxed mb-2 font-medium soft-glow-pulse ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
