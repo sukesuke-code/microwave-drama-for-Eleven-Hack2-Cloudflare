@@ -91,7 +91,7 @@ export default function TopPage({
       <div className="relative z-10 mt-20 md:mt-24 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
-            className="font-display w-full max-w-full text-[clamp(2.4rem,11.5vw,5.1rem)] md:text-[clamp(4.2rem,8.8vw,6.5rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2"
+            className="font-display w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2"
             style={{
               background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
               WebkitBackgroundClip: 'text',
@@ -101,9 +101,9 @@ export default function TopPage({
               filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
             }}
           >
-            <Zap className="text-orange-300/90 h-12 w-12 md:h-[4.5rem] md:w-[4.5rem] lg:h-[5.5rem] lg:w-[5.5rem] shrink-0" strokeWidth={1.8} fill="none" />
+            <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
             <span>{t.topTitle}</span>
-            <Zap className="text-orange-300/90 h-12 w-12 md:h-[4.5rem] md:w-[4.5rem] lg:h-[5.5rem] lg:w-[5.5rem] shrink-0" strokeWidth={1.8} fill="none" />
+            <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
           </h1>
 
           <div
