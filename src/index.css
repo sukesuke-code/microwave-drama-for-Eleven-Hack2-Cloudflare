@@ -243,6 +243,30 @@
   will-change: filter, text-shadow;
 }
 
+@keyframes completeOrbPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    background: radial-gradient(circle at 30% 30%, var(--orb-accent-strong), var(--orb-accent-soft) 68%);
+    box-shadow:
+      0 0 20px var(--orb-accent-base),
+      0 0 50px var(--orb-accent-soft),
+      inset 0 0 14px rgba(255, 255, 255, 0.22);
+  }
+  45% {
+    transform: scale(1.08);
+    background: radial-gradient(circle at 68% 32%, rgba(255, 255, 255, 0.55), var(--orb-accent-strong) 45%, var(--orb-accent-soft) 100%);
+    box-shadow:
+      0 0 30px var(--orb-accent-strong),
+      0 0 75px var(--orb-accent-base),
+      inset 0 0 20px rgba(255, 255, 255, 0.28);
+  }
+}
+
+.result-complete-orb {
+  animation: completeOrbPulse 2.8s ease-in-out infinite;
+  will-change: transform, background, box-shadow;
+}
+
 @keyframes heroCopyBlink {
   0%, 100% {
     opacity: 1;

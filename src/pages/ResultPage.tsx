@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { Moon, RotateCcw, Share2, Sun, Trophy } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
@@ -13,6 +13,20 @@ interface ResultPageProps {
   onHome: () => void;
 }
 
+function hexToRgba(hexColor: string, alpha: number): string {
+  const normalized = hexColor.replace('#', '');
+  const isShort = normalized.length === 3;
+  const hex = isShort
+    ? normalized.split('').map((char) => `${char}${char}`).join('')
+    : normalized;
+
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function ResultPage({
   locale,
   settings,
@@ -25,6 +39,11 @@ export default function ResultPage({
   const t = UI_TEXT[locale];
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isLight = themeMode === 'light';
+  const orbStyle = {
+    '--orb-accent-soft': hexToRgba(styleConfig.accentColor, 0.2),
+    '--orb-accent-base': hexToRgba(styleConfig.accentColor, 0.45),
+    '--orb-accent-strong': hexToRgba(styleConfig.accentColor, 0.85),
+  } as CSSProperties;
 
   const handleShare = async () => {
     const text = locale === 'ja'
@@ -72,11 +91,10 @@ export default function ResultPage({
 
       <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full text-center">
         <div
-          className="w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-scale-in"
+          className="result-complete-orb w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-scale-in"
           style={{
-            background: `linear-gradient(135deg, ${styleConfig.accentColor}30, ${styleConfig.accentColor}10)`,
             border: `2px solid ${styleConfig.accentColor}40`,
-            boxShadow: `0 0 40px ${styleConfig.accentColor}30`,
+            ...orbStyle,
           }}
         >
           <Trophy
