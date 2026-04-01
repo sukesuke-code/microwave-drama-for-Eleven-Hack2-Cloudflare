@@ -85,6 +85,7 @@ export default function App() {
             settings={settings}
             themeMode={themeMode}
             onThemeModeChange={setThemeMode}
+            onBack={() => setScreen('settings')}
             onFinish={handleFinish}
           />
         )}
