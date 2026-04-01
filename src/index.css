@@ -164,19 +164,19 @@
 @keyframes heroBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.24) saturate(1.26);
+    filter: brightness(1.1) saturate(1.1);
     text-shadow:
-      0 0 10px rgba(255, 255, 255, 0.35),
-      0 0 24px rgba(249, 115, 22, 0.62),
-      0 0 44px rgba(249, 115, 22, 0.5);
+      0 0 10px rgba(255, 255, 255, 0.32),
+      0 0 22px rgba(249, 115, 22, 0.5),
+      0 0 44px rgba(249, 115, 22, 0.24);
   }
   50% {
     opacity: 1;
-    filter: brightness(1.5) saturate(1.46);
+    filter: brightness(1.26) saturate(1.24);
     text-shadow:
-      0 0 18px rgba(255, 255, 255, 0.58),
-      0 0 36px rgba(249, 115, 22, 0.86),
-      0 0 68px rgba(249, 115, 22, 0.7);
+      0 0 16px rgba(255, 255, 255, 0.56),
+      0 0 34px rgba(249, 115, 22, 0.72),
+      0 0 66px rgba(249, 115, 22, 0.36);
   }
 }
 
@@ -188,17 +188,20 @@
 @keyframes heroCopyBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.06) saturate(1.08);
+    filter: brightness(1.1) saturate(1.1);
     color: rgb(226 232 240 / 0.9);
-    text-shadow: 0 0 8px rgba(249, 115, 22, 0.22);
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.24),
+      0 0 18px rgba(249, 115, 22, 0.26);
   }
   50% {
     opacity: 1;
-    filter: brightness(1.2) saturate(1.22);
+    filter: brightness(1.26) saturate(1.24);
     color: rgb(254 215 170 / 0.98);
     text-shadow:
-      0 0 14px rgba(255, 255, 255, 0.36),
-      0 0 24px rgba(249, 115, 22, 0.5);
+      0 0 14px rgba(255, 255, 255, 0.44),
+      0 0 30px rgba(249, 115, 22, 0.5),
+      0 0 52px rgba(249, 115, 22, 0.26);
   }
 }
 
@@ -210,15 +213,18 @@
 @keyframes heroSectionBlink {
   0%, 100% {
     color: rgb(148 163 184 / 0.9);
-    filter: brightness(1.02) saturate(1.04);
-    text-shadow: 0 0 6px rgba(249, 115, 22, 0.18);
+    filter: brightness(1.1) saturate(1.1);
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.2),
+      0 0 16px rgba(249, 115, 22, 0.24);
   }
   50% {
     color: rgb(251 146 60 / 0.95);
-    filter: brightness(1.18) saturate(1.22);
+    filter: brightness(1.26) saturate(1.24);
     text-shadow:
-      0 0 12px rgba(255, 255, 255, 0.3),
-      0 0 20px rgba(249, 115, 22, 0.4);
+      0 0 14px rgba(255, 255, 255, 0.4),
+      0 0 28px rgba(249, 115, 22, 0.44),
+      0 0 48px rgba(249, 115, 22, 0.22);
   }
 }
 
