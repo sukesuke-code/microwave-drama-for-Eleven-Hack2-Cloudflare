@@ -140,15 +140,23 @@
 @keyframes softGlowPulse {
   0%, 100% {
     opacity: 1;
-    filter: blur(0px);
+    filter: brightness(1.05) saturate(1.08);
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.28),
+      0 0 18px rgba(249, 115, 22, 0.45),
+      0 0 32px rgba(249, 115, 22, 0.35);
   }
   50% {
-    opacity: 0.75;
-    filter: blur(1.4px);
+    opacity: 0.9;
+    filter: brightness(1.35) saturate(1.28);
+    text-shadow:
+      0 0 14px rgba(255, 255, 255, 0.5),
+      0 0 28px rgba(249, 115, 22, 0.72),
+      0 0 52px rgba(249, 115, 22, 0.58);
   }
 }
 
 .soft-glow-pulse {
   animation: softGlowPulse 3.8s ease-in-out infinite;
-  will-change: opacity, filter;
+  will-change: opacity, filter, text-shadow;
 }
