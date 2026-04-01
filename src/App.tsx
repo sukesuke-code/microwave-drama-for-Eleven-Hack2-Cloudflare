@@ -12,12 +12,19 @@ export default function App() {
     const saved = localStorage.getItem('ching-drama-locale');
     return saved === 'en' || saved === 'ja' ? saved : 'ja';
   });
-  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem('ching-drama-theme');
+    return saved === 'light' || saved === 'dark' ? saved : 'dark';
+  });
 
   useEffect(() => {
     localStorage.setItem('ching-drama-locale', locale);
     document.documentElement.lang = locale;
   }, [locale]);
+
+  useEffect(() => {
+    localStorage.setItem('ching-drama-theme', themeMode);
+  }, [themeMode]);
 
   const handleStartSettings = () => setScreen('settings');
 
@@ -48,6 +55,8 @@ export default function App() {
       {screen === 'settings' && (
         <SettingsPage
           locale={locale}
+          themeMode={themeMode}
+          onThemeModeChange={setThemeMode}
           onBack={() => setScreen('top')}
           onStart={handleStartCountdown}
         />
@@ -56,6 +65,8 @@ export default function App() {
         <CountdownPage
           locale={locale}
           settings={settings}
+          themeMode={themeMode}
+          onThemeModeChange={setThemeMode}
           onFinish={handleFinish}
         />
       )}
@@ -63,6 +74,8 @@ export default function App() {
         <ResultPage
           locale={locale}
           settings={settings}
+          themeMode={themeMode}
+          onThemeModeChange={setThemeMode}
           onReplay={handleReplay}
           onHome={handleHome}
         />

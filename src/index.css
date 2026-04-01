@@ -133,6 +133,21 @@
   }
 }
 
+.eq-bar-classic {
+  animation: eqBarClassic 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes eqBarClassic {
+  0%, 100% {
+    height: var(--eq-min-height, 8px);
+    opacity: var(--eq-opacity-min, 0.45);
+  }
+  50% {
+    height: var(--eq-max-height, 30px);
+    opacity: var(--eq-opacity-max, 0.88);
+  }
+}
+
 .animate-eq-bar {
   animation: eqBar 0.9s ease-in-out infinite alternate;
 }
@@ -252,13 +267,13 @@
 }
 
 .hero-copy-light {
-  --hero-copy-color-base: rgb(15 23 42 / 0.9);
-  --hero-copy-color-peak: rgb(2 6 23 / 0.98);
-  --hero-copy-shadow-base-1: 0 0 7px rgba(15, 23, 42, 0.14);
-  --hero-copy-shadow-base-2: 0 0 14px rgba(15, 23, 42, 0.1);
-  --hero-copy-shadow-peak-1: 0 0 10px rgba(15, 23, 42, 0.22);
-  --hero-copy-shadow-peak-2: 0 0 20px rgba(15, 23, 42, 0.16);
-  --hero-copy-shadow-peak-3: 0 0 32px rgba(15, 23, 42, 0.12);
+  --hero-copy-color-base: rgb(51 65 85 / 0.94);
+  --hero-copy-color-peak: rgb(249 115 22 / 0.98);
+  --hero-copy-shadow-base-1: 0 0 8px rgba(255, 255, 255, 0.4);
+  --hero-copy-shadow-base-2: 0 0 16px rgba(249, 115, 22, 0.22);
+  --hero-copy-shadow-peak-1: 0 0 12px rgba(255, 255, 255, 0.48);
+  --hero-copy-shadow-peak-2: 0 0 28px rgba(249, 115, 22, 0.46);
+  --hero-copy-shadow-peak-3: 0 0 44px rgba(249, 115, 22, 0.24);
 }
 
 @keyframes heroLightStepBlink {
