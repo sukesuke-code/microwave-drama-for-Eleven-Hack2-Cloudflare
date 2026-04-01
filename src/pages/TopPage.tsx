@@ -1,4 +1,3 @@
-import { Zap } from 'lucide-react';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import FloatingSpheres from '../components/FloatingSpheres';
 import { Locale, ThemeMode } from '../types';
@@ -73,14 +72,6 @@ export default function TopPage({
       />
 
       <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full">
-        <div className="flex items-center gap-2 mb-6">
-          <Zap size={20} className="text-orange-500 animate-pulse" />
-          <span className="text-orange-500/70 text-xs font-bold tracking-widest uppercase">
-            Microwave Drama
-          </span>
-          <Zap size={20} className="text-orange-500 animate-pulse" />
-        </div>
-
         <h1
           className="font-display text-7xl font-bold text-center mb-2 tracking-tight"
           style={{
@@ -92,12 +83,8 @@ export default function TopPage({
             filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
           }}
         >
-          チンドラマ
+          {t.topTitle}
         </h1>
-
-        <p className="text-sm text-orange-400/60 tracking-widest font-bold mb-2 uppercase">
-          Ching Drama
-        </p>
 
         <div
           className="h-px w-24 mb-8"
@@ -121,7 +108,7 @@ export default function TopPage({
             boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
           }}
         >
-          <span className="relative z-10">START</span>
+          <span className="relative z-10">{t.startButton}</span>
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{

@@ -19,6 +19,8 @@ export const UI_TEXT = {
   ja: {
     topTagline1: '世界で最も退屈な待ち時間を',
     topTagline2: '人生で最もドラマチックな瞬間に変える',
+    topTitle: '⚡️Microwave Drama⚡️',
+    startButton: '開始',
     startHint: '電子レンジのドラマが今始まる',
     settings: '設定',
     timeSetting: '時間設定',
@@ -33,6 +35,7 @@ export const UI_TEXT = {
     resume: '▶ 再開',
     almostDone: 'もうすぐ チーン！',
     done: 'チーン！！！',
+    nearingCompletion: '間もなく完成',
     elapsed: '秒経過',
     dramaDone: 'ドラマ完了！',
     replay: 'もう一度',
@@ -45,6 +48,8 @@ export const UI_TEXT = {
   en: {
     topTagline1: 'Turn the world’s most boring wait',
     topTagline2: 'into your most dramatic moment.',
+    topTitle: '⚡️Microwave Drama⚡️',
+    startButton: 'START',
     startHint: 'Your microwave drama starts now',
     settings: 'Settings',
     timeSetting: 'Time',
@@ -59,6 +64,7 @@ export const UI_TEXT = {
     resume: '▶ Resume',
     almostDone: 'Almost... DING!',
     done: 'DING!!!',
+    nearingCompletion: 'Almost done',
     elapsed: 'sec elapsed',
     dramaDone: 'Drama Complete!',
     replay: 'Replay',

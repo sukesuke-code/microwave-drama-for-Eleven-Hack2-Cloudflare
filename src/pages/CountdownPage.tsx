@@ -122,6 +122,7 @@ export default function CountdownPage({ locale, settings, onFinish }: CountdownP
               totalTime={totalSeconds}
               style={style}
               isDanger={isDanger}
+              nearingCompletionLabel={t.nearingCompletion}
             />
 
             <div className="w-full max-w-xs mt-2">

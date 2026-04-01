@@ -6,6 +6,7 @@ interface CircularTimerProps {
   totalTime: number;
   style: NarrationStyle;
   isDanger: boolean;
+  nearingCompletionLabel: string;
 }
 
 const STYLE_COLORS: Record<NarrationStyle, { stroke: string; glow: string; text: string }> = {
@@ -15,7 +16,13 @@ const STYLE_COLORS: Record<NarrationStyle, { stroke: string; glow: string; text:
   nature: { stroke: '#10b981', glow: 'rgba(16,185,129,0.6)', text: '#34d399' },
 };
 
-export default function CircularTimer({ timeLeft, totalTime, style, isDanger }: CircularTimerProps) {
+export default function CircularTimer({
+  timeLeft,
+  totalTime,
+  style,
+  isDanger,
+  nearingCompletionLabel,
+}: CircularTimerProps) {
   const size = 240;
   const strokeWidth = 8;
   const radius = (size - strokeWidth * 2) / 2;
@@ -107,7 +114,7 @@ export default function CircularTimer({ timeLeft, totalTime, style, isDanger }: 
             className="text-xs font-bold tracking-widest mt-1 uppercase"
             style={{ color: colors.text, opacity: 0.8 }}
           >
-            間もなく完成
+            {nearingCompletionLabel}
           </span>
         )}
       </div>
