@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronLeft, Moon, Play, Sun } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Locale, Settings, NarrationStyle, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
 import { UI_TEXT } from '../i18n';
@@ -12,21 +12,36 @@ interface SettingsPageProps {
   onStart: (settings: Settings) => void;
 }
 
-export default function SettingsPage({
-  locale,
-  themeMode,
-  onThemeModeChange,
-  onBack,
-  onStart,
-}: SettingsPageProps) {
-  const [minutes, setMinutes] = useState(2);
-  const [seconds, setSeconds] = useState(0);
-  const [dishName, setDishName] = useState('');
+const QUICK_SECONDS = [30, 60, 120, 180, 300];
+
+const STYLE_DESCRIPTIONS: Record<Locale, Record<NarrationStyle, string>> = {
+  ja: {
+    sports: '熱狂的な生中継スタイル',
+    movie: '壮大なシネマティック演出',
+    horror: '恐怖の深淵へようこそ…',
+    nature: 'BBCスタイルの静謐な語り',
+  },
+  en: {
+    sports: 'Live play-by-play energy',
+    movie: 'Epic cinematic delivery',
+    horror: 'Welcome to pure dread...',
+    nature: 'Calm documentary narration',
+  },
+};
+
+export default function SettingsPage({ locale, onBack, onStart }: SettingsPageProps) {
+  const [totalSeconds, setTotalSeconds] = useState(60);
+  const [dishName, setDishName] = useState(locale === 'ja' ? '冷凍チャーハン' : 'Frozen fried rice');
   const [selectedStyle, setSelectedStyle] = useState<NarrationStyle>('sports');
 
   const t = UI_TEXT[locale];
-  const isLight = themeMode === 'light';
-  const totalSeconds = Math.max(1, Math.min(600, minutes * 60 + seconds));
+  const styleConfigs = getStyleConfigs(locale);
+
+  const { minutes, seconds } = useMemo(() => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return { minutes: mins, seconds: secs };
+  }, [totalSeconds]);
 
   const handleStart = () => {
     onStart({
@@ -36,181 +51,119 @@ export default function SettingsPage({
     });
   };
 
-  const styleConfigs = getStyleConfigs(locale);
-  const styleConfig = styleConfigs.find((s) => s.id === selectedStyle)!;
-
   return (
-    <div className={`min-h-screen flex flex-col ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#00031a] text-slate-100'}`}>
-      <div className={`flex items-center justify-between gap-3 px-4 pt-safe pt-4 pb-4 border-b ${isLight ? 'border-slate-200 bg-white/90' : 'border-white/5'}`}>
-        <div className="flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className={`flex items-center justify-center w-9 h-9 rounded-xl transition-colors ${isLight ? 'bg-slate-200 hover:bg-slate-300' : 'bg-white/5 hover:bg-white/10'}`}
-        >
-          <ChevronLeft size={20} className={isLight ? 'text-slate-700' : 'text-slate-300'} />
-        </button>
-        <h2 className={`font-display text-xl font-bold tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.settings}</h2>
-        </div>
-        <button
-          onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-          className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
-            isLight
-              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
-          }`}
-          aria-label="Dark mode switcher"
-        >
-          {isLight ? <Moon size={14} /> : <Sun size={14} />}
-          {isLight ? 'Dark' : 'Light'}
-        </button>
-      </div>
+    <div className="h-[100dvh] overflow-hidden bg-[#020818] text-slate-100">
+      <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-7">
+        <header className="mb-7 flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-white/10"
+          >
+            <ChevronLeft size={26} />
+          </button>
+          <h1 className="text-[clamp(1.6rem,5.3vw,3.2rem)] font-black leading-none tracking-tight">{t.settings}</h1>
+        </header>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-6 max-w-lg mx-auto space-y-8">
-          <section>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t.timeSetting}
-            </label>
-            <div className={`rounded-2xl p-5 space-y-5 border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/3 border-white/8'}`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{t.minutes}</span>
-                  <span className="font-display text-2xl font-bold text-orange-400">
-                    {String(minutes).padStart(2, '0')}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="9"
-                  value={minutes}
-                  onChange={(e) => setMinutes(Number(e.target.value))}
-                  className="w-full accent-orange-500 h-2 rounded-full cursor-pointer"
-                  style={{ accentColor: '#f97316' }}
-                />
-                <div className={`flex justify-between text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <span>0 {t.minutes}</span>
-                  <span>9 {t.minutes}</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{t.seconds}</span>
-                  <span className="font-display text-2xl font-bold text-orange-400">
-                    {String(seconds).padStart(2, '0')}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="59"
-                  value={seconds}
-                  onChange={(e) => setSeconds(Number(e.target.value))}
-                  className="w-full h-2 rounded-full cursor-pointer"
-                  style={{ accentColor: '#f97316' }}
-                />
-                <div className={`flex justify-between text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <span>0 {t.seconds}</span>
-                  <span>59 {t.seconds}</span>
-                </div>
-              </div>
-
-              <div
-                className={`text-center py-3 rounded-xl border ${isLight ? 'border-orange-300/60 bg-orange-100/80' : 'border-orange-500/20 bg-orange-950/20'}`}
-              >
-                <span className="font-display text-3xl font-bold text-orange-400">
-                  {String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:
-                  {String(totalSeconds % 60).padStart(2, '0')}
-                </span>
-                <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.total} {totalSeconds} {t.seconds}</p>
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t.optionalDish}
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={dishName}
-                onChange={(e) => setDishName(e.target.value)}
-                placeholder={t.dishPlaceholder}
-                maxLength={30}
-                className={`w-full border rounded-2xl px-5 py-4 text-base focus:outline-none focus:border-orange-500/50 transition-colors ${
-                  isLight
-                    ? 'bg-white text-slate-900 placeholder-slate-400 border-slate-200'
-                    : 'bg-white/3 text-white placeholder-slate-600 border-white/10'
+        <section className="mb-7">
+          <p className="mb-4 text-[clamp(1.4rem,4.8vw,2.8rem)] font-black leading-none text-orange-400">{t.timeSetting}</p>
+          <div className="mb-5 flex flex-wrap gap-3">
+            {QUICK_SECONDS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTotalSeconds(value)}
+                className={`rounded-[18px] px-6 py-3 text-[clamp(1.1rem,4vw,2.7rem)] font-black leading-none transition-colors ${
+                  totalSeconds === value
+                    ? 'bg-[#ff7a14] text-white'
+                    : 'bg-[#26334a] text-slate-200 hover:bg-[#32435f]'
                 }`}
-              />
-              <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                {dishName.length}/30
-              </span>
-            </div>
-          </section>
-
-          <section>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t.style}
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {styleConfigs.map((s) => {
-                const isSelected = selectedStyle === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedStyle(s.id)}
-                    className={`
-                      relative flex flex-col items-center justify-center
-                      p-4 rounded-2xl border-2 transition-all duration-200
-                      ${isSelected
-                        ? isLight ? 'bg-orange-50 scale-[1.02]' : 'bg-white/8 scale-[1.02]'
-                        : isLight ? 'bg-white border-slate-200 hover:bg-slate-100' : 'bg-white/3 border-white/8 hover:bg-white/5'
-                      }
-                    `}
-                    style={isSelected ? {
-                      borderColor: s.accentColor,
-                      boxShadow: `0 0 20px ${s.accentColor}30`,
-                    } : {
-                      borderColor: isLight ? 'rgb(226 232 240)' : 'rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    {isSelected && (
-                      <div
-                        className="absolute top-2 right-2 w-2 h-2 rounded-full"
-                        style={{ backgroundColor: s.accentColor }}
-                      />
-                    )}
-                    <span className="text-3xl mb-2">{s.emoji}</span>
-                    <span
-                      className="text-sm font-bold text-center leading-tight"
-                      style={{ color: isSelected ? s.accentColor : 'rgb(148 163 184)' }}
-                    >
-                      {s.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <div className="pb-8">
-            <button
-              onClick={handleStart}
-              disabled={totalSeconds < 1}
-              className="w-full py-5 rounded-2xl font-display text-xl font-bold tracking-widest text-white uppercase flex items-center justify-center gap-3 transition-all duration-200 active:scale-95 disabled:opacity-50"
-              style={{
-                background: `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`,
-                boxShadow: `0 0 25px ${styleConfig.accentColor}50`,
-              }}
-            >
-              <Play size={22} fill="white" />
-              {t.startNarration}
-            </button>
+              >
+                {value < 60 ? `${value}${t.seconds}` : `${value / 60}${t.minutes}`}
+              </button>
+            ))}
           </div>
-        </div>
+
+          <div className="rounded-[34px] border border-[#243650] bg-[#101d35] px-8 py-7">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center text-center">
+              <div>
+                <p className="mb-2 text-[clamp(.9rem,3.5vw,2.35rem)] text-slate-500">{t.minutes}</p>
+                <p className="text-[clamp(2.4rem,8vw,5.6rem)] font-black leading-none">{minutes}</p>
+              </div>
+              <p className="mx-10 text-[clamp(2.4rem,8vw,5.6rem)] font-black leading-none text-orange-400">:</p>
+              <div>
+                <p className="mb-2 text-[clamp(.9rem,3.5vw,2.35rem)] text-slate-500">{t.seconds}</p>
+                <p className="text-[clamp(2.4rem,8vw,5.6rem)] font-black leading-none">{String(seconds).padStart(2, '0')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 px-2">
+            <input
+              type="range"
+              min={1}
+              max={600}
+              value={totalSeconds}
+              onChange={(e) => setTotalSeconds(Number(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#405373] accent-orange-500"
+            />
+            <div className="mt-1 flex justify-between text-[clamp(.9rem,3.5vw,2.35rem)] text-slate-600">
+              <span>1{t.seconds}</span>
+              <span>10{t.minutes}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-7">
+          <p className="mb-4 text-[clamp(1.4rem,4.8vw,2.8rem)] font-black leading-none text-orange-400">{locale === 'ja' ? '料理名' : 'Dish Name'}</p>
+          <input
+            type="text"
+            value={dishName}
+            onChange={(e) => setDishName(e.target.value)}
+            className="w-full rounded-[34px] border border-[#253a5c] bg-[#101d35] px-7 py-5 text-[clamp(1.4rem,4.8vw,3.05rem)] font-bold leading-none text-white placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none"
+            placeholder={t.dishPlaceholder}
+          />
+        </section>
+
+        <section className="mb-7 flex-1">
+          <p className="mb-4 text-[clamp(1.4rem,4.8vw,2.8rem)] font-black leading-none text-orange-400">{t.style}</p>
+          <div className="grid h-full max-h-[34vh] grid-cols-2 gap-4">
+            {styleConfigs.map((style) => {
+              const isSelected = selectedStyle === style.id;
+              const cardClass =
+                style.id === 'sports'
+                  ? 'from-[#1f3263] to-[#0e5d89] border-[#2d95c6]'
+                  : style.id === 'movie'
+                    ? 'from-[#5b3018] to-[#683628] border-[#9d5b23]'
+                    : style.id === 'horror'
+                      ? 'from-[#330919] to-[#1a102f] border-[#8b1a2c]'
+                      : 'from-[#042d2a] to-[#0e5037] border-[#0b8e65]';
+
+              return (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => setSelectedStyle(style.id)}
+                  className={`relative h-full rounded-[30px] border bg-gradient-to-br p-6 text-left ${cardClass}`}
+                  style={{
+                    boxShadow: isSelected ? `0 0 0 3px #ff9a43, inset 0 0 0 1px #ff9a43` : undefined,
+                  }}
+                >
+                  {isSelected && <span className="absolute right-4 top-4 h-3.5 w-3.5 rounded-full bg-orange-400" />}
+                  <p className="mb-3 text-[clamp(1.4rem,4.3vw,2.6rem)] leading-none">{style.emoji}</p>
+                  <p className="mb-2 text-[clamp(1.6rem,5.3vw,3.2rem)] font-black leading-none text-white">{style.label}</p>
+                  <p className="text-[clamp(1rem,3.9vw,2.5rem)] leading-none text-slate-400">{STYLE_DESCRIPTIONS[locale][style.id]}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <button
+          onClick={handleStart}
+          className="mt-auto w-full rounded-[34px] bg-gradient-to-r from-[#ff5f0f] to-[#ff2f2f] py-7 text-[clamp(1.8rem,6vw,3.8rem)] font-black leading-none text-white shadow-[0_0_35px_rgba(255,98,0,0.45)]"
+        >
+          {t.startNarration}
+        </button>
       </div>
     </div>
   );
