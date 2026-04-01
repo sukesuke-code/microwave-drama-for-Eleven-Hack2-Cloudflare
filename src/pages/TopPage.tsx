@@ -101,9 +101,9 @@ export default function TopPage({
               filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
             }}
           >
-            <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
-            <span>{t.topTitle}</span>
-            <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
+            <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0 hero-outline-title" strokeWidth={1.8} fill="none" />
+            <span className="hero-outline-title">{t.topTitle}</span>
+            <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0 hero-outline-title" strokeWidth={1.8} fill="none" />
           </h1>
 
           <div
@@ -115,13 +115,13 @@ export default function TopPage({
         </div>
 
         <p
-          className={`hero-copy-blink text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
+          className={`hero-copy-blink hero-outline-copy text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700 hero-outline-copy-light' : 'text-slate-300/80'}`}
           style={{ animationDelay: '0.35s' }}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`hero-copy-blink text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
+          className={`hero-copy-blink hero-outline-copy text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900 hero-outline-copy-light' : 'text-white'}`}
           style={{ animationDelay: '0.7s' }}
         >
           {t.topTagline2}
@@ -146,7 +146,7 @@ export default function TopPage({
             animationDelay: '1.3s',
           }}
         >
-          <span className="relative z-10">{t.startButton}</span>
+          <span className="relative z-10 hero-outline-cta">{t.startButton}</span>
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{
