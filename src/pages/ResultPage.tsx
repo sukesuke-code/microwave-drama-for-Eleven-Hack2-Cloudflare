@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Moon, RotateCcw, Share2, Sun, Trophy } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
@@ -37,7 +38,10 @@ export default function ResultPage({
     }
   };
 
-  const randomMessage = RESULT_MESSAGES[locale][style][Math.floor(Math.random() * RESULT_MESSAGES[locale][style].length)];
+  const randomMessage = useMemo(() => {
+    const messages = RESULT_MESSAGES[locale][style];
+    return messages[Math.floor(Math.random() * messages.length)];
+  }, [locale, style]);
 
   return (
     <div

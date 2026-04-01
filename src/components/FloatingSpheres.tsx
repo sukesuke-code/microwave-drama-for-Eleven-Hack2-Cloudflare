@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 interface Sphere {
   id: number;
@@ -13,12 +13,15 @@ interface Sphere {
   delay: number;
 }
 
-export default function FloatingSpheres() {
+function FloatingSpheres() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [spheres, setSpheres] = useState<Sphere[]>([]);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const frameRef = useRef<number | null>(null);
+  const latestMouseRef = useRef({ x: 0, y: 0 });
+  const lastCommittedRef = useRef({ x: 0, y: 0 });
 
-  useEffect(() => {
+  const spheres = useMemo(() => {
     const orangeRed = [
       'rgba(249, 115, 22, ',
       'rgba(239, 68, 68, ',
@@ -50,17 +53,46 @@ export default function FloatingSpheres() {
       });
     }
 
-    setSpheres(newSpheres);
+    return newSpheres;
   }, []);
 
   useEffect(() => {
+    const updateSize = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      setContainerSize({
+        width: rect?.width ?? 0,
+        height: rect?.height ?? 0,
+      });
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  useEffect(() => {
+    const scheduleUpdate = (x: number, y: number) => {
+      latestMouseRef.current = { x, y };
+      if (frameRef.current !== null) return;
+      frameRef.current = window.requestAnimationFrame(() => {
+        frameRef.current = null;
+        const next = latestMouseRef.current;
+        const prev = lastCommittedRef.current;
+        const dx = next.x - prev.x;
+        const dy = next.y - prev.y;
+        if (Math.hypot(dx, dy) < 12) return;
+        lastCommittedRef.current = next;
+        setMousePos(next);
+      });
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
+      scheduleUpdate(e.clientX, e.clientY);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches[0]) {
-        setMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+        scheduleUpdate(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
 
@@ -68,6 +100,7 @@ export default function FloatingSpheres() {
     window.addEventListener('touchmove', handleTouchMove);
 
     return () => {
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('touchmove', handleTouchMove);
     };
@@ -81,8 +114,8 @@ export default function FloatingSpheres() {
     >
       {spheres.map((sphere) => {
         const repelDistance = 150;
-        const dx = (containerRef.current?.offsetWidth || 0) * (sphere.x / 100) - mousePos.x;
-        const dy = (containerRef.current?.offsetHeight || 0) * (sphere.y / 100) - mousePos.y;
+        const dx = containerSize.width * (sphere.x / 100) - mousePos.x;
+        const dy = containerSize.height * (sphere.y / 100) - mousePos.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const shouldRepel = distance < repelDistance && distance > 0;
 
@@ -115,36 +148,8 @@ export default function FloatingSpheres() {
           />
         );
       })}
-
-      <style>{`
-        @keyframes floatSphere0 {
-          0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(40px, -50px); }
-          50% { transform: translate(-30px, 40px); }
-          75% { transform: translate(35px, 45px); }
-        }
-
-        @keyframes floatSphere1 {
-          0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(-45px, 35px); }
-          50% { transform: translate(40px, -40px); }
-          75% { transform: translate(-35px, -45px); }
-        }
-
-        @keyframes floatSphere2 {
-          0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(50px, 30px); }
-          50% { transform: translate(-40px, -35px); }
-          75% { transform: translate(30px, 50px); }
-        }
-
-        @keyframes floatSphere3 {
-          0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(-35px, -40px); }
-          50% { transform: translate(45px, 35px); }
-          75% { transform: translate(-40px, 40px); }
-        }
-      `}</style>
     </div>
   );
 }
+
+export default memo(FloatingSpheres);

@@ -446,3 +446,31 @@
   animation: steadyBlink 2.8s ease-in-out infinite;
   will-change: opacity;
 }
+
+@keyframes floatSphere0 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(40px, -50px); }
+  50% { transform: translate(-30px, 40px); }
+  75% { transform: translate(35px, 45px); }
+}
+
+@keyframes floatSphere1 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-45px, 35px); }
+  50% { transform: translate(40px, -40px); }
+  75% { transform: translate(-35px, -45px); }
+}
+
+@keyframes floatSphere2 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(50px, 30px); }
+  50% { transform: translate(-40px, -35px); }
+  75% { transform: translate(30px, 50px); }
+}
+
+@keyframes floatSphere3 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-35px, -40px); }
+  50% { transform: translate(45px, 35px); }
+  75% { transform: translate(-40px, 40px); }
+}

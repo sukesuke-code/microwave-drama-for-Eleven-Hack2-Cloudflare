@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppScreen, Locale, Settings, ThemeMode } from './types';
-import TopPage from './pages/TopPage';
-import SettingsPage from './pages/SettingsPage';
-import CountdownPage from './pages/CountdownPage';
-import ResultPage from './pages/ResultPage';
+
+const TopPage = lazy(() => import('./pages/TopPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const CountdownPage = lazy(() => import('./pages/CountdownPage'));
+const ResultPage = lazy(() => import('./pages/ResultPage'));
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('top');
@@ -43,43 +44,45 @@ export default function App() {
 
   return (
     <div className="font-sans">
-      {screen === 'top' && (
-        <TopPage
-          onStart={handleStartSettings}
-          locale={locale}
-          themeMode={themeMode}
-          onLocaleChange={setLocale}
-          onThemeModeChange={setThemeMode}
-        />
-      )}
-      {screen === 'settings' && (
-        <SettingsPage
-          locale={locale}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
-          onBack={() => setScreen('top')}
-          onStart={handleStartCountdown}
-        />
-      )}
-      {screen === 'countdown' && settings && (
-        <CountdownPage
-          locale={locale}
-          settings={settings}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
-          onFinish={handleFinish}
-        />
-      )}
-      {screen === 'result' && settings && (
-        <ResultPage
-          locale={locale}
-          settings={settings}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
-          onReplay={handleReplay}
-          onHome={handleHome}
-        />
-      )}
+      <Suspense fallback={<div className="min-h-screen bg-[#00031a]" />}>
+        {screen === 'top' && (
+          <TopPage
+            onStart={handleStartSettings}
+            locale={locale}
+            themeMode={themeMode}
+            onLocaleChange={setLocale}
+            onThemeModeChange={setThemeMode}
+          />
+        )}
+        {screen === 'settings' && (
+          <SettingsPage
+            locale={locale}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+            onBack={() => setScreen('top')}
+            onStart={handleStartCountdown}
+          />
+        )}
+        {screen === 'countdown' && settings && (
+          <CountdownPage
+            locale={locale}
+            settings={settings}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+            onFinish={handleFinish}
+          />
+        )}
+        {screen === 'result' && settings && (
+          <ResultPage
+            locale={locale}
+            settings={settings}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+            onReplay={handleReplay}
+            onHome={handleHome}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
