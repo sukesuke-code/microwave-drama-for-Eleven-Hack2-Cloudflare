@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppScreen, Locale, Settings, ThemeMode } from './types';
 import TopPage from './pages/TopPage';
 import SettingsPage from './pages/SettingsPage';
@@ -8,8 +8,16 @@ import ResultPage from './pages/ResultPage';
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('top');
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [locale, setLocale] = useState<Locale>('ja');
+  const [locale, setLocale] = useState<Locale>(() => {
+    const saved = localStorage.getItem('ching-drama-locale');
+    return saved === 'en' || saved === 'ja' ? saved : 'ja';
+  });
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+
+  useEffect(() => {
+    localStorage.setItem('ching-drama-locale', locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const handleStartSettings = () => setScreen('settings');
 

@@ -31,8 +31,8 @@ export default function TopPage({
           className={`text-xs rounded-lg px-2 py-1 border ${isLight ? 'bg-white text-slate-700 border-slate-300' : 'bg-slate-900/80 text-slate-200 border-white/10'}`}
           aria-label="Language switcher"
         >
-          <option value="ja">日本語</option>
           <option value="en">English</option>
+          <option value="ja">日本語</option>
         </select>
         <button
           onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
