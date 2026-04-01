@@ -19,7 +19,7 @@ export const UI_TEXT = {
   ja: {
     topTagline1: '世界で最も退屈な待ち時間を',
     topTagline2: '人生で最もドラマチックな瞬間に変える',
-    topTitle: '⚡️Microwave Drama⚡️',
+    topTitle: '⚡️MICROWAVE DRAMA⚡️',
     startButton: '開始',
     startHint: '電子レンジのドラマが今始まる',
     settings: '設定',
@@ -48,7 +48,7 @@ export const UI_TEXT = {
   en: {
     topTagline1: 'Turn the world’s most boring wait',
     topTagline2: 'into your most dramatic moment.',
-    topTitle: '⚡️Microwave Drama⚡️',
+    topTitle: '⚡️MICROWAVE DRAMA⚡️',
     startButton: 'START',
     startHint: 'Your microwave drama starts now',
     settings: 'Settings',
