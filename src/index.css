@@ -124,17 +124,51 @@
 
 @keyframes eqBar {
   from {
-    height: 6px;
-    opacity: 0.4;
+    height: var(--eq-min-height, 6px);
+    opacity: var(--eq-opacity-min, 0.4);
   }
   to {
-    height: 32px;
-    opacity: 0.9;
+    height: var(--eq-max-height, 32px);
+    opacity: var(--eq-opacity-max, 0.9);
   }
 }
 
 .animate-eq-bar {
   animation: eqBar 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes eqBarWide {
+  0% {
+    height: calc(var(--eq-min-height, 8px) * 0.9);
+    opacity: var(--eq-opacity-min, 0.35);
+  }
+  35% {
+    height: var(--eq-max-height, 42px);
+    opacity: var(--eq-opacity-max, 0.95);
+  }
+  100% {
+    height: calc(var(--eq-min-height, 8px) * 1.4);
+    opacity: calc(var(--eq-opacity-min, 0.35) + 0.16);
+  }
+}
+
+@keyframes eqBarStaccato {
+  0% {
+    height: var(--eq-min-height, 4px);
+    opacity: calc(var(--eq-opacity-min, 0.45) + 0.05);
+  }
+  20% {
+    height: calc(var(--eq-max-height, 26px) * 0.45);
+    opacity: calc(var(--eq-opacity-max, 0.9) - 0.22);
+  }
+  45% {
+    height: var(--eq-max-height, 26px);
+    opacity: var(--eq-opacity-max, 0.9);
+  }
+  100% {
+    height: calc(var(--eq-min-height, 4px) * 1.1);
+    opacity: var(--eq-opacity-min, 0.45);
+  }
 }
 
 @keyframes softGlowPulse {
@@ -164,43 +198,117 @@
 @keyframes heroBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.28) saturate(1.3);
+    filter: brightness(1.1) saturate(1.1);
     text-shadow:
-      0 0 12px rgba(255, 255, 255, 0.42),
-      0 0 30px rgba(249, 115, 22, 0.72),
-      0 0 52px rgba(249, 115, 22, 0.56);
+      0 0 10px rgba(255, 255, 255, 0.32),
+      0 0 22px rgba(249, 115, 22, 0.5),
+      0 0 44px rgba(249, 115, 22, 0.24);
   }
   50% {
-    opacity: 0.98;
-    filter: brightness(1.62) saturate(1.48);
+    opacity: 1;
+    filter: brightness(1.26) saturate(1.24);
     text-shadow:
-      0 0 22px rgba(255, 255, 255, 0.68),
-      0 0 44px rgba(249, 115, 22, 0.96),
-      0 0 76px rgba(249, 115, 22, 0.76);
+      0 0 16px rgba(255, 255, 255, 0.56),
+      0 0 34px rgba(249, 115, 22, 0.72),
+      0 0 66px rgba(249, 115, 22, 0.36);
   }
 }
 
 .hero-blink {
   animation: heroBlink 2.4s ease-in-out infinite;
-  will-change: opacity, filter, text-shadow;
+  will-change: filter, text-shadow;
 }
 
 @keyframes heroCopyBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.06) saturate(1.08);
-    text-shadow: 0 0 6px rgba(249, 115, 22, 0.22);
+    filter: brightness(1.1) saturate(1.1);
+    color: var(--hero-copy-color-base, rgb(226 232 240 / 0.9));
+    text-shadow:
+      var(--hero-copy-shadow-base-1, 0 0 8px rgba(255, 255, 255, 0.24)),
+      var(--hero-copy-shadow-base-2, 0 0 18px rgba(249, 115, 22, 0.26));
   }
   50% {
-    opacity: 0.97;
-    filter: brightness(1.22) saturate(1.24);
-    text-shadow: 0 0 14px rgba(249, 115, 22, 0.38);
+    opacity: 1;
+    filter: brightness(1.26) saturate(1.24);
+    color: var(--hero-copy-color-peak, rgb(254 215 170 / 0.98));
+    text-shadow:
+      var(--hero-copy-shadow-peak-1, 0 0 14px rgba(255, 255, 255, 0.44)),
+      var(--hero-copy-shadow-peak-2, 0 0 30px rgba(249, 115, 22, 0.5)),
+      var(--hero-copy-shadow-peak-3, 0 0 52px rgba(249, 115, 22, 0.26));
   }
 }
 
 .hero-copy-blink {
+  --hero-copy-color-base: rgb(226 232 240 / 0.9);
+  --hero-copy-color-peak: rgb(254 215 170 / 0.98);
+  --hero-copy-shadow-base-1: 0 0 8px rgba(255, 255, 255, 0.24);
+  --hero-copy-shadow-base-2: 0 0 18px rgba(249, 115, 22, 0.26);
+  --hero-copy-shadow-peak-1: 0 0 14px rgba(255, 255, 255, 0.44);
+  --hero-copy-shadow-peak-2: 0 0 30px rgba(249, 115, 22, 0.5);
+  --hero-copy-shadow-peak-3: 0 0 52px rgba(249, 115, 22, 0.26);
   animation: heroCopyBlink 2.5s ease-in-out infinite;
-  will-change: opacity, filter, text-shadow;
+  will-change: color, filter, text-shadow;
+}
+
+.hero-copy-light {
+  --hero-copy-color-base: rgb(15 23 42 / 0.9);
+  --hero-copy-color-peak: rgb(2 6 23 / 0.98);
+  --hero-copy-shadow-base-1: 0 0 7px rgba(15, 23, 42, 0.14);
+  --hero-copy-shadow-base-2: 0 0 14px rgba(15, 23, 42, 0.1);
+  --hero-copy-shadow-peak-1: 0 0 10px rgba(15, 23, 42, 0.22);
+  --hero-copy-shadow-peak-2: 0 0 20px rgba(15, 23, 42, 0.16);
+  --hero-copy-shadow-peak-3: 0 0 32px rgba(15, 23, 42, 0.12);
+}
+
+@keyframes heroLightStepBlink {
+  0%, 100% {
+    color: var(--step-color-base, rgb(30 41 59 / 0.92));
+    filter: brightness(1.02) saturate(1.04);
+    text-shadow: none;
+  }
+  50% {
+    color: var(--step-color-peak, rgb(2 6 23 / 0.98));
+    filter: brightness(1.15) saturate(1.14);
+    text-shadow: none;
+  }
+}
+
+.hero-light-step-blink {
+  --step-color-base: rgb(30 41 59 / 0.92);
+  --step-color-peak: rgb(2 6 23 / 0.98);
+  animation: heroLightStepBlink 2.4s ease-in-out infinite;
+  will-change: color, filter;
+}
+
+.start-button-light-step {
+  --step-color-base: rgb(255 237 213 / 0.95);
+  --step-color-peak: rgb(255 255 255 / 1);
+  animation: heroLightStepBlink 2.4s ease-in-out infinite;
+  will-change: color, filter;
+}
+
+@keyframes heroSectionBlink {
+  0%, 100% {
+    color: rgb(148 163 184 / 0.9);
+    filter: brightness(1.1) saturate(1.1);
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.2),
+      0 0 16px rgba(249, 115, 22, 0.24);
+  }
+  50% {
+    color: rgb(251 146 60 / 0.95);
+    filter: brightness(1.26) saturate(1.24);
+    text-shadow:
+      0 0 14px rgba(255, 255, 255, 0.4),
+      0 0 28px rgba(249, 115, 22, 0.44),
+      0 0 48px rgba(249, 115, 22, 0.22);
+  }
+}
+
+.hero-section-blink {
+  animation: heroSectionBlink 2.5s ease-in-out infinite;
+  will-change: color, filter, text-shadow;
 }
 
 @keyframes heroBlinkMobile {
@@ -234,11 +342,13 @@
 @keyframes startButtonBlink {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1.08) saturate(1.08);
+    filter: brightness(1.1) saturate(1.1);
+    box-shadow: 0 0 30px rgba(249, 115, 22, 0.5), 0 0 60px rgba(249, 115, 22, 0.2);
   }
   50% {
-    opacity: 0.96;
-    filter: brightness(1.2) saturate(1.18);
+    opacity: 1;
+    filter: brightness(1.26) saturate(1.24);
+    box-shadow: 0 0 42px rgba(249, 115, 22, 0.72), 0 0 88px rgba(249, 115, 22, 0.36);
   }
 }
 
