@@ -73,7 +73,7 @@ export default function TopPage({
 
       <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full">
         <h1
-          className="font-display text-7xl font-bold text-center mb-2 tracking-tight"
+          className="font-display text-7xl font-bold text-center mb-2 tracking-tight soft-glow-pulse"
           style={{
             background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
             WebkitBackgroundClip: 'text',
@@ -93,22 +93,29 @@ export default function TopPage({
           }}
         />
 
-        <p className={`text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}>
+        <p
+          className={`text-center text-base leading-relaxed mb-2 font-medium soft-glow-pulse ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
+          style={{ animationDelay: '0.5s' }}
+        >
           {t.topTagline1}
         </p>
-        <p className={`text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+        <p
+          className={`text-center text-lg font-bold mb-10 soft-glow-pulse ${isLight ? 'text-slate-900' : 'text-white'}`}
+          style={{ animationDelay: '0.9s' }}
+        >
           {t.topTagline2}
         </p>
 
         <button
           onClick={onStart}
-          className="relative group w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden"
+          className="relative group w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden soft-glow-pulse"
           style={{
             background: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
             boxShadow: '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
+            animationDelay: '1.3s',
           }}
         >
-          <span className="relative z-10">{t.startButton}</span>
+          <span className="relative z-10 soft-glow-pulse">{t.startButton}</span>
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{
