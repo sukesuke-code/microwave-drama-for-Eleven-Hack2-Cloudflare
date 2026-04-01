@@ -1,7 +1,17 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "types": ["react", "react-native"]
+  },
+  "include": [
+    "index.js",
+    "src/App.tsx",
+    "src/pages/**/*.tsx",
+    "src/data/**/*.ts",
+    "src/types/**/*.ts",
+    "src/i18n.ts"
+  ],
+  "exclude": ["node_modules"]
 }

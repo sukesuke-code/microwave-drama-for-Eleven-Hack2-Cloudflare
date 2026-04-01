@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
-import { Moon, RotateCcw, Share2, Sun, Trophy } from 'lucide-react';
+import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Locale, Settings, ThemeMode } from '../types';
-import { getStyleConfigs } from '../data/narrations';
 import { RESULT_MESSAGES, UI_TEXT } from '../i18n';
 
-interface ResultPageProps {
+interface Props {
   locale: Locale;
   settings: Settings;
   themeMode: ThemeMode;
@@ -13,145 +12,33 @@ interface ResultPageProps {
   onHome: () => void;
 }
 
-export default function ResultPage({
-  locale,
-  settings,
-  themeMode,
-  onThemeModeChange,
-  onReplay,
-  onHome,
-}: ResultPageProps) {
-  const { dishName, style } = settings;
+export default function ResultPage({ locale, settings, themeMode, onThemeModeChange, onReplay, onHome }: Props) {
   const t = UI_TEXT[locale];
-  const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isLight = themeMode === 'light';
+  const message = useMemo(() => {
+    const messages = RESULT_MESSAGES[locale][settings.style];
+    return messages[Math.floor(Math.random() * messages.length)];
+  }, [locale, settings.style]);
 
   const handleShare = async () => {
-    const text = locale === 'ja'
-      ? `チンドラマで「${dishName}」を完璧に温め直した！\n\n#チンドラマ #ChingDrama #電子レンジ`
-      : `I reheated "${dishName}" perfectly with Ching Show!\n\n#ChingShow #Microwave`;
-    if (navigator.share) {
-      await navigator.share({ text }).catch(() => null);
-    } else {
-      await navigator.clipboard.writeText(text).catch(() => null);
-      alert(t.shareCopied);
+    try {
+      await Share.share({ message: `${settings.dishName}: ${message}` });
+    } catch {
+      Alert.alert('Share failed');
     }
   };
 
-  const randomMessage = useMemo(() => {
-    const messages = RESULT_MESSAGES[locale][style];
-    return messages[Math.floor(Math.random() * messages.length)];
-  }, [locale, style]);
-
   return (
-    <div
-      className={`min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
-        isLight ? 'from-slate-50 via-orange-50/70 to-slate-100' : `${styleConfig.bgGradient} bg-[#00031a]`
-      }`}
-    >
-      <div className="absolute right-4 top-4 z-30">
-        <button
-          onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-          className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
-            isLight
-              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
-          }`}
-          aria-label="Dark mode switcher"
-        >
-          {isLight ? <Moon size={14} /> : <Sun size={14} />}
-          {isLight ? 'Dark' : 'Light'}
-        </button>
-      </div>
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `radial-gradient(ellipse 60% 50% at 50% 40%, ${styleConfig.accentColor}10 0%, transparent 70%)`,
-        }}
-      />
-
-      <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full text-center">
-        <div
-          className="w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-scale-in"
-          style={{
-            background: `linear-gradient(135deg, ${styleConfig.accentColor}30, ${styleConfig.accentColor}10)`,
-            border: `2px solid ${styleConfig.accentColor}40`,
-            boxShadow: `0 0 40px ${styleConfig.accentColor}30`,
-          }}
-        >
-          <Trophy
-            size={40}
-            style={{ color: styleConfig.accentColor }}
-          />
-        </div>
-
-        <h1 className={`font-display text-4xl font-bold mb-2 animate-fade-up ${isLight ? 'text-slate-900' : 'text-white'}`}>
-          {t.dramaDone}
-        </h1>
-
-        <p
-          className="text-lg font-bold mb-1 animate-fade-up"
-          style={{
-            color: styleConfig.accentColor,
-            animationDelay: '0.1s',
-          }}
-        >
-          {dishName}
-        </p>
-
-        <p className={`text-sm mb-2 animate-fade-up ${isLight ? 'text-slate-500' : 'text-slate-400'}`} style={{ animationDelay: '0.15s' }}>
-          {styleConfig.emoji} {styleConfig.label}
-        </p>
-
-        <div
-          className="my-6 px-6 py-4 rounded-2xl border animate-fade-up w-full"
-          style={{
-            borderColor: `${styleConfig.accentColor}30`,
-            background: `${styleConfig.accentColor}08`,
-            animationDelay: '0.2s',
-          }}
-        >
-          <p
-            className="text-base font-medium italic leading-relaxed"
-            style={{ color: `${styleConfig.accentColor}cc` }}
-          >
-            「{randomMessage}」
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 w-full animate-fade-up" style={{ animationDelay: '0.3s' }}>
-          <button
-            onClick={onReplay}
-            className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-bold text-white text-lg transition-all active:scale-95"
-            style={{
-              background: `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`,
-              boxShadow: `0 0 20px ${styleConfig.accentColor}40`,
-            }}
-          >
-            <RotateCcw size={20} />
-            {t.replay}
-          </button>
-
-          <button
-            onClick={handleShare}
-            className={`flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-bold text-base border transition-all active:scale-95 ${
-              isLight
-                ? 'text-slate-700 bg-white border-slate-200 hover:bg-slate-100'
-                : 'text-slate-300 bg-white/5 border-white/10 hover:bg-white/8'
-            }`}
-          >
-            <Share2 size={18} />
-            {t.share}
-          </button>
-
-          <button
-            onClick={onHome}
-            className={`text-sm py-2 transition-colors ${isLight ? 'text-slate-600 hover:text-slate-700' : 'text-slate-500 hover:text-slate-400'}`}
-          >
-            {t.backTop}
-          </button>
-        </div>
-      </div>
-    </div>
+    <View style={[s.page, { backgroundColor: isLight ? '#f8fafc' : '#020617' }]}>
+      <Pressable onPress={() => onThemeModeChange(isLight ? 'dark' : 'light')}><Text style={s.orange}>{isLight ? '🌙' : '☀️'}</Text></Pressable>
+      <Text style={[s.title, { color: isLight ? '#0f172a' : '#fff' }]}>{t.dramaDone}</Text>
+      <Text style={s.orange}>{settings.dishName}</Text>
+      <Text style={[s.message, { color: isLight ? '#334155' : '#cbd5e1' }]}>{message}</Text>
+      <Pressable style={s.button} onPress={onReplay}><Text style={s.buttonText}>{t.replay}</Text></Pressable>
+      <Pressable style={s.buttonSecondary} onPress={handleShare}><Text>{t.share}</Text></Pressable>
+      <Pressable onPress={onHome}><Text style={{ color: '#94a3b8' }}>{t.backTop}</Text></Pressable>
+    </View>
   );
 }
+
+const s = StyleSheet.create({ page: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, padding: 24 }, orange: { color: '#f97316', fontWeight: '800' }, title: { fontSize: 34, fontWeight: '800' }, message: { textAlign: 'center', fontStyle: 'italic' }, button: { borderRadius: 12, backgroundColor: '#ea580c', paddingHorizontal: 24, paddingVertical: 12 }, buttonText: { color: 'white', fontWeight: '700' }, buttonSecondary: { borderRadius: 12, backgroundColor: '#e2e8f0', paddingHorizontal: 24, paddingVertical: 12 } });

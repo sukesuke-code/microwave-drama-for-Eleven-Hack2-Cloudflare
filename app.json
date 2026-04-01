@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Microwave Show",
+    "slug": "microwave-show",
+    "scheme": "microwaveshow",
+    "platforms": ["ios", "android", "web"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"]
+  }
+}
