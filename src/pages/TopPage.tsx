@@ -97,8 +97,8 @@ export default function TopPage({
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-              textShadow: '0 0 14px rgba(249,115,22,0.45)',
-              filter: 'drop-shadow(0 0 16px rgba(249,115,22,0.45))',
+              textShadow: isLight ? 'none' : '0 0 14px rgba(249,115,22,0.45)',
+              filter: isLight ? 'none' : 'drop-shadow(0 0 16px rgba(249,115,22,0.45))',
             }}
           >
             <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
