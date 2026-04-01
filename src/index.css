@@ -161,6 +161,124 @@
   will-change: opacity, filter, text-shadow;
 }
 
+@keyframes heroBlink {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1.28) saturate(1.3);
+    text-shadow:
+      0 0 12px rgba(255, 255, 255, 0.42),
+      0 0 30px rgba(249, 115, 22, 0.72),
+      0 0 52px rgba(249, 115, 22, 0.56);
+  }
+  50% {
+    opacity: 0.98;
+    filter: brightness(1.62) saturate(1.48);
+    text-shadow:
+      0 0 22px rgba(255, 255, 255, 0.68),
+      0 0 44px rgba(249, 115, 22, 0.96),
+      0 0 76px rgba(249, 115, 22, 0.76);
+  }
+}
+
+.hero-blink {
+  animation: heroBlink 2.4s ease-in-out infinite;
+  will-change: opacity, filter, text-shadow;
+}
+
+@keyframes heroCopyBlink {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1.06) saturate(1.08);
+    text-shadow: 0 0 6px rgba(249, 115, 22, 0.22);
+  }
+  50% {
+    opacity: 0.97;
+    filter: brightness(1.22) saturate(1.24);
+    text-shadow: 0 0 14px rgba(249, 115, 22, 0.38);
+  }
+}
+
+.hero-copy-blink {
+  animation: heroCopyBlink 2.5s ease-in-out infinite;
+  will-change: opacity, filter, text-shadow;
+}
+
+@keyframes heroBlinkMobile {
+  0%, 100% {
+    filter: brightness(1.22) saturate(1.24);
+    text-shadow:
+      0 0 10px rgba(255, 255, 255, 0.4),
+      0 0 26px rgba(249, 115, 22, 0.66),
+      0 0 48px rgba(249, 115, 22, 0.48);
+  }
+  50% {
+    filter: brightness(1.38) saturate(1.36);
+    text-shadow:
+      0 0 16px rgba(255, 255, 255, 0.56),
+      0 0 36px rgba(249, 115, 22, 0.84),
+      0 0 64px rgba(249, 115, 22, 0.68);
+  }
+}
+
+@keyframes heroCopyBlinkMobile {
+  0%, 100% {
+    filter: brightness(1.03) saturate(1.04);
+    text-shadow: 0 0 5px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    filter: brightness(1.14) saturate(1.16);
+    text-shadow: 0 0 10px rgba(249, 115, 22, 0.34);
+  }
+}
+
+@keyframes startButtonBlink {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1.08) saturate(1.08);
+  }
+  50% {
+    opacity: 0.96;
+    filter: brightness(1.2) saturate(1.18);
+  }
+}
+
+.start-button-blink {
+  animation: startButtonBlink 2.6s ease-in-out infinite;
+  will-change: opacity, filter;
+}
+
+@keyframes startButtonBlinkMobile {
+  0%, 100% {
+    filter: brightness(1.06) saturate(1.08);
+    box-shadow: 0 0 28px rgba(249, 115, 22, 0.45), 0 0 52px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.22);
+    box-shadow: 0 0 36px rgba(249, 115, 22, 0.62), 0 0 70px rgba(249, 115, 22, 0.28);
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-blink {
+    animation: heroBlinkMobile 2.4s ease-in-out infinite;
+    opacity: 1;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+
+  .hero-copy-blink {
+    animation: heroCopyBlinkMobile 2.6s ease-in-out infinite;
+    opacity: 1;
+  }
+
+  .start-button-blink {
+    animation: startButtonBlinkMobile 2.8s ease-in-out infinite;
+    opacity: 1;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+}
+
 @keyframes steadyBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.84; }
