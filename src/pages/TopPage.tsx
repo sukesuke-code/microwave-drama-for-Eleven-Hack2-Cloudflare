@@ -1,4 +1,4 @@
-import { Zap, Waves } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import FloatingSpheres from '../components/FloatingSpheres';
 
@@ -98,21 +98,14 @@ export default function TopPage({ onStart }: TopPageProps) {
           <div className="absolute inset-0 group-hover:animate-glow-pulse" />
         </button>
 
-        <div className="mt-12 flex items-center gap-4">
-          <div className="flex flex-col items-center gap-1">
-            <Waves size={18} className="text-orange-500/50" />
-            <span className="text-xs text-slate-500">4つのスタイル</span>
-          </div>
-          <div className="h-8 w-px bg-slate-700" />
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-orange-500/50 text-lg">🎙️</span>
-            <span className="text-xs text-slate-500">ドラマチック実況</span>
-          </div>
-          <div className="h-8 w-px bg-slate-700" />
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-orange-500/50 text-lg">🎉</span>
-            <span className="text-xs text-slate-500">完了エフェクト</span>
-          </div>
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+          <span>🏟️ スポーツ</span>
+          <span className="text-slate-600">·</span>
+          <span>🎬 映画</span>
+          <span className="text-slate-600">·</span>
+          <span>😱 ホラー</span>
+          <span className="text-slate-600">·</span>
+          <span>🌍 自然</span>
         </div>
       </div>
 
