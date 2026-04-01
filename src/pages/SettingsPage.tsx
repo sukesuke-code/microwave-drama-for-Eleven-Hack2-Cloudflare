@@ -173,12 +173,13 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
         </section>
 
         <section className="space-y-3">
-          <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">{locale === 'ja' ? '料理名' : 'Dish Name'}</p>
+          <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">DISH NAME (OPTIONAL)</p>
           <input
             type="text"
             value={dishName}
             onChange={(e) => setDishName(e.target.value)}
-            placeholder={locale === 'ja' ? '例: 冷凍チャーハン' : 'e.g. Frozen fried rice'}
+            maxLength={100}
+            placeholder="e.g. Frozen fried rice, Bento..."
             className="w-full rounded-2xl border border-gray-800 bg-gray-900 px-4 py-3 text-base text-white placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500"
           />
         </section>
