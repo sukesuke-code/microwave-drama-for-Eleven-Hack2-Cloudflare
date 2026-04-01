@@ -98,7 +98,6 @@ export default function TopPage({
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
               textShadow: 'none',
-              filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
             }}
           >
             <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
@@ -127,7 +126,7 @@ export default function TopPage({
           {t.topTagline2}
         </p>
 
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+        <div className="hero-section-blink mb-4 flex flex-wrap items-center justify-center gap-2 text-xs">
           <span>{t.styleShort[0]}</span>
           <span className="text-slate-600">·</span>
           <span>{t.styleShort[1]}</span>
@@ -156,10 +155,10 @@ export default function TopPage({
           <div className="absolute inset-0 group-hover:animate-glow-pulse" />
         </button>
 
-        <div className="mt-3 text-slate-600 text-xs text-center w-full max-w-xs">
+        <div className="hero-section-blink mt-3 text-xs text-center w-full max-w-xs">
           <div className="flex flex-col items-center gap-2">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
-          <span className="text-xs text-slate-500">{t.startHint}</span>
+          <span className="text-xs">{t.startHint}</span>
           </div>
         </div>
       </div>
