@@ -11,7 +11,13 @@ interface SettingsPageProps {
   onStart: (settings: Settings) => void;
 }
 
-const QUICK_SECONDS = [30, 60, 120, 180, 300] as const;
+const QUICK_PRESETS = [
+  { seconds: 30, label: '30Sec' },
+  { seconds: 60, label: '1Min' },
+  { seconds: 120, label: '2Min' },
+  { seconds: 180, label: '3Min' },
+  { seconds: 300, label: '5Min' },
+] as const;
 
 const STYLE_CARDS: Array<{
   id: NarrationStyle;
@@ -109,19 +115,19 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
         <section className="space-y-3">
           <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
-          <div className="flex flex-wrap gap-2">
-            {QUICK_SECONDS.map((preset) => {
-              const selected = preset === duration;
+          <div className="grid grid-cols-5 gap-1.5">
+            {QUICK_PRESETS.map((preset) => {
+              const selected = preset.seconds === duration;
               return (
                 <button
-                  key={preset}
+                  key={preset.seconds}
                   type="button"
-                  onClick={() => setDuration(preset)}
-                  className={`rounded-xl px-4 py-2 text-lg font-black transition-colors ${
+                  onClick={() => setDuration(preset.seconds)}
+                  className={`rounded-lg px-1 py-2 text-xs font-black leading-none transition-colors ${
                     selected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
-                  {preset < 60 ? `${preset}${t.seconds}` : `${preset / 60}${t.minutes}`}
+                  {preset.label}
                 </button>
               );
             })}
