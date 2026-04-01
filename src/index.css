@@ -161,6 +161,53 @@
   will-change: opacity, filter, text-shadow;
 }
 
+@keyframes heroBlink {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1.2) saturate(1.2);
+    text-shadow:
+      0 0 10px rgba(255, 255, 255, 0.32),
+      0 0 26px rgba(249, 115, 22, 0.58),
+      0 0 44px rgba(249, 115, 22, 0.42);
+  }
+  50% {
+    opacity: 0.98;
+    filter: brightness(1.45) saturate(1.35);
+    text-shadow:
+      0 0 18px rgba(255, 255, 255, 0.55),
+      0 0 36px rgba(249, 115, 22, 0.85),
+      0 0 62px rgba(249, 115, 22, 0.62);
+  }
+}
+
+.hero-blink {
+  animation: heroBlink 2.4s ease-in-out infinite;
+  will-change: opacity, filter, text-shadow;
+}
+
+@keyframes startButtonBlink {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1.08) saturate(1.08);
+  }
+  50% {
+    opacity: 0.96;
+    filter: brightness(1.2) saturate(1.18);
+  }
+}
+
+.start-button-blink {
+  animation: startButtonBlink 2.6s ease-in-out infinite;
+  will-change: opacity, filter;
+}
+
+@media (max-width: 640px) {
+  .start-button-blink {
+    animation: none;
+    filter: brightness(1.1) saturate(1.1);
+  }
+}
+
 @keyframes steadyBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.84; }
