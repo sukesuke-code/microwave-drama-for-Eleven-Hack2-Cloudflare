@@ -1,30 +1,34 @@
 import { useState } from 'react';
 import { ChevronLeft, Play } from 'lucide-react';
-import { Settings, NarrationStyle } from '../types';
-import { STYLE_CONFIGS } from '../data/narrations';
+import { Locale, Settings, NarrationStyle } from '../types';
+import { getStyleConfigs } from '../data/narrations';
+import { UI_TEXT } from '../i18n';
 
 interface SettingsPageProps {
+  locale: Locale;
   onBack: () => void;
   onStart: (settings: Settings) => void;
 }
 
-export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
+export default function SettingsPage({ locale, onBack, onStart }: SettingsPageProps) {
   const [minutes, setMinutes] = useState(2);
   const [seconds, setSeconds] = useState(0);
   const [dishName, setDishName] = useState('');
   const [selectedStyle, setSelectedStyle] = useState<NarrationStyle>('sports');
 
+  const t = UI_TEXT[locale];
   const totalSeconds = Math.max(1, Math.min(600, minutes * 60 + seconds));
 
   const handleStart = () => {
     onStart({
       totalSeconds,
-      dishName: dishName.trim() || '謎の料理',
+      dishName: dishName.trim() || t.mysteryDish,
       style: selectedStyle,
     });
   };
 
-  const styleConfig = STYLE_CONFIGS.find((s) => s.id === selectedStyle)!;
+  const styleConfigs = getStyleConfigs(locale);
+  const styleConfig = styleConfigs.find((s) => s.id === selectedStyle)!;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#00031a]">
@@ -35,19 +39,19 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
         >
           <ChevronLeft size={20} className="text-slate-300" />
         </button>
-        <h2 className="font-display text-xl font-bold text-white tracking-wide">設定</h2>
+        <h2 className="font-display text-xl font-bold text-white tracking-wide">{t.settings}</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-6 max-w-lg mx-auto space-y-8">
           <section>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-              時間設定
+              {t.timeSetting}
             </label>
             <div className="bg-white/3 border border-white/8 rounded-2xl p-5 space-y-5">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-400">分</span>
+                  <span className="text-sm text-slate-400">{t.minutes}</span>
                   <span className="font-display text-2xl font-bold text-orange-400">
                     {String(minutes).padStart(2, '0')}
                   </span>
@@ -62,14 +66,14 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
                   style={{ accentColor: '#f97316' }}
                 />
                 <div className="flex justify-between text-xs text-slate-600 mt-1">
-                  <span>0分</span>
-                  <span>9分</span>
+                  <span>0 {t.minutes}</span>
+                  <span>9 {t.minutes}</span>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-400">秒</span>
+                  <span className="text-sm text-slate-400">{t.seconds}</span>
                   <span className="font-display text-2xl font-bold text-orange-400">
                     {String(seconds).padStart(2, '0')}
                   </span>
@@ -84,8 +88,8 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
                   style={{ accentColor: '#f97316' }}
                 />
                 <div className="flex justify-between text-xs text-slate-600 mt-1">
-                  <span>0秒</span>
-                  <span>59秒</span>
+                  <span>0 {t.seconds}</span>
+                  <span>59 {t.seconds}</span>
                 </div>
               </div>
 
@@ -96,21 +100,21 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
                   {String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:
                   {String(totalSeconds % 60).padStart(2, '0')}
                 </span>
-                <p className="text-xs text-slate-500 mt-1">合計 {totalSeconds} 秒</p>
+                <p className="text-xs text-slate-500 mt-1">{t.total} {totalSeconds} {t.seconds}</p>
               </div>
             </div>
           </section>
 
           <section>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-              料理名（任意）
+              {t.optionalDish}
             </label>
             <div className="relative">
               <input
                 type="text"
                 value={dishName}
                 onChange={(e) => setDishName(e.target.value)}
-                placeholder="例: 冷凍チャーハン、お弁当..."
+                placeholder={t.dishPlaceholder}
                 maxLength={30}
                 className="w-full bg-white/3 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 text-base focus:outline-none focus:border-orange-500/50 transition-colors"
               />
@@ -122,10 +126,10 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
 
           <section>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-              実況スタイル
+              {t.style}
             </label>
             <div className="grid grid-cols-2 gap-3">
-              {STYLE_CONFIGS.map((s) => {
+              {styleConfigs.map((s) => {
                 const isSelected = selectedStyle === s.id;
                 return (
                   <button
@@ -176,7 +180,7 @@ export default function SettingsPage({ onBack, onStart }: SettingsPageProps) {
               }}
             >
               <Play size={22} fill="white" />
-              実況開始！
+              {t.startNarration}
             </button>
           </div>
         </div>

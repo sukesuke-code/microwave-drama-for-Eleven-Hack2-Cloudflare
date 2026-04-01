@@ -1,4 +1,6 @@
 export type NarrationStyle = 'sports' | 'movie' | 'horror' | 'nature';
+export type Locale = 'ja' | 'en';
+export type ThemeMode = 'dark' | 'light';
 
 export type AppScreen = 'top' | 'settings' | 'countdown' | 'result';
 

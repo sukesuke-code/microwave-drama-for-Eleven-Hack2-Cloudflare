@@ -1,4 +1,5 @@
-import { NarrationCue, NarrationStyle, StyleConfig } from '../types';
+import { Locale, NarrationCue, NarrationStyle, StyleConfig } from '../types';
+import { STYLE_LABELS } from '../i18n';
 
 export const STYLE_CONFIGS: StyleConfig[] = [
   {
@@ -43,11 +44,57 @@ export const STYLE_CONFIGS: StyleConfig[] = [
   },
 ];
 
+export function getStyleConfigs(locale: Locale): StyleConfig[] {
+  return STYLE_CONFIGS.map((config) => ({
+    ...config,
+    label: STYLE_LABELS[locale][config.id],
+  }));
+}
+
 export function getNarrationCues(
   style: NarrationStyle,
-  dishName: string
+  dishName: string,
+  locale: Locale = 'ja'
 ): NarrationCue[] {
-  const d = dishName || '謎の食べ物';
+  const d = dishName || (locale === 'ja' ? '謎の食べ物' : 'mystery dish');
+
+  if (locale === 'en') {
+    const englishCues: Record<NarrationStyle, NarrationCue[]> = {
+      sports: [
+        { minPercent: 90, maxPercent: 100, lines: [`And we are live! ${d} enters the arena!`] },
+        { minPercent: 70, maxPercent: 90, lines: [`Strong opening pace. ${d} looks focused.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`Halfway mark! Momentum is building.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`Final quarter. The heat is rising fast!`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Last sprint! This is championship territory.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`Final countdown—hold your breath!`] },
+      ],
+      movie: [
+        { minPercent: 90, maxPercent: 100, lines: [`This summer, one dish changes everything: "${d}"`] },
+        { minPercent: 70, maxPercent: 90, lines: [`The door is closed. Fate starts to move.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`No turning back now. The plot thickens.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`Time is running out. Climax incoming.`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Almost there... everything converges.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`In theaters soon. One final sound remains.`] },
+      ],
+      horror: [
+        { minPercent: 90, maxPercent: 100, lines: [`You put ${d} inside... and something woke up.`] },
+        { minPercent: 70, maxPercent: 90, lines: [`The light flickers. Something feels wrong.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`Midpoint. Few have returned from here.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`Run. Right now. If you still can.`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Too late. The countdown has chosen you.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`The ding draws near. No one is coming.`] },
+      ],
+      nature: [
+        { minPercent: 90, maxPercent: 100, lines: [`In the microwave wilds, ${d}'s journey begins.`] },
+        { minPercent: 70, maxPercent: 90, lines: [`Microwaves stir each molecule with precision.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`Transformation accelerates deep within.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`A critical threshold is near.`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Only moments remain in this thermal dance.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`The journey reaches its natural climax.`] },
+      ],
+    };
+    return englishCues[style];
+  }
 
   const cues: Record<NarrationStyle, NarrationCue[]> = {
     sports: [
@@ -259,10 +306,11 @@ export function getCurrentNarration(
   timeLeft: number,
   totalTime: number,
   style: NarrationStyle,
-  dishName: string
+  dishName: string,
+  locale: Locale = 'ja'
 ): string {
   const percent = totalTime > 0 ? (timeLeft / totalTime) * 100 : 0;
-  const cues = getNarrationCues(style, dishName);
+  const cues = getNarrationCues(style, dishName, locale);
 
   const matching = cues.filter(
     (c) => percent >= c.minPercent && percent < c.maxPercent
@@ -289,6 +337,14 @@ export const FINISH_LINES: Record<NarrationStyle, string> = {
     '「チーン」\n\n生命の循環は続く。\n\n${d}は今、その使命を全うした。',
 };
 
-export function getFinishLine(style: NarrationStyle, dishName: string): string {
-  return FINISH_LINES[style].replace(/\$\{d\}/g, dishName || '謎の食べ物');
+const FINISH_LINES_EN: Record<NarrationStyle, string> = {
+  sports: 'FINISH!!\n\nHistoric moment!\n\n${d}, you did it!\n\nDIIIIING!!!!',
+  movie: '"Ding."\n\n— And the story goes on.',
+  horror: '...\n\nDing.\n\n...\n\nRun.',
+  nature: '"Ding"\n\nThe cycle continues.\n\n${d} fulfilled its role.',
+};
+
+export function getFinishLine(style: NarrationStyle, dishName: string, locale: Locale = 'ja'): string {
+  const source = locale === 'ja' ? FINISH_LINES : FINISH_LINES_EN;
+  return source[style].replace(/\$\{d\}/g, dishName || (locale === 'ja' ? '謎の食べ物' : 'mystery dish'));
 }

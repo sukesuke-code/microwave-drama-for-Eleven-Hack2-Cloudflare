@@ -1,20 +1,23 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Settings } from '../types';
-import { STYLE_CONFIGS, getCurrentNarration, getFinishLine } from '../data/narrations';
+import { Locale, Settings } from '../types';
+import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
 import WaveAnimation from '../components/WaveAnimation';
 import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
+import { UI_TEXT } from '../i18n';
 
 interface CountdownPageProps {
+  locale: Locale;
   settings: Settings;
   onFinish: () => void;
 }
 
-export default function CountdownPage({ settings, onFinish }: CountdownPageProps) {
+export default function CountdownPage({ locale, settings, onFinish }: CountdownPageProps) {
   const { totalSeconds, dishName, style } = settings;
+  const t = UI_TEXT[locale];
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
   const [narrationText, setNarrationText] = useState('');
   const [isFlashing, setIsFlashing] = useState(false);
@@ -24,23 +27,23 @@ export default function CountdownPage({ settings, onFinish }: CountdownPageProps
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const styleConfig = STYLE_CONFIGS.find((s) => s.id === style)!;
+  const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
 
   const updateNarration = useCallback((tl: number, tt: number) => {
     if (tl <= 0) return;
-    const text = getCurrentNarration(tl, tt, style, dishName);
+    const text = getCurrentNarration(tl, tt, style, dishName, locale);
     if (text !== prevNarrationRef.current) {
       prevNarrationRef.current = text;
       setNarrationText(text);
     }
-  }, [style, dishName]);
+  }, [style, dishName, locale]);
 
   useEffect(() => {
-    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName);
+    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
-  }, [totalSeconds, style, dishName]);
+  }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
     if (isPaused || isFinished) return;
@@ -53,7 +56,7 @@ export default function CountdownPage({ settings, onFinish }: CountdownPageProps
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
-          const finishText = getFinishLine(style, dishName);
+          const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
           setTimeout(() => setIsFlashing(false), 600);
@@ -68,7 +71,7 @@ export default function CountdownPage({ settings, onFinish }: CountdownPageProps
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
@@ -108,7 +111,7 @@ export default function CountdownPage({ settings, onFinish }: CountdownPageProps
             onClick={() => setIsPaused((p) => !p)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs font-bold text-slate-400"
           >
-            {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+            {isPaused ? t.resume : t.pause}
           </button>
         </div>
 
@@ -149,7 +152,7 @@ export default function CountdownPage({ settings, onFinish }: CountdownPageProps
                 textShadow: `0 0 15px ${styleConfig.accentColor}`,
               }}
             >
-              もうすぐ チーン！
+              {t.almostDone}
             </div>
           )}
 
@@ -164,14 +167,14 @@ export default function CountdownPage({ settings, onFinish }: CountdownPageProps
                 filter: `drop-shadow(0 0 20px ${styleConfig.accentColor})`,
               }}
             >
-              チーン！！！
+              {t.done}
             </div>
           )}
         </div>
 
         <div className="px-4 pb-6 text-center">
           <p className="text-xs text-slate-600">
-            {totalSeconds - timeLeft} 秒経過 / {totalSeconds} 秒
+            {totalSeconds - timeLeft} {t.elapsed} / {totalSeconds} {t.seconds}
           </p>
         </div>
       </div>

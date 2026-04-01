@@ -1,35 +1,33 @@
 import { RotateCcw, Share2, Trophy } from 'lucide-react';
-import { Settings } from '../types';
-import { STYLE_CONFIGS } from '../data/narrations';
+import { Locale, Settings } from '../types';
+import { getStyleConfigs } from '../data/narrations';
+import { RESULT_MESSAGES, UI_TEXT } from '../i18n';
 
 interface ResultPageProps {
+  locale: Locale;
   settings: Settings;
   onReplay: () => void;
   onHome: () => void;
 }
 
-export default function ResultPage({ settings, onReplay, onHome }: ResultPageProps) {
+export default function ResultPage({ locale, settings, onReplay, onHome }: ResultPageProps) {
   const { dishName, style } = settings;
-  const styleConfig = STYLE_CONFIGS.find((s) => s.id === style)!;
+  const t = UI_TEXT[locale];
+  const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
 
   const handleShare = async () => {
-    const text = `チンドラマで「${dishName}」を完璧に温め直した！\n\n#チンドラマ #ChingDrama #電子レンジ`;
+    const text = locale === 'ja'
+      ? `チンドラマで「${dishName}」を完璧に温め直した！\n\n#チンドラマ #ChingDrama #電子レンジ`
+      : `I reheated "${dishName}" perfectly with Ching Drama!\n\n#ChingDrama #Microwave`;
     if (navigator.share) {
       await navigator.share({ text }).catch(() => null);
     } else {
       await navigator.clipboard.writeText(text).catch(() => null);
-      alert('テキストをコピーしました！');
+      alert(t.shareCopied);
     }
   };
 
-  const messages: Record<typeof style, string[]> = {
-    sports: ['金メダル確定！！', '歴史的快挙達成！！！', '観客総立ち！！！'],
-    movie: ['エンドロールが流れる…', '名作、誕生。', 'スタンディングオベーション。'],
-    horror: ['…生き残った。', '扉の向こう側へ。', '…今夜は眠れない。'],
-    nature: ['生命の循環は続く。', '大自然の摂理に従い。', '次の旅が待っている。'],
-  };
-
-  const randomMessage = messages[style][Math.floor(Math.random() * messages[style].length)];
+  const randomMessage = RESULT_MESSAGES[locale][style][Math.floor(Math.random() * RESULT_MESSAGES[locale][style].length)];
 
   return (
     <div
@@ -58,7 +56,7 @@ export default function ResultPage({ settings, onReplay, onHome }: ResultPagePro
         </div>
 
         <h1 className="font-display text-4xl font-bold text-white mb-2 animate-fade-up">
-          ドラマ完了！
+          {t.dramaDone}
         </h1>
 
         <p
@@ -101,7 +99,7 @@ export default function ResultPage({ settings, onReplay, onHome }: ResultPagePro
             }}
           >
             <RotateCcw size={20} />
-            もう一度
+            {t.replay}
           </button>
 
           <button
@@ -109,14 +107,14 @@ export default function ResultPage({ settings, onReplay, onHome }: ResultPagePro
             className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-bold text-slate-300 text-base bg-white/5 border border-white/10 transition-all hover:bg-white/8 active:scale-95"
           >
             <Share2 size={18} />
-            シェア
+            {t.share}
           </button>
 
           <button
             onClick={onHome}
             className="text-slate-500 text-sm py-2 hover:text-slate-400 transition-colors"
           >
-            トップに戻る
+            {t.backTop}
           </button>
         </div>
       </div>

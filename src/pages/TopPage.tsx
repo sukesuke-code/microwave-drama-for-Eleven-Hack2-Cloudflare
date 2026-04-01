@@ -1,15 +1,48 @@
 import { Zap } from 'lucide-react';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import FloatingSpheres from '../components/FloatingSpheres';
+import { Locale, ThemeMode } from '../types';
+import { UI_TEXT } from '../i18n';
 
 interface TopPageProps {
   onStart: () => void;
+  locale: Locale;
+  themeMode: ThemeMode;
+  onLocaleChange: (locale: Locale) => void;
+  onThemeModeChange: (themeMode: ThemeMode) => void;
 }
 
-export default function TopPage({ onStart }: TopPageProps) {
+export default function TopPage({
+  onStart,
+  locale,
+  themeMode,
+  onLocaleChange,
+  onThemeModeChange,
+}: TopPageProps) {
+  const t = UI_TEXT[locale];
+  const isLight = themeMode === 'light';
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#00031a] noise-bg">
+    <div className={`min-h-screen flex flex-col items-center justify-center relative overflow-hidden noise-bg ${isLight ? 'bg-slate-100' : 'bg-[#00031a]'}`}>
       <FloatingSpheres />
+      <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+        <select
+          value={locale}
+          onChange={(e) => onLocaleChange(e.target.value as Locale)}
+          className={`text-xs rounded-lg px-2 py-1 border ${isLight ? 'bg-white text-slate-700 border-slate-300' : 'bg-slate-900/80 text-slate-200 border-white/10'}`}
+          aria-label="Language switcher"
+        >
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+        <button
+          onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
+          className={`text-xs rounded-lg px-2 py-1 border ${isLight ? 'bg-white text-slate-700 border-slate-300' : 'bg-slate-900/80 text-slate-200 border-white/10'}`}
+          aria-label="Dark mode switcher"
+        >
+          {isLight ? '🌙 Dark' : '☀️ Light'}
+        </button>
+      </div>
 
       <div
         className="absolute inset-0 pointer-events-none"
@@ -73,11 +106,11 @@ export default function TopPage({ onStart }: TopPageProps) {
           }}
         />
 
-        <p className="text-center text-slate-300/80 text-base leading-relaxed mb-2 font-medium">
-          世界で最も退屈な待ち時間を
+        <p className={`text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}>
+          {t.topTagline1}
         </p>
-        <p className="text-center text-white text-lg font-bold mb-10">
-          人生で最もドラマチックな瞬間に変える
+        <p className={`text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+          {t.topTagline2}
         </p>
 
         <button
@@ -99,20 +132,20 @@ export default function TopPage({ onStart }: TopPageProps) {
         </button>
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
-          <span>🏟️ スポーツ</span>
+          <span>{t.styleShort[0]}</span>
           <span className="text-slate-600">·</span>
-          <span>🎬 映画</span>
+          <span>{t.styleShort[1]}</span>
           <span className="text-slate-600">·</span>
-          <span>😱 ホラー</span>
+          <span>{t.styleShort[2]}</span>
           <span className="text-slate-600">·</span>
-          <span>🌍 自然</span>
+          <span>{t.styleShort[3]}</span>
         </div>
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-600 text-xs text-center w-full max-w-xs">
         <div className="flex flex-col items-center gap-3">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
-          <span className="text-xs text-slate-500">電子レンジのドラマが今始まる</span>
+          <span className="text-xs text-slate-500">{t.startHint}</span>
         </div>
       </div>
     </div>
