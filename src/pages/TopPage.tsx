@@ -1,3 +1,4 @@
+import { Zap } from 'lucide-react';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import FloatingSpheres from '../components/FloatingSpheres';
 import { Locale, ThemeMode } from '../types';
@@ -73,7 +74,7 @@ export default function TopPage({
 
       <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full">
         <h1
-          className="font-display text-5xl md:text-6xl font-bold text-center mb-2 tracking-tight whitespace-nowrap soft-glow-pulse"
+          className="font-display text-5xl md:text-6xl font-bold text-center mb-2 tracking-tight whitespace-nowrap soft-glow-pulse inline-flex items-center gap-2"
           style={{
             background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
             WebkitBackgroundClip: 'text',
@@ -83,7 +84,9 @@ export default function TopPage({
             filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
           }}
         >
-          {t.topTitle}
+          <Zap size={34} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
+          <span>{t.topTitle}</span>
+          <Zap size={34} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
         </h1>
 
         <div
