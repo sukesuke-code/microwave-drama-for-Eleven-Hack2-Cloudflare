@@ -7,7 +7,7 @@ interface AudioWaveVisualizerProps {
 }
 
 type WavePattern = {
-  keyframe: 'eqBar' | 'eqBarWide' | 'eqBarStaccato';
+  keyframe: 'eqBar' | 'eqBarWide' | 'eqBarStaccato' | 'eqBarClassic';
   durationMin: number;
   durationMax: number;
   minHeight: number;
@@ -17,6 +17,15 @@ type WavePattern = {
 };
 
 const WAVE_PATTERNS: WavePattern[] = [
+  {
+    keyframe: 'eqBarClassic',
+    durationMin: 0.9,
+    durationMax: 0.9,
+    minHeight: 8,
+    maxHeight: 30,
+    opacityMin: 0.45,
+    opacityMax: 0.88,
+  },
   {
     keyframe: 'eqBar',
     durationMin: 0.82,
