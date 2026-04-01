@@ -63,7 +63,7 @@ const STYLE_CARDS: Array<{
 
 function clampDuration(value: number): number {
   if (Number.isNaN(value)) return 1;
-  return Math.max(1, Math.min(600, value));
+  return Math.max(1, Math.min(600, Math.floor(value)));
 }
 
 export default function SettingsPage({ locale, onBack, onStart }: SettingsPageProps) {
@@ -166,7 +166,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
               type="range"
               min={1}
               max={600}
-              step={0.1}
+              step={1}
               value={duration}
               onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
               className="h-2 w-full cursor-pointer accent-orange-500"
