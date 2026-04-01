@@ -6,7 +6,7 @@ interface WaveAnimationProps {
 }
 
 const STYLE_COLORS: Record<NarrationStyle, string> = {
-  sports: '#f97316',
+  sports: '#38bdf8',
   movie: '#f59e0b',
   horror: '#dc2626',
   nature: '#10b981',

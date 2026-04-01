@@ -10,7 +10,7 @@ interface CircularTimerProps {
 }
 
 const STYLE_COLORS: Record<NarrationStyle, { stroke: string; glow: string; text: string }> = {
-  sports: { stroke: '#f97316', glow: 'rgba(249,115,22,0.6)', text: '#fb923c' },
+  sports: { stroke: '#38bdf8', glow: 'rgba(56,189,248,0.6)', text: '#7dd3fc' },
   movie: { stroke: '#f59e0b', glow: 'rgba(245,158,11,0.6)', text: '#fbbf24' },
   horror: { stroke: '#dc2626', glow: 'rgba(220,38,38,0.6)', text: '#ef4444' },
   nature: { stroke: '#10b981', glow: 'rgba(16,185,129,0.6)', text: '#34d399' },

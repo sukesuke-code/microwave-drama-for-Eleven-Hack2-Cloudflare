@@ -22,7 +22,7 @@ export default function BackgroundEffect({ style, isDanger }: BackgroundEffectPr
     const particles: { x: number; y: number; vx: number; vy: number; r: number; alpha: number }[] = [];
 
     const configs: Record<NarrationStyle, { color: string; count: number; speed: number }> = {
-      sports: { color: '#f97316', count: 30, speed: 1.5 },
+      sports: { color: '#38bdf8', count: 30, speed: 1.5 },
       movie: { color: '#f59e0b', count: 20, speed: 0.5 },
       horror: { color: '#dc2626', count: 25, speed: 0.8 },
       nature: { color: '#10b981', count: 35, speed: 0.7 },

@@ -7,21 +7,21 @@ interface NarrationTextProps {
 }
 
 const STYLE_TEXT_COLORS: Record<NarrationStyle, string> = {
-  sports: 'text-orange-300',
+  sports: 'text-sky-300',
   movie: 'text-yellow-300',
   horror: 'text-red-300',
   nature: 'text-emerald-300',
 };
 
 const STYLE_BORDER_COLORS: Record<NarrationStyle, string> = {
-  sports: 'border-orange-500/30',
+  sports: 'border-sky-500/30',
   movie: 'border-yellow-500/30',
   horror: 'border-red-500/30',
   nature: 'border-emerald-500/30',
 };
 
 const STYLE_BG: Record<NarrationStyle, string> = {
-  sports: 'bg-orange-950/20',
+  sports: 'bg-blue-950/20',
   movie: 'bg-yellow-950/20',
   horror: 'bg-red-950/20',
   nature: 'bg-emerald-950/20',
