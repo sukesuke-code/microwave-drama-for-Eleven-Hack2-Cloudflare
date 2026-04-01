@@ -88,7 +88,7 @@ export default function TopPage({
         }}
       />
 
-      <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full">
+      <div className="relative z-10 mt-12 md:mt-16 flex flex-col items-center px-6 max-w-md w-full">
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
             className="font-display text-5xl md:text-6xl font-bold text-center mb-2 tracking-tight whitespace-nowrap soft-glow-pulse inline-flex items-center gap-2"
