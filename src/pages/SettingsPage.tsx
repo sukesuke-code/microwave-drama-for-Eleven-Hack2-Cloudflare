@@ -1,7 +1,6 @@
-import { useState } from 'react';
-import { ChevronLeft, Moon, Play, Sun } from 'lucide-react';
-import { Locale, Settings, NarrationStyle, ThemeMode } from '../types';
-import { getStyleConfigs } from '../data/narrations';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, Moon, Sun } from 'lucide-react';
+import { Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
 
 interface SettingsPageProps {
@@ -12,6 +11,61 @@ interface SettingsPageProps {
   onStart: (settings: Settings) => void;
 }
 
+const QUICK_PRESETS = [
+  { seconds: 30, label: '30Sec' },
+  { seconds: 60, label: '1Min' },
+  { seconds: 120, label: '2Min' },
+  { seconds: 180, label: '3Min' },
+  { seconds: 300, label: '5Min' },
+] as const;
+
+const STYLE_CARDS: Array<{
+  id: NarrationStyle;
+  emoji: string;
+  title: { ja: string; en: string };
+  description: { ja: string; en: string };
+  gradient: string;
+  border: string;
+}> = [
+  {
+    id: 'sports',
+    emoji: '🏟️',
+    title: { ja: 'スポーツ実況', en: 'Sports' },
+    description: { ja: '熱狂的な生中継スタイル', en: 'Live play-by-play style' },
+    gradient: 'from-blue-900/60 to-cyan-900/60',
+    border: 'border-cyan-700',
+  },
+  {
+    id: 'movie',
+    emoji: '🎬',
+    title: { ja: '映画予告編', en: 'Movie Trailer' },
+    description: { ja: '壮大なシネマティック演出', en: 'Epic cinematic delivery' },
+    gradient: 'from-yellow-900/60 to-orange-900/60',
+    border: 'border-yellow-700',
+  },
+  {
+    id: 'horror',
+    emoji: '😱',
+    title: { ja: 'ホラー', en: 'Horror' },
+    description: { ja: '恐怖の深淵へようこそ…', en: 'Welcome to the abyss...' },
+    gradient: 'from-red-950/60 to-gray-900/60',
+    border: 'border-red-800',
+  },
+  {
+    id: 'nature',
+    emoji: '🌍',
+    title: { ja: '自然ドキュメンタリー', en: 'Nature Doc' },
+    description: { ja: 'BBCスタイルの静謐な語り', en: 'Calm BBC-style narration' },
+    gradient: 'from-green-950/60 to-emerald-900/60',
+    border: 'border-emerald-700',
+  },
+];
+
+function clampDuration(value: number): number {
+  if (Number.isNaN(value)) return 1;
+  return Math.max(1, Math.min(600, Math.floor(value)));
+}
+
 export default function SettingsPage({
   locale,
   themeMode,
@@ -19,198 +73,181 @@ export default function SettingsPage({
   onBack,
   onStart,
 }: SettingsPageProps) {
-  const [minutes, setMinutes] = useState(2);
-  const [seconds, setSeconds] = useState(0);
-  const [dishName, setDishName] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState<NarrationStyle>('sports');
+  const [duration, setDuration] = useState(60);
+  const [dishName, setDishName] = useState(locale === 'ja' ? '冷凍チャーハン' : '');
+  const [style, setStyle] = useState<NarrationStyle>('sports');
 
   const t = UI_TEXT[locale];
   const isLight = themeMode === 'light';
-  const totalSeconds = Math.max(1, Math.min(600, minutes * 60 + seconds));
+
+  const { minutes, seconds } = useMemo(() => {
+    const m = Math.floor(duration / 60);
+    const s = duration % 60;
+    return { minutes: m, seconds: s };
+  }, [duration]);
+
+  const updateMinutes = (value: string) => {
+    const nextMinutes = Math.max(0, Math.min(9, Number(value || '0')));
+    setDuration(clampDuration(nextMinutes * 60 + seconds));
+  };
+
+  const updateSeconds = (value: string) => {
+    const nextSeconds = Math.max(0, Math.min(59, Number(value || '0')));
+    setDuration(clampDuration(minutes * 60 + nextSeconds));
+  };
 
   const handleStart = () => {
     onStart({
-      totalSeconds,
+      totalSeconds: duration,
       dishName: dishName.trim() || t.mysteryDish,
-      style: selectedStyle,
+      style,
     });
   };
 
-  const styleConfigs = getStyleConfigs(locale);
-  const styleConfig = styleConfigs.find((s) => s.id === selectedStyle)!;
-
   return (
-    <div className={`min-h-screen flex flex-col ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#00031a] text-slate-100'}`}>
-      <div className={`flex items-center justify-between gap-3 px-4 pt-safe pt-4 pb-4 border-b ${isLight ? 'border-slate-200 bg-white/90' : 'border-white/5'}`}>
-        <div className="flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className={`flex items-center justify-center w-9 h-9 rounded-xl transition-colors ${isLight ? 'bg-slate-200 hover:bg-slate-300' : 'bg-white/5 hover:bg-white/10'}`}
-        >
-          <ChevronLeft size={20} className={isLight ? 'text-slate-700' : 'text-slate-300'} />
-        </button>
-        <h2 className={`font-display text-xl font-bold tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.settings}</h2>
-        </div>
-        <button
-          onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-          className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
-            isLight
-              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
-          }`}
-          aria-label="Dark mode switcher"
-        >
-          {isLight ? <Moon size={14} /> : <Sun size={14} />}
-          {isLight ? 'Dark' : 'Light'}
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-6 max-w-lg mx-auto space-y-8">
-          <section>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t.timeSetting}
-            </label>
-            <div className={`rounded-2xl p-5 space-y-5 border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/3 border-white/8'}`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{t.minutes}</span>
-                  <span className="font-display text-2xl font-bold text-orange-400">
-                    {String(minutes).padStart(2, '0')}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="9"
-                  value={minutes}
-                  onChange={(e) => setMinutes(Number(e.target.value))}
-                  className="w-full accent-orange-500 h-2 rounded-full cursor-pointer"
-                  style={{ accentColor: '#f97316' }}
-                />
-                <div className={`flex justify-between text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <span>0 {t.minutes}</span>
-                  <span>9 {t.minutes}</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{t.seconds}</span>
-                  <span className="font-display text-2xl font-bold text-orange-400">
-                    {String(seconds).padStart(2, '0')}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="59"
-                  value={seconds}
-                  onChange={(e) => setSeconds(Number(e.target.value))}
-                  className="w-full h-2 rounded-full cursor-pointer"
-                  style={{ accentColor: '#f97316' }}
-                />
-                <div className={`flex justify-between text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <span>0 {t.seconds}</span>
-                  <span>59 {t.seconds}</span>
-                </div>
-              </div>
-
-              <div
-                className={`text-center py-3 rounded-xl border ${isLight ? 'border-orange-300/60 bg-orange-100/80' : 'border-orange-500/20 bg-orange-950/20'}`}
-              >
-                <span className="font-display text-3xl font-bold text-orange-400">
-                  {String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:
-                  {String(totalSeconds % 60).padStart(2, '0')}
-                </span>
-                <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.total} {totalSeconds} {t.seconds}</p>
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t.optionalDish}
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={dishName}
-                onChange={(e) => setDishName(e.target.value)}
-                placeholder={t.dishPlaceholder}
-                maxLength={30}
-                className={`w-full border rounded-2xl px-5 py-4 text-base focus:outline-none focus:border-orange-500/50 transition-colors ${
-                  isLight
-                    ? 'bg-white text-slate-900 placeholder-slate-400 border-slate-200'
-                    : 'bg-white/3 text-white placeholder-slate-600 border-white/10'
-                }`}
-              />
-              <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                {dishName.length}/30
-              </span>
-            </div>
-          </section>
-
-          <section>
-            <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t.style}
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {styleConfigs.map((s) => {
-                const isSelected = selectedStyle === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedStyle(s.id)}
-                    className={`
-                      relative flex flex-col items-center justify-center
-                      p-4 rounded-2xl border-2 transition-all duration-200
-                      ${isSelected
-                        ? isLight ? 'bg-orange-50 scale-[1.02]' : 'bg-white/8 scale-[1.02]'
-                        : isLight ? 'bg-white border-slate-200 hover:bg-slate-100' : 'bg-white/3 border-white/8 hover:bg-white/5'
-                      }
-                    `}
-                    style={isSelected ? {
-                      borderColor: s.accentColor,
-                      boxShadow: `0 0 20px ${s.accentColor}30`,
-                    } : {
-                      borderColor: isLight ? 'rgb(226 232 240)' : 'rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    {isSelected && (
-                      <div
-                        className="absolute top-2 right-2 w-2 h-2 rounded-full"
-                        style={{ backgroundColor: s.accentColor }}
-                      />
-                    )}
-                    <span className="text-3xl mb-2">{s.emoji}</span>
-                    <span
-                      className="text-sm font-bold text-center leading-tight"
-                      style={{ color: isSelected ? s.accentColor : 'rgb(148 163 184)' }}
-                    >
-                      {s.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <div className="pb-8">
+    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-gray-100 text-gray-900' : 'bg-gray-950 text-white'}`}>
+      <div className="mx-auto flex h-full w-full max-w-md flex-col p-4">
+        <header className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleStart}
-              disabled={totalSeconds < 1}
-              className="w-full py-5 rounded-2xl font-display text-xl font-bold tracking-widest text-white uppercase flex items-center justify-center gap-3 transition-all duration-200 active:scale-95 disabled:opacity-50"
-              style={{
-                background: `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`,
-                boxShadow: `0 0 25px ${styleConfig.accentColor}50`,
-              }}
+              type="button"
+              onClick={onBack}
+              className={`rounded-lg p-1 transition-colors ${isLight ? 'text-gray-700 hover:bg-gray-200' : 'text-white/80 hover:bg-white/10'}`}
+              aria-label="back"
             >
-              <Play size={22} fill="white" />
-              {t.startNarration}
+              <ChevronLeft size={24} />
             </button>
+            <h1 className={`text-xl font-black ${isLight ? 'text-gray-900' : 'text-white'}`}>{t.settings}</h1>
           </div>
-        </div>
+          <button
+            type="button"
+            onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
+            className={`rounded-lg px-2 py-1 text-xs font-bold transition-colors ${isLight ? 'bg-gray-200 text-gray-700' : 'bg-gray-800 text-gray-200'}`}
+          >
+            {isLight ? <Moon size={14} /> : <Sun size={14} />}
+          </button>
+        </header>
+
+        <section className="mb-3 space-y-2">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
+
+          <div className="grid grid-cols-5 gap-1">
+            {QUICK_PRESETS.map((preset) => {
+              const selected = preset.seconds === duration;
+              return (
+                <button
+                  key={preset.seconds}
+                  type="button"
+                  onClick={() => setDuration(preset.seconds)}
+                  className={`rounded-lg px-1 py-1.5 text-[10px] font-black leading-none transition-colors ${
+                    selected
+                      ? 'bg-orange-500 text-white'
+                      : isLight
+                        ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className={`rounded-xl border p-3 ${isLight ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-900'}`}>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+              <div>
+                <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.minutes}</p>
+                <input
+                  type="number"
+                  min={0}
+                  max={9}
+                  value={minutes}
+                  onChange={(e) => updateMinutes(e.target.value)}
+                  className={`w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                />
+              </div>
+              <span className="text-3xl font-black text-orange-400">:</span>
+              <div>
+                <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.seconds}</p>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={String(seconds).padStart(2, '0')}
+                  onChange={(e) => updateSeconds(e.target.value)}
+                  className={`w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-0.5">
+            <input
+              type="range"
+              min={1}
+              max={600}
+              step={1}
+              value={duration}
+              onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
+              className="h-2 w-full cursor-pointer accent-orange-500"
+            />
+            <div className={`flex justify-between text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
+              <span>1{t.seconds}</span>
+              <span>10{t.minutes}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-3 space-y-2">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.optionalDish}</p>
+          <input
+            type="text"
+            value={dishName}
+            onChange={(e) => setDishName(e.target.value)}
+            maxLength={100}
+            placeholder={locale === 'ja' ? '例: 冷凍チャーハン、お弁当...' : 'e.g. Frozen fried rice, Bento...'}
+            className={`w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
+          />
+        </section>
+
+        <section className="mb-3 flex-1 space-y-2">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
+          <div className="grid h-full max-h-[34vh] grid-cols-2 gap-2">
+            {STYLE_CARDS.map((card) => {
+              const selected = style === card.id;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => setStyle(card.id)}
+                  className={`relative rounded-xl border bg-gradient-to-br p-3 text-left transition-all ${card.gradient} ${card.border} ${
+                    selected
+                      ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
+                      : 'opacity-70 hover:opacity-90'
+                  }`}
+                >
+                  {selected && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-orange-400" />}
+                  <p className="mb-1 text-lg">{card.emoji}</p>
+                  <p className="text-xs font-bold text-white">{card.title[locale]}</p>
+                  <p className="mt-1 text-[10px] text-gray-300">{card.description[locale]}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={duration < 1}
+          className="mt-auto w-full rounded-xl py-3 text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40"
+          style={{
+            background: 'linear-gradient(135deg, #ea580c, #dc2626)',
+            boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
+          }}
+        >
+          {t.startNarration}
+        </button>
       </div>
     </div>
   );
