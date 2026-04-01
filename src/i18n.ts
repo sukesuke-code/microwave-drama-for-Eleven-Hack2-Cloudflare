@@ -46,8 +46,8 @@ export const UI_TEXT = {
     styleShort: ['🏟️ スポーツ', '🎬 映画', '😱 ホラー', '🌍 自然'],
   },
   en: {
-    topTagline1: 'Turn the world’s most boring wait',
-    topTagline2: 'into your most dramatic moment.',
+    topTagline1: 'Turn the world’s most boring wait into',
+    topTagline2: 'your most dramatic moment.',
     topTitle: 'Microwave Show',
     startButton: 'START',
     startHint: 'Your microwave drama starts now',
