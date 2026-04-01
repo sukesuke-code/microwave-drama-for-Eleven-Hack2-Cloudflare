@@ -44,11 +44,24 @@ export const STYLE_CONFIGS: StyleConfig[] = [
   },
 ];
 
+const STYLE_CONFIGS_CACHE: Record<Locale, ReadonlyArray<StyleConfig>> = {
+  ja: Object.freeze(STYLE_CONFIGS.map((config) => Object.freeze({ ...config, label: STYLE_LABELS.ja[config.id] }))),
+  en: Object.freeze(STYLE_CONFIGS.map((config) => Object.freeze({ ...config, label: STYLE_LABELS.en[config.id] }))),
+};
+
 export function getStyleConfigs(locale: Locale): StyleConfig[] {
-  return STYLE_CONFIGS.map((config) => ({
-    ...config,
-    label: STYLE_LABELS[locale][config.id],
-  }));
+  return STYLE_CONFIGS_CACHE[locale] as StyleConfig[];
+}
+
+const narrationCuesCache = new Map<string, NarrationCue[]>();
+const NARRATION_CACHE_MAX = 120;
+
+function setNarrationCache(key: string, value: NarrationCue[]) {
+  if (narrationCuesCache.size >= NARRATION_CACHE_MAX) {
+    const oldestKey = narrationCuesCache.keys().next().value;
+    if (oldestKey) narrationCuesCache.delete(oldestKey);
+  }
+  narrationCuesCache.set(key, value);
 }
 
 export function getNarrationCues(
@@ -57,43 +70,56 @@ export function getNarrationCues(
   locale: Locale = 'ja'
 ): NarrationCue[] {
   const d = dishName || (locale === 'ja' ? '謎の食べ物' : 'mystery dish');
+  const cacheKey = `${locale}:${style}:${d}`;
+  const cached = narrationCuesCache.get(cacheKey);
+  if (cached) return cached;
 
+  let result: NarrationCue[];
   if (locale === 'en') {
-    const englishCues: Record<NarrationStyle, NarrationCue[]> = {
-      sports: [
+    switch (style) {
+      case 'sports':
+        result = [
         { minPercent: 90, maxPercent: 100, lines: [`And we are live! ${d} enters the arena!`] },
         { minPercent: 70, maxPercent: 90, lines: [`Strong opening pace. ${d} looks focused.`] },
         { minPercent: 50, maxPercent: 70, lines: [`Halfway mark! Momentum is building.`] },
         { minPercent: 25, maxPercent: 50, lines: [`Final quarter. The heat is rising fast!`] },
         { minPercent: 10, maxPercent: 25, lines: [`Last sprint! This is championship territory.`] },
         { minPercent: 0, maxPercent: 10, lines: [`Final countdown—hold your breath!`] },
-      ],
-      movie: [
+        ];
+        break;
+      case 'movie':
+        result = [
         { minPercent: 90, maxPercent: 100, lines: [`This summer, one dish changes everything: "${d}"`] },
         { minPercent: 70, maxPercent: 90, lines: [`The door is closed. Fate starts to move.`] },
         { minPercent: 50, maxPercent: 70, lines: [`No turning back now. The plot thickens.`] },
         { minPercent: 25, maxPercent: 50, lines: [`Time is running out. Climax incoming.`] },
         { minPercent: 10, maxPercent: 25, lines: [`Almost there... everything converges.`] },
         { minPercent: 0, maxPercent: 10, lines: [`In theaters soon. One final sound remains.`] },
-      ],
-      horror: [
+        ];
+        break;
+      case 'horror':
+        result = [
         { minPercent: 90, maxPercent: 100, lines: [`You put ${d} inside... and something woke up.`] },
         { minPercent: 70, maxPercent: 90, lines: [`The light flickers. Something feels wrong.`] },
         { minPercent: 50, maxPercent: 70, lines: [`Midpoint. Few have returned from here.`] },
         { minPercent: 25, maxPercent: 50, lines: [`Run. Right now. If you still can.`] },
         { minPercent: 10, maxPercent: 25, lines: [`Too late. The countdown has chosen you.`] },
         { minPercent: 0, maxPercent: 10, lines: [`The ding draws near. No one is coming.`] },
-      ],
-      nature: [
+        ];
+        break;
+      case 'nature':
+        result = [
         { minPercent: 90, maxPercent: 100, lines: [`In the microwave wilds, ${d}'s journey begins.`] },
         { minPercent: 70, maxPercent: 90, lines: [`Microwaves stir each molecule with precision.`] },
         { minPercent: 50, maxPercent: 70, lines: [`Transformation accelerates deep within.`] },
         { minPercent: 25, maxPercent: 50, lines: [`A critical threshold is near.`] },
         { minPercent: 10, maxPercent: 25, lines: [`Only moments remain in this thermal dance.`] },
         { minPercent: 0, maxPercent: 10, lines: [`The journey reaches its natural climax.`] },
-      ],
-    };
-    return englishCues[style];
+        ];
+        break;
+    }
+    setNarrationCache(cacheKey, result);
+    return result;
   }
 
   const cues: Record<NarrationStyle, NarrationCue[]> = {
@@ -299,7 +325,9 @@ export function getNarrationCues(
     ],
   };
 
-  return cues[style];
+  result = cues[style];
+  setNarrationCache(cacheKey, result);
+  return result;
 }
 
 export function getCurrentNarration(
@@ -312,16 +340,7 @@ export function getCurrentNarration(
   const percent = totalTime > 0 ? (timeLeft / totalTime) * 100 : 0;
   const cues = getNarrationCues(style, dishName, locale);
 
-  const matching = cues.filter(
-    (c) => percent >= c.minPercent && percent < c.maxPercent
-  );
-
-  if (matching.length === 0) {
-    const last = cues[cues.length - 1];
-    return last.lines[0];
-  }
-
-  const cue = matching[0];
+  const cue = cues.find((c) => percent >= c.minPercent && percent < c.maxPercent) ?? cues[cues.length - 1];
   const idx = Math.floor((percent - cue.minPercent) / (cue.maxPercent - cue.minPercent) * cue.lines.length);
   return cue.lines[Math.min(idx, cue.lines.length - 1)];
 }

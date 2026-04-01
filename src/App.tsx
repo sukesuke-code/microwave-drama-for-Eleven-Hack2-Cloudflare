@@ -1,29 +1,46 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppScreen, Locale, Settings, ThemeMode } from './types';
 import TopPage from './pages/TopPage';
-import SettingsPage from './pages/SettingsPage';
-import CountdownPage from './pages/CountdownPage';
-import ResultPage from './pages/ResultPage';
+
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const CountdownPage = lazy(() => import('./pages/CountdownPage'));
+const ResultPage = lazy(() => import('./pages/ResultPage'));
+
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // no-op: storage might be unavailable in private mode or restricted contexts
+  }
+}
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('top');
   const [settings, setSettings] = useState<Settings | null>(null);
   const [locale, setLocale] = useState<Locale>(() => {
-    const saved = localStorage.getItem('ching-drama-locale');
+    const saved = readStorage('ching-drama-locale');
     return saved === 'en' || saved === 'ja' ? saved : 'ja';
   });
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem('ching-drama-theme');
+    const saved = readStorage('ching-drama-theme');
     return saved === 'light' || saved === 'dark' ? saved : 'dark';
   });
 
   useEffect(() => {
-    localStorage.setItem('ching-drama-locale', locale);
+    writeStorage('ching-drama-locale', locale);
     document.documentElement.lang = locale;
   }, [locale]);
 
   useEffect(() => {
-    localStorage.setItem('ching-drama-theme', themeMode);
+    writeStorage('ching-drama-theme', themeMode);
   }, [themeMode]);
 
   const handleStartSettings = () => setScreen('settings');
@@ -52,34 +69,36 @@ export default function App() {
           onThemeModeChange={setThemeMode}
         />
       )}
-      {screen === 'settings' && (
-        <SettingsPage
-          locale={locale}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
-          onBack={() => setScreen('top')}
-          onStart={handleStartCountdown}
-        />
-      )}
-      {screen === 'countdown' && settings && (
-        <CountdownPage
-          locale={locale}
-          settings={settings}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
-          onFinish={handleFinish}
-        />
-      )}
-      {screen === 'result' && settings && (
-        <ResultPage
-          locale={locale}
-          settings={settings}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
-          onReplay={handleReplay}
-          onHome={handleHome}
-        />
-      )}
+      <Suspense fallback={<div className="min-h-screen bg-[#00031a]" />}>
+        {screen === 'settings' && (
+          <SettingsPage
+            locale={locale}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+            onBack={() => setScreen('top')}
+            onStart={handleStartCountdown}
+          />
+        )}
+        {screen === 'countdown' && settings && (
+          <CountdownPage
+            locale={locale}
+            settings={settings}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+            onFinish={handleFinish}
+          />
+        )}
+        {screen === 'result' && settings && (
+          <ResultPage
+            locale={locale}
+            settings={settings}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
+            onReplay={handleReplay}
+            onHome={handleHome}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
