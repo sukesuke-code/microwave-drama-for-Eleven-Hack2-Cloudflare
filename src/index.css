@@ -124,17 +124,51 @@
 
 @keyframes eqBar {
   from {
-    height: 6px;
-    opacity: 0.4;
+    height: var(--eq-min-height, 6px);
+    opacity: var(--eq-opacity-min, 0.4);
   }
   to {
-    height: 32px;
-    opacity: 0.9;
+    height: var(--eq-max-height, 32px);
+    opacity: var(--eq-opacity-max, 0.9);
   }
 }
 
 .animate-eq-bar {
   animation: eqBar 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes eqBarWide {
+  0% {
+    height: calc(var(--eq-min-height, 8px) * 0.9);
+    opacity: var(--eq-opacity-min, 0.35);
+  }
+  35% {
+    height: var(--eq-max-height, 42px);
+    opacity: var(--eq-opacity-max, 0.95);
+  }
+  100% {
+    height: calc(var(--eq-min-height, 8px) * 1.4);
+    opacity: calc(var(--eq-opacity-min, 0.35) + 0.16);
+  }
+}
+
+@keyframes eqBarStaccato {
+  0% {
+    height: var(--eq-min-height, 4px);
+    opacity: calc(var(--eq-opacity-min, 0.45) + 0.05);
+  }
+  20% {
+    height: calc(var(--eq-max-height, 26px) * 0.45);
+    opacity: calc(var(--eq-opacity-max, 0.9) - 0.22);
+  }
+  45% {
+    height: var(--eq-max-height, 26px);
+    opacity: var(--eq-opacity-max, 0.9);
+  }
+  100% {
+    height: calc(var(--eq-min-height, 4px) * 1.1);
+    opacity: var(--eq-opacity-min, 0.45);
+  }
 }
 
 @keyframes softGlowPulse {
