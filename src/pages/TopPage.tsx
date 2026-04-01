@@ -91,7 +91,7 @@ export default function TopPage({
       <div className="relative z-10 mt-20 md:mt-24 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
-            className="font-display w-full max-w-full text-[clamp(2.4rem,11.5vw,5.1rem)] md:text-[clamp(4.2rem,8.8vw,6.5rem)] font-bold text-center mb-2 tracking-tight leading-none soft-glow-pulse inline-flex items-center justify-center gap-1 sm:gap-2"
+            className="font-display w-full max-w-full text-[clamp(2.4rem,11.5vw,5.1rem)] md:text-[clamp(4.2rem,8.8vw,6.5rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2"
             style={{
               background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
               WebkitBackgroundClip: 'text',
@@ -115,14 +115,12 @@ export default function TopPage({
         </div>
 
         <p
-          className={`text-center text-base leading-relaxed mb-2 font-medium soft-glow-pulse ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
-          style={{ animationDelay: '0.5s' }}
+          className={`text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`text-center text-lg font-bold mb-10 soft-glow-pulse ${isLight ? 'text-slate-900' : 'text-white'}`}
-          style={{ animationDelay: '0.9s' }}
+          className={`text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
         >
           {t.topTagline2}
         </p>
