@@ -125,7 +125,7 @@ export default function TopPage({
           <div className="absolute inset-0 group-hover:animate-glow-pulse" />
         </button>
 
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
           <span>{t.styleShort[0]}</span>
           <span className="text-slate-600">·</span>
           <span>{t.styleShort[1]}</span>
@@ -136,7 +136,7 @@ export default function TopPage({
         </div>
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-600 text-xs text-center w-full max-w-xs">
+      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 text-slate-600 text-xs text-center w-full max-w-xs">
         <div className="flex flex-col items-center gap-3">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
           <span className="text-xs text-slate-500">{t.startHint}</span>
