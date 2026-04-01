@@ -107,22 +107,20 @@ export default function SettingsPage({
   return (
     <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-gray-100 text-gray-900' : 'bg-gray-950 text-white'}`}>
       <div className="mx-auto flex h-full w-full max-w-md flex-col p-4">
-        <header className="mb-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onBack}
-              className={`rounded-lg p-1 transition-colors ${isLight ? 'text-gray-700 hover:bg-gray-200' : 'text-white/80 hover:bg-white/10'}`}
-              aria-label="back"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <h1 className={`text-xl font-black ${isLight ? 'text-gray-900' : 'text-white'}`}>{t.settings}</h1>
-          </div>
+        <header className="mb-3 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className={`justify-self-start rounded-lg p-1 transition-colors ${isLight ? 'text-gray-700 hover:bg-gray-200' : 'text-white/80 hover:bg-white/10'}`}
+            aria-label="back"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <h1 className={`text-center text-xl font-black ${isLight ? 'text-gray-900' : 'text-white'}`}>{t.settings}</h1>
           <button
             type="button"
             onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-            className={`rounded-lg px-2 py-1 text-xs font-bold transition-colors ${isLight ? 'bg-gray-200 text-gray-700' : 'bg-gray-800 text-gray-200'}`}
+            className={`justify-self-end rounded-lg px-2 py-1 text-xs font-bold transition-colors ${isLight ? 'bg-gray-200 text-gray-700' : 'bg-gray-800 text-gray-200'}`}
           >
             {isLight ? <Moon size={14} /> : <Sun size={14} />}
           </button>
