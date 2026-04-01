@@ -219,17 +219,6 @@
   will-change: filter, text-shadow;
 }
 
-.hero-blink-light {
-  --hero-title-filter-base: brightness(1.04) saturate(1.04);
-  --hero-title-filter-peak: brightness(1.18) saturate(1.18);
-  --hero-title-shadow-base-1: 0 0 8px rgba(255, 255, 255, 0.42);
-  --hero-title-shadow-base-2: 0 0 18px rgba(251, 146, 60, 0.42);
-  --hero-title-shadow-base-3: 0 0 34px rgba(251, 191, 36, 0.22);
-  --hero-title-shadow-peak-1: 0 0 14px rgba(255, 255, 255, 0.62);
-  --hero-title-shadow-peak-2: 0 0 28px rgba(251, 146, 60, 0.6);
-  --hero-title-shadow-peak-3: 0 0 52px rgba(251, 191, 36, 0.34);
-}
-
 @keyframes heroCopyBlink {
   0%, 100% {
     opacity: 1;

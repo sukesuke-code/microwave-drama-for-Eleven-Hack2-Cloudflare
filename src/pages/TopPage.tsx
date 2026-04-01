@@ -91,18 +91,14 @@ export default function TopPage({
       <div className="relative z-10 mt-60 md:mt-64 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8">
           <h1
-            className={`font-display ${isLight ? 'hero-blink hero-blink-light' : 'hero-blink'} w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2`}
+            className={`font-display ${isLight ? 'hero-light-step-blink' : 'hero-blink'} w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2`}
             style={{
-              background: isLight
-                ? 'linear-gradient(135deg, #fb923c 0%, #f97316 45%, #facc15 100%)'
-                : 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
+              background: 'linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-              textShadow: isLight ? '0 0 10px rgba(251,146,60,0.4)' : '0 0 14px rgba(249,115,22,0.45)',
-              filter: isLight
-                ? 'drop-shadow(0 0 12px rgba(251,146,60,0.35))'
-                : 'drop-shadow(0 0 16px rgba(249,115,22,0.45))',
+              textShadow: '0 0 14px rgba(249,115,22,0.45)',
+              filter: 'drop-shadow(0 0 16px rgba(249,115,22,0.45))',
             }}
           >
             <Zap className="text-orange-300/90 h-[clamp(1.8rem,8.2vw,5.5rem)] w-[clamp(1.8rem,8.2vw,5.5rem)] shrink-0" strokeWidth={1.8} fill="none" />
