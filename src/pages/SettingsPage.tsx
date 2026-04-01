@@ -52,27 +52,27 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
   };
 
   return (
-    <div className="min-h-screen bg-[#020818] text-slate-100">
-      <div className="mx-auto w-full max-w-xl px-5 pt-6 pb-8">
-        <header className="mb-10 flex items-center gap-4">
+    <div className="h-[100dvh] overflow-hidden bg-[#020818] text-slate-100">
+      <div className="mx-auto flex h-full w-full max-w-[760px] flex-col px-5 pb-5 pt-4">
+        <header className="mb-4 flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-white/10"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-white/10"
           >
-            <ChevronLeft size={28} />
+            <ChevronLeft size={24} />
           </button>
-          <h1 className="text-5xl font-black tracking-tight">{t.settings}</h1>
+          <h1 className="text-2xl font-black tracking-tight">{t.settings}</h1>
         </header>
 
-        <section className="mb-10">
-          <p className="mb-4 text-3xl font-black text-orange-400">{t.timeSetting}</p>
-          <div className="mb-5 flex flex-wrap gap-3">
+        <section className="mb-5">
+          <p className="mb-2 text-xl font-black text-orange-400">{t.timeSetting}</p>
+          <div className="mb-3 flex flex-wrap gap-2">
             {QUICK_SECONDS.map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setTotalSeconds(value)}
-                className={`rounded-2xl px-6 py-3 text-4xl font-black transition-colors ${
+                className={`rounded-2xl px-4 py-2 text-2xl font-black transition-colors ${
                   totalSeconds === value
                     ? 'bg-slate-500/60 text-white'
                     : 'bg-slate-700/35 text-slate-300 hover:bg-slate-600/50'
@@ -83,21 +83,21 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
             ))}
           </div>
 
-          <div className="rounded-3xl border border-[#243650] bg-[#101d35] px-6 py-6">
+          <div className="rounded-3xl border border-[#243650] bg-[#101d35] px-5 py-4">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center text-center">
               <div>
-                <p className="mb-2 text-xl text-slate-400">{t.minutes}</p>
-                <p className="text-7xl font-black leading-none">{minutes}</p>
+                <p className="mb-1 text-sm text-slate-400">{t.minutes}</p>
+                <p className="text-6xl font-black leading-none">{minutes}</p>
               </div>
-              <p className="mx-8 text-7xl font-black leading-none text-orange-400">:</p>
+              <p className="mx-5 text-6xl font-black leading-none text-orange-400">:</p>
               <div>
-                <p className="mb-2 text-xl text-slate-400">{t.seconds}</p>
-                <p className="text-7xl font-black leading-none">{String(seconds).padStart(2, '0')}</p>
+                <p className="mb-1 text-sm text-slate-400">{t.seconds}</p>
+                <p className="text-6xl font-black leading-none">{String(seconds).padStart(2, '0')}</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-4">
             <input
               type="range"
               min={1}
@@ -106,7 +106,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
               onChange={(e) => setTotalSeconds(Number(e.target.value))}
               className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-600/70 accent-orange-500"
             />
-            <div className="mt-2 flex justify-between text-3xl text-slate-500">
+            <div className="mt-1 flex justify-between text-base text-slate-500">
               <span>1{t.seconds}</span>
               <span>10{t.minutes}</span>
             </div>
@@ -114,19 +114,19 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
         </section>
 
         <section className="mb-10">
-          <p className="mb-4 text-3xl font-black text-orange-400">{locale === 'ja' ? '料理名' : 'Dish Name'}</p>
+          <p className="mb-2 text-xl font-black text-orange-400">{locale === 'ja' ? '料理名' : 'Dish Name'}</p>
           <input
             type="text"
             value={dishName}
             onChange={(e) => setDishName(e.target.value)}
-            className="w-full rounded-3xl border border-[#253a5c] bg-[#101d35] px-6 py-5 text-4xl font-bold text-white placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none"
+            className="w-full rounded-3xl border border-[#253a5c] bg-[#101d35] px-5 py-4 text-2xl font-bold text-white placeholder:text-slate-500 focus:border-orange-400/60 focus:outline-none"
             placeholder={t.dishPlaceholder}
           />
         </section>
 
-        <section className="mb-12">
-          <p className="mb-4 text-3xl font-black text-orange-400">{t.style}</p>
-          <div className="grid grid-cols-2 gap-4">
+        <section className="mb-5 flex-1">
+          <p className="mb-2 text-xl font-black text-orange-400">{t.style}</p>
+          <div className="grid grid-cols-2 gap-3">
             {styleConfigs.map((style) => {
               const isSelected = selectedStyle === style.id;
               const cardClass =
@@ -143,15 +143,15 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   key={style.id}
                   type="button"
                   onClick={() => setSelectedStyle(style.id)}
-                  className={`relative rounded-3xl border bg-gradient-to-br p-5 text-left transition-transform hover:scale-[1.01] ${cardClass}`}
+                  className={`relative rounded-3xl border bg-gradient-to-br p-4 text-left transition-transform hover:scale-[1.01] ${cardClass}`}
                   style={{
                     boxShadow: isSelected ? `0 0 0 3px ${style.accentColor}, 0 8px 26px ${style.accentColor}40` : undefined,
                   }}
                 >
-                  {isSelected && <span className="absolute right-4 top-4 h-3 w-3 rounded-full bg-orange-400" />}
-                  <p className="mb-4 text-4xl">{style.emoji}</p>
-                  <p className="mb-1 text-4xl font-black text-white">{style.label}</p>
-                  <p className="text-3xl text-slate-300">{STYLE_DESCRIPTIONS[locale][style.id]}</p>
+                  {isSelected && <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-orange-400" />}
+                  <p className="mb-2 text-2xl">{style.emoji}</p>
+                  <p className="mb-1 text-[1.8rem] font-black leading-tight text-white">{style.label}</p>
+                  <p className="text-xl text-slate-300">{STYLE_DESCRIPTIONS[locale][style.id]}</p>
                 </button>
               );
             })}
@@ -160,7 +160,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
 
         <button
           onClick={handleStart}
-          className="w-full rounded-3xl bg-gradient-to-r from-[#ff6a00] to-[#ff2b2b] py-6 text-5xl font-black text-white shadow-[0_0_35px_rgba(255,98,0,0.45)]"
+          className="mt-auto w-full rounded-3xl bg-gradient-to-r from-[#ff6a00] to-[#ff2b2b] py-4 text-3xl font-black text-white shadow-[0_0_35px_rgba(255,98,0,0.45)]"
         >
           {t.startNarration}
         </button>
