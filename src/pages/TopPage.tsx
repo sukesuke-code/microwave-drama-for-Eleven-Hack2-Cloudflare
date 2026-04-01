@@ -101,9 +101,9 @@ export default function TopPage({
               filter: 'drop-shadow(0 0 20px rgba(249,115,22,0.5))',
             }}
           >
-            <Zap size={44} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
+            <Zap size={64} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
             <span>{t.topTitle}</span>
-            <Zap size={44} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
+            <Zap size={64} className="text-orange-300/90 shrink-0" strokeWidth={1.8} fill="none" />
           </h1>
 
           <div
@@ -146,7 +146,7 @@ export default function TopPage({
           <div className="absolute inset-0 group-hover:animate-glow-pulse" />
         </button>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
           <span>{t.styleShort[0]}</span>
           <span className="text-slate-600">·</span>
           <span>{t.styleShort[1]}</span>
@@ -157,7 +157,7 @@ export default function TopPage({
         </div>
       </div>
 
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 text-slate-600 text-xs text-center w-full max-w-xs">
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-slate-600 text-xs text-center w-full max-w-xs">
         <div className="flex flex-col items-center gap-2">
           <AudioWaveVisualizer color="#f97316" barCount={16} />
           <span className="text-xs text-slate-500">{t.startHint}</span>
