@@ -6,9 +6,9 @@ interface AudioWaveVisualizerProps {
   intensity?: 'low' | 'medium' | 'high';
 }
 
-type WavePattern = 'ripple' | 'symmetric' | 'chaotic';
+type WavePattern = 'classic' | 'ripple' | 'symmetric' | 'chaotic';
 
-const WAVE_PATTERNS: WavePattern[] = ['ripple', 'symmetric', 'chaotic'];
+const WAVE_PATTERNS: WavePattern[] = ['classic', 'ripple', 'symmetric', 'chaotic'];
 
 export default function AudioWaveVisualizer({
   color = '#f97316',
@@ -23,6 +23,7 @@ export default function AudioWaveVisualizer({
   );
 
   const getAnimationDelay = (index: number): string => {
+    if (wavePattern === 'classic') return `${index * delayMultiplier}s`;
     if (wavePattern === 'ripple') return `${index * delayMultiplier}s`;
     if (wavePattern === 'symmetric') {
       const center = (barCount - 1) / 2;
@@ -31,13 +32,15 @@ export default function AudioWaveVisualizer({
     return `${((index * 7) % barCount) * delayMultiplier * 0.7}s`;
   };
 
-  const getAnimationDuration = (index: number): string => {
+  const getAnimationDuration = (index: number): string | undefined => {
+    if (wavePattern === 'classic') return undefined;
     if (wavePattern === 'ripple') return `${0.85 + (index % 3) * 0.12}s`;
     if (wavePattern === 'symmetric') return `${1.05 + Math.abs(index - (barCount - 1) / 2) * 0.06}s`;
     return `${0.8 + ((index * 5) % 6) * 0.09}s`;
   };
 
-  const getAnimationTiming = (index: number): string => {
+  const getAnimationTiming = (index: number): string | undefined => {
+    if (wavePattern === 'classic') return undefined;
     if (wavePattern === 'ripple') return 'ease-in-out';
     if (wavePattern === 'symmetric') return 'cubic-bezier(0.4, 0, 0.2, 1)';
     return index % 2 === 0 ? 'ease-in' : 'ease-out';
