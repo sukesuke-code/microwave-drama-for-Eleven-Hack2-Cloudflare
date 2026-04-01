@@ -98,9 +98,9 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <div className="mx-auto w-full max-w-md p-5 space-y-6">
-        <header className="flex items-center gap-3">
+    <div className="h-[100dvh] overflow-hidden bg-gray-950 text-white">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col p-4">
+        <header className="mb-3 flex items-center gap-2">
           <button
             type="button"
             onClick={onBack}
@@ -112,10 +112,10 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
           <h1 className="text-xl font-black text-white">{t.settings}</h1>
         </header>
 
-        <section className="space-y-3">
-          <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
+        <section className="mb-3 space-y-2">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-5 gap-1">
             {QUICK_PRESETS.map((preset) => {
               const selected = preset.seconds === duration;
               return (
@@ -123,7 +123,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   key={preset.seconds}
                   type="button"
                   onClick={() => setDuration(preset.seconds)}
-                  className={`rounded-lg px-1 py-2 text-xs font-black leading-none transition-colors ${
+                  className={`rounded-lg px-1 py-1.5 text-[10px] font-black leading-none transition-colors ${
                     selected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
@@ -133,7 +133,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
             })}
           </div>
 
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
+          <div className="rounded-xl border border-gray-800 bg-gray-900 p-3">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
               <div>
                 <p className="mb-1 text-xs text-gray-500">{t.minutes}</p>
@@ -143,10 +143,10 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
-                  className="w-full appearance-none bg-transparent text-center text-4xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
-              <span className="text-4xl font-black text-orange-400">:</span>
+              <span className="text-3xl font-black text-orange-400">:</span>
               <div>
                 <p className="mb-1 text-xs text-gray-500">{t.seconds}</p>
                 <input
@@ -155,13 +155,13 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
-                  className="w-full appearance-none bg-transparent text-center text-4xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <input
               type="range"
               min={1}
@@ -171,28 +171,28 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
               onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
               className="h-2 w-full cursor-pointer accent-orange-500"
             />
-            <div className="flex justify-between text-sm text-gray-500">
+            <div className="flex justify-between text-xs text-gray-500">
               <span>1{t.seconds}</span>
               <span>10{t.minutes}</span>
             </div>
           </div>
         </section>
 
-        <section className="space-y-3">
-          <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">DISH NAME (OPTIONAL)</p>
+        <section className="mb-3 space-y-2">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">DISH NAME (OPTIONAL)</p>
           <input
             type="text"
             value={dishName}
             onChange={(e) => setDishName(e.target.value)}
             maxLength={100}
             placeholder="e.g. Frozen fried rice, Bento..."
-            className="w-full rounded-2xl border border-gray-800 bg-gray-900 px-4 py-3 text-base text-white placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500"
+            className="w-full rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500"
           />
         </section>
 
-        <section className="space-y-3">
-          <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">{t.style}</p>
-          <div className="grid grid-cols-2 gap-3">
+        <section className="mb-3 flex-1 space-y-2">
+          <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
+          <div className="grid h-full max-h-[34vh] grid-cols-2 gap-2">
             {STYLE_CARDS.map((card) => {
               const selected = style === card.id;
               return (
@@ -200,16 +200,16 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
                   key={card.id}
                   type="button"
                   onClick={() => setStyle(card.id)}
-                  className={`relative rounded-2xl border bg-gradient-to-br p-4 text-left transition-all ${card.gradient} ${card.border} ${
+                  className={`relative rounded-xl border bg-gradient-to-br p-3 text-left transition-all ${card.gradient} ${card.border} ${
                     selected
                       ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
                       : 'opacity-70 hover:opacity-90'
                   }`}
                 >
                   {selected && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-orange-400" />}
-                  <p className="mb-2 text-2xl">{card.emoji}</p>
-                  <p className="text-sm font-bold text-white">{card.title[locale]}</p>
-                  <p className="mt-1 text-xs text-gray-400">{card.description[locale]}</p>
+                  <p className="mb-1 text-lg">{card.emoji}</p>
+                  <p className="text-xs font-bold text-white">{card.title[locale]}</p>
+                  <p className="mt-1 text-[10px] text-gray-400">{card.description[locale]}</p>
                 </button>
               );
             })}
@@ -220,7 +220,7 @@ export default function SettingsPage({ locale, onBack, onStart }: SettingsPagePr
           type="button"
           onClick={handleStart}
           disabled={duration < 1}
-          className="w-full rounded-2xl py-5 text-white font-black tracking-widest transition-opacity disabled:opacity-40"
+          className="mt-auto w-full rounded-xl py-3 text-sm text-white font-black tracking-widest transition-opacity disabled:opacity-40"
           style={{
             background: 'linear-gradient(135deg, #ea580c, #dc2626)',
             boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
