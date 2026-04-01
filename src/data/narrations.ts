@@ -44,16 +44,25 @@ export const STYLE_CONFIGS: StyleConfig[] = [
   },
 ];
 
-const STYLE_CONFIGS_CACHE: Record<Locale, StyleConfig[]> = {
-  ja: STYLE_CONFIGS.map((config) => ({ ...config, label: STYLE_LABELS.ja[config.id] })),
-  en: STYLE_CONFIGS.map((config) => ({ ...config, label: STYLE_LABELS.en[config.id] })),
+const STYLE_CONFIGS_CACHE: Record<Locale, ReadonlyArray<StyleConfig>> = {
+  ja: Object.freeze(STYLE_CONFIGS.map((config) => Object.freeze({ ...config, label: STYLE_LABELS.ja[config.id] }))),
+  en: Object.freeze(STYLE_CONFIGS.map((config) => Object.freeze({ ...config, label: STYLE_LABELS.en[config.id] }))),
 };
 
 export function getStyleConfigs(locale: Locale): StyleConfig[] {
-  return STYLE_CONFIGS_CACHE[locale];
+  return STYLE_CONFIGS_CACHE[locale] as StyleConfig[];
 }
 
 const narrationCuesCache = new Map<string, NarrationCue[]>();
+const NARRATION_CACHE_MAX = 120;
+
+function setNarrationCache(key: string, value: NarrationCue[]) {
+  if (narrationCuesCache.size >= NARRATION_CACHE_MAX) {
+    const oldestKey = narrationCuesCache.keys().next().value;
+    if (oldestKey) narrationCuesCache.delete(oldestKey);
+  }
+  narrationCuesCache.set(key, value);
+}
 
 export function getNarrationCues(
   style: NarrationStyle,
@@ -109,7 +118,7 @@ export function getNarrationCues(
         ];
         break;
     }
-    narrationCuesCache.set(cacheKey, result);
+    setNarrationCache(cacheKey, result);
     return result;
   }
 
@@ -317,7 +326,7 @@ export function getNarrationCues(
   };
 
   result = cues[style];
-  narrationCuesCache.set(cacheKey, result);
+  setNarrationCache(cacheKey, result);
   return result;
 }
 
