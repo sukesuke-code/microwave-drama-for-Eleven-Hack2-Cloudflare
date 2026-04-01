@@ -243,6 +243,44 @@
   will-change: filter, text-shadow;
 }
 
+@keyframes completeOrbPulse {
+  0%, 100% {
+    transform: scale(0.94);
+    background: radial-gradient(
+      circle at 34% 30%,
+      rgba(255, 255, 255, 0.2) 0%,
+      #ff6b35 24%,
+      #f97316 56%,
+      #fbbf24 100%
+    );
+    box-shadow:
+      0 0 20px rgba(249, 115, 22, 0.42),
+      0 0 50px rgba(249, 115, 22, 0.25),
+      inset 0 0 14px rgba(255, 255, 255, 0.22);
+    filter: brightness(1.1) saturate(1.1);
+  }
+  50% {
+    transform: scale(1.06);
+    background: radial-gradient(
+      circle at 60% 32%,
+      rgba(255, 255, 255, 0.42) 0%,
+      #ff8a4c 26%,
+      #f97316 58%,
+      #facc15 100%
+    );
+    box-shadow:
+      0 0 30px rgba(249, 115, 22, 0.7),
+      0 0 75px rgba(249, 115, 22, 0.45),
+      inset 0 0 20px rgba(255, 255, 255, 0.28);
+    filter: brightness(1.26) saturate(1.24);
+  }
+}
+
+.result-complete-orb {
+  animation: completeOrbPulse 2.4s ease-in-out infinite;
+  will-change: transform, background, box-shadow, filter;
+}
+
 @keyframes heroCopyBlink {
   0%, 100% {
     opacity: 1;
