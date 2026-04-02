@@ -215,10 +215,11 @@ export default function CountdownPage({
         setIsRunning(true);
         timerStartRef.current = Date.now();
         pausedTotalMsRef.current = 0;
-      } catch {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setError(locale === 'ja'
-          ? 'セッション開始に失敗しました。設定画面に戻って再試行してください。'
-          : 'Failed to start session. Go back and try again.');
+          ? `セッション開始に失敗: ${errorMessage}。設定画面に戻って再試行してください。`
+          : `Failed to start session: ${errorMessage}. Go back and try again.`);
         setIsRunning(false);
       }
     };
