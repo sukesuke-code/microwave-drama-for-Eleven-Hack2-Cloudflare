@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
-import WaveAnimation from '../components/WaveAnimation';
+import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
@@ -90,6 +90,19 @@ export default function CountdownPage({
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
+  const waveSeed = useMemo(() => {
+    const textSeed = narrationText
+      .split('')
+      .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
+    return textSeed + (totalSeconds - timeLeft) * 31;
+  }, [narrationText, totalSeconds, timeLeft]);
+
+  const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
+    if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
+    if (narrationText.length > 42) return 'medium';
+    return 'low';
+  }, [isDanger, narrationText]);
+
   return (
       <div
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
@@ -169,7 +182,7 @@ export default function CountdownPage({
           </div>
 
           <div className="mt-1">
-            <WaveAnimation style={style} active={!isPaused && !isFinished} narrationText={narrationText} beat={totalSeconds - timeLeft} />
+            <AudioWaveVisualizer color={styleConfig.accentColor} barCount={12} intensity={waveIntensity} syncSeed={waveSeed} />
           </div>
 
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
