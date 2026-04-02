@@ -161,7 +161,7 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="mt-2 flex flex-1 min-h-0 flex-col justify-between gap-1.5 sm:gap-2">
+        <div className="mt-2 flex flex-1 min-h-0 flex-col justify-between gap-1 sm:gap-1.5">
           <section className="space-y-2 shrink-0">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1.5">
               <Timer size={13} />
