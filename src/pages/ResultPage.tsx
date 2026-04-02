@@ -79,6 +79,7 @@ export default function ResultPage({
   const t = UI_TEXT[locale];
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isLight = themeMode === 'light';
+  const [isReplayInteracting, setIsReplayInteracting] = useState(false);
   const summaryLabels = locale === 'ja'
     ? { dish: '料理', time: '加熱時間', narration: '実況スタイル' }
     : { dish: 'Dish', time: 'Cook Time', narration: 'Narration Style' };
@@ -99,6 +100,8 @@ export default function ResultPage({
     const messages = RESULT_MESSAGES[locale][style];
     return messages[Math.floor(Math.random() * messages.length)];
   }, [locale, style]);
+  const replayGradientDefault = `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`;
+  const replayGradientInteract = `linear-gradient(135deg, ${styleConfig.accentColor}, ${styleConfig.accentColor}99)`;
 
   return (
     <div
@@ -206,9 +209,14 @@ export default function ResultPage({
         <div className="flex flex-col w-full">
           <button
             onClick={onReplay}
+            onMouseEnter={() => setIsReplayInteracting(true)}
+            onMouseLeave={() => setIsReplayInteracting(false)}
+            onTouchStart={() => setIsReplayInteracting(true)}
+            onTouchEnd={() => setIsReplayInteracting(false)}
+            onTouchCancel={() => setIsReplayInteracting(false)}
             className="flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
             style={{
-              background: `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`,
+              background: isReplayInteracting ? replayGradientInteract : replayGradientDefault,
               boxShadow: `0 0 20px ${styleConfig.accentColor}40`,
             }}
           >
