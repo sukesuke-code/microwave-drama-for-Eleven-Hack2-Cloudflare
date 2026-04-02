@@ -37,6 +37,7 @@ export default function CircularTimer({
   const seconds = timeLeft % 60;
   const minuteStr = String(minutes).padStart(2, '0');
   const secondStr = String(seconds).padStart(2, '0');
+  const showMinutePrefix = timeLeft >= 60;
   const isSecondsDanger = timeLeft <= 10;
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
@@ -109,7 +110,7 @@ export default function CircularTimer({
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          <span>{minuteStr}:</span>
+          {showMinutePrefix && <span>{minuteStr}:</span>}
           <span
             style={{
               color: isSecondsDanger ? '#ef4444' : colors.text,

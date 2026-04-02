@@ -247,7 +247,7 @@
   0%, 100% {
     transform: scale(0.94);
     background: radial-gradient(
-      circle at 34% 30%,
+      circle at 50% 42%,
       rgba(255, 255, 255, 0.2) 0%,
       #ff6b35 24%,
       #f97316 56%,
@@ -262,7 +262,7 @@
   50% {
     transform: scale(1.06);
     background: radial-gradient(
-      circle at 60% 32%,
+      circle at 50% 42%,
       rgba(255, 255, 255, 0.42) 0%,
       #ff8a4c 26%,
       #f97316 58%,
