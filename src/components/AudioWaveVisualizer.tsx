@@ -5,6 +5,7 @@ interface AudioWaveVisualizerProps {
   barCount?: number;
   intensity?: 'low' | 'medium' | 'high';
   syncSeed?: number;
+  inverted?: boolean;
 }
 
 type WavePattern = {
@@ -66,6 +67,7 @@ export default function AudioWaveVisualizer({
   barCount = 8,
   intensity = 'medium',
   syncSeed,
+  inverted = false,
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
   const delayMultiplier = intensity === 'high' ? 0.06 : intensity === 'low' ? 0.12 : 0.08;
@@ -79,7 +81,7 @@ export default function AudioWaveVisualizer({
   return (
     <div
       className="flex items-end justify-center gap-1 h-12 px-2"
-      style={{ transform: 'scaleY(-1)' }}
+      style={inverted ? { transform: 'scaleY(-1)' } : undefined}
     >
       {bars.map((_, i) => {
         const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();

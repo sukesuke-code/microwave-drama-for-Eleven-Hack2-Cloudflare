@@ -36,6 +36,7 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
   const auraOpacity = isFinished ? 0.9 : 0.62;
+  const finishedLabelSize = Math.min(size * 0.22, 48);
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
@@ -91,7 +92,7 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
           <span
             className="font-display font-black leading-none"
             style={{
-              fontSize: 80,
+              fontSize: finishedLabelSize,
               color: colors.stroke,
               textShadow: `0 0 18px ${colors.glow}, 0 0 42px ${colors.glow}`,
               filter: `drop-shadow(0 0 14px ${colors.glow})`,

@@ -141,7 +141,7 @@ export default function SettingsPage({
 
   return (
     <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
-      <div className="mx-auto flex h-full w-full max-w-md flex-col p-3">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col justify-between p-3 sm:justify-start sm:gap-2">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
             type="button"
@@ -161,7 +161,7 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="mt-2 flex flex-1 flex-col gap-2">
+        <div className="contents sm:mt-2 sm:flex sm:flex-1 sm:min-h-0 sm:flex-col sm:justify-start sm:gap-2">
           <section className="space-y-2">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 

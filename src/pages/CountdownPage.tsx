@@ -35,6 +35,7 @@ export default function CountdownPage({
   const [isFinished, setIsFinished] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [waveBeat, setWaveBeat] = useState(0);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -44,6 +45,32 @@ export default function CountdownPage({
   const lightBgGradient = style === 'sports'
     ? 'from-sky-50 via-blue-50/80 to-slate-100'
     : 'from-slate-50 via-orange-50/80 to-slate-100';
+
+  const playAlarmTone = useCallback(() => {
+    const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextImpl) return;
+
+    const ctx = new AudioContextImpl();
+    const scheduleTone = (offset: number, frequency: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(frequency, ctx.currentTime + offset);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + offset + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.24);
+    };
+
+    scheduleTone(0, 880);
+    scheduleTone(0.28, 1046.5);
+    scheduleTone(0.56, 1318.5);
+
+    window.setTimeout(() => void ctx.close(), 1300);
+  }, []);
 
   const updateNarration = useCallback((tl: number, tt: number) => {
     if (tl <= 0) return;
@@ -71,6 +98,7 @@ export default function CountdownPage({
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
+          playAlarmTone();
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
@@ -86,7 +114,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
@@ -94,14 +122,29 @@ export default function CountdownPage({
     const textSeed = narrationText
       .split('')
       .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
-    return textSeed + (totalSeconds - timeLeft) * 31;
-  }, [narrationText, totalSeconds, timeLeft]);
+    return textSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13;
+  }, [narrationText, totalSeconds, timeLeft, waveBeat]);
 
   const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
     if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
     if (narrationText.length > 42) return 'medium';
     return 'low';
   }, [isDanger, narrationText]);
+
+  useEffect(() => {
+    if (isPaused || isFinished) return;
+
+    const punctuationBoost = (narrationText.match(/[!?！？]/g) ?? []).length;
+    const lengthBoost = Math.min(5, Math.floor(narrationText.length / 24));
+    const tempoScore = Math.max(1, punctuationBoost + lengthBoost + (waveIntensity === 'high' ? 3 : waveIntensity === 'medium' ? 2 : 1));
+    const cadenceMs = Math.max(90, 180 - tempoScore * 14);
+
+    const beatTimer = setInterval(() => {
+      setWaveBeat((prev) => prev + 1);
+    }, cadenceMs);
+
+    return () => clearInterval(beatTimer);
+  }, [isPaused, isFinished, narrationText, waveIntensity]);
 
   return (
       <div
@@ -182,7 +225,13 @@ export default function CountdownPage({
           </div>
 
           <div className="mt-1">
-            <AudioWaveVisualizer color={styleConfig.accentColor} barCount={12} intensity={waveIntensity} syncSeed={waveSeed} />
+            <AudioWaveVisualizer
+              color={styleConfig.accentColor}
+              barCount={16}
+              intensity={waveIntensity}
+              syncSeed={waveSeed}
+              inverted
+            />
           </div>
 
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
