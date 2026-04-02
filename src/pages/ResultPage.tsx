@@ -106,20 +106,6 @@ export default function ResultPage({
           {t.dramaDone}
         </h1>
 
-        <p
-          className="text-lg font-bold mb-1 animate-fade-up"
-          style={{
-            color: styleConfig.accentColor,
-            animationDelay: '0.1s',
-          }}
-        >
-          {dishName}
-        </p>
-
-        <p className={`text-sm mb-2 animate-fade-up ${isLight ? 'text-slate-500' : 'text-slate-400'}`} style={{ animationDelay: '0.15s' }}>
-          {styleConfig.emoji} {styleConfig.label}
-        </p>
-
         <div
           className="my-6 px-6 py-4 rounded-2xl border animate-fade-up w-full"
           style={{
@@ -135,6 +121,20 @@ export default function ResultPage({
             「{randomMessage}」
           </p>
         </div>
+
+        <p
+          className="text-lg font-bold mb-1 animate-fade-up"
+          style={{
+            color: styleConfig.accentColor,
+            animationDelay: '0.1s',
+          }}
+        >
+          {dishName}
+        </p>
+
+        <p className={`text-sm mb-2 animate-fade-up ${isLight ? 'text-slate-500' : 'text-slate-400'}`} style={{ animationDelay: '0.15s' }}>
+          {styleConfig.emoji} {styleConfig.label}
+        </p>
 
         <div className="flex flex-col gap-3 w-full animate-fade-up" style={{ animationDelay: '0.3s' }}>
           <button
