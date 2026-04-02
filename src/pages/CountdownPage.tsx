@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
-import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
+import { getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
@@ -9,6 +9,15 @@ import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
+import {
+  getPhaseFromRemainingTime,
+  getSignedUrl,
+  saveNarration,
+  startSession,
+  type CountdownPhase,
+  updatePhase,
+} from '../lib/microwaveAgentApi';
+import { AgentConnection, AgentStatus, connectAgent } from '../lib/elevenlabsAgent';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -19,6 +28,38 @@ interface CountdownPageProps {
   onFinish: () => void;
 }
 
+function getPhaseNarrationText(phase: CountdownPhase, dishName: string, locale: Locale): string {
+  const d = dishName || (locale === 'ja' ? '謎の料理' : 'mystery dish');
+
+  if (locale === 'ja') {
+    switch (phase) {
+      case 'opening':
+        return `${d}、スタート！最高の加熱ショーの幕開けです。`;
+      case 'quarter':
+        return `残り75%！${d}は順調に温まり続けています。`;
+      case 'middle':
+        return `折り返し通過、${d}が一気に仕上がっていきます。`;
+      case 'final':
+        return `ラストスパート！${d}の完成まであと少しです。`;
+      case 'done':
+        return `${d}、完成です！`;
+    }
+  }
+
+  switch (phase) {
+    case 'opening':
+      return `${d} is in. The microwave show has begun.`;
+    case 'quarter':
+      return `75% remaining. ${d} is heating on schedule.`;
+    case 'middle':
+      return `Halfway through. ${d} is building momentum.`;
+    case 'final':
+      return `Final stretch. ${d} is almost ready.`;
+    case 'done':
+      return `${d} is done. Show complete.`;
+  }
+}
+
 export default function CountdownPage({
   locale,
   settings,
@@ -27,20 +68,33 @@ export default function CountdownPage({
   onBack,
   onFinish,
 }: CountdownPageProps) {
-  const { totalSeconds, dishName, style } = settings;
+  const { totalSeconds: totalTime, dishName: foodName, style } = settings;
+  const currentScreen = 'countdown';
   const t = UI_TEXT[locale];
-  const [timeLeft, setTimeLeft] = useState(totalSeconds);
+  const [remainingTime, setRemainingTime] = useState(totalTime);
   const [narrationText, setNarrationText] = useState('');
   const [isFlashing, setIsFlashing] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
-  const prevNarrationRef = useRef('');
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [sessionId, setSessionId] = useState('');
+  const [phase, setPhase] = useState<CountdownPhase>('opening');
+  const [latestNarration, setLatestNarration] = useState('');
+  const [bestMoment, setBestMoment] = useState('');
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>('disconnected');
+  const [error, setError] = useState('');
+
+  const timerStartRef = useRef<number | null>(null);
+  const pausedAtRef = useRef<number | null>(null);
+  const pausedTotalMsRef = useRef(0);
+  const prevPhaseRef = useRef<CountdownPhase | null>(null);
+  const finishTimeoutRef = useRef<number | null>(null);
+  const agentRef = useRef<AgentConnection | null>(null);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
-  const isDanger = timeLeft <= 10 && timeLeft > 0;
+  const isDanger = remainingTime <= 10 && remainingTime > 0;
   const isLight = themeMode === 'light';
   const lightBgGradient = style === 'sports'
     ? 'from-sky-50 via-blue-50/80 to-slate-100'
@@ -72,58 +126,168 @@ export default function CountdownPage({
     window.setTimeout(() => void ctx.close(), 1300);
   }, []);
 
-  const updateNarration = useCallback((tl: number, tt: number) => {
-    if (tl <= 0) return;
-    const text = getCurrentNarration(tl, tt, style, dishName, locale);
-    if (text !== prevNarrationRef.current) {
-      prevNarrationRef.current = text;
-      setNarrationText(text);
+  const syncNarration = useCallback(async (activeSessionId: string, text: string) => {
+    setLatestNarration(text);
+    setNarrationText(text);
+
+    if (agentStatus === 'connected' || agentStatus === 'speaking') {
+      agentRef.current?.sendText(text);
+      setAgentStatus('speaking');
+      window.setTimeout(() => {
+        setAgentStatus((status) => (status === 'speaking' ? 'connected' : status));
+      }, 800);
     }
-  }, [style, dishName, locale]);
 
-  useEffect(() => {
-    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
-    prevNarrationRef.current = initial;
-    setNarrationText(initial);
-  }, [totalSeconds, style, dishName, locale]);
+    try {
+      await saveNarration(activeSessionId, text);
+    } catch (saveError) {
+      console.warn('narration save failed', saveError);
+    }
+  }, [agentStatus]);
 
-  useEffect(() => {
-    if (isPaused || isFinished) return;
+  const handlePhaseTransition = useCallback(async (activeSessionId: string, nextRemainingTime: number) => {
+    const nextPhase = getPhaseFromRemainingTime(nextRemainingTime, totalTime);
+    if (prevPhaseRef.current === nextPhase) return;
 
-    intervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          clearInterval(intervalRef.current!);
-          setIsFinished(true);
-          setIsFlashing(true);
-          setShowConfetti(true);
-          playAlarmTone();
-          const finishText = getFinishLine(style, dishName, locale);
-          prevNarrationRef.current = finishText;
-          setNarrationText(finishText);
-          setTimeout(() => setIsFlashing(false), 600);
-          setTimeout(() => onFinish(), 4000);
-          return 0;
-        }
-        updateNarration(next, totalSeconds);
-        return next;
+    prevPhaseRef.current = nextPhase;
+    setPhase(nextPhase);
+
+    try {
+      await updatePhase(activeSessionId, nextRemainingTime);
+    } catch (tickError) {
+      console.warn('phase update failed', tickError);
+    }
+
+    const phaseText = getPhaseNarrationText(nextPhase, foodName, locale);
+    void syncNarration(activeSessionId, phaseText);
+  }, [foodName, locale, syncNarration, totalTime]);
+
+  const connectWithSignedUrl = useCallback(async () => {
+    setAgentStatus('connecting');
+
+    try {
+      const signedUrl = await getSignedUrl();
+      agentRef.current?.disconnect();
+      agentRef.current = connectAgent(signedUrl, {
+        onOpen: () => {
+          setAgentStatus('connected');
+          setError('');
+        },
+        onSpeaking: () => setAgentStatus('speaking'),
+        onText: (text) => {
+          setLatestNarration(text);
+          setNarrationText(text);
+        },
+        onClose: () => {
+          setAgentStatus((status) => (status === 'error' ? status : 'disconnected'));
+        },
+        onError: () => {
+          setAgentStatus('error');
+          setError(locale === 'ja'
+            ? '音声接続に失敗しました。テキストのみで継続中です。再接続できます。'
+            : 'Voice connection failed. Continuing in text mode. You can retry.');
+        },
       });
-    }, 1000);
+    } catch {
+      setAgentStatus('error');
+      setError(locale === 'ja'
+        ? 'signed URLの取得に失敗しました。テキストのみで継続中です。再試行してください。'
+        : 'Failed to get signed URL. Continuing in text mode. Please retry.');
+    }
+  }, [locale]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initializeSession = async () => {
+      setError('');
+      try {
+        const createdSessionId = await startSession(foodName, totalTime, style);
+        if (cancelled) return;
+
+        setSessionId(createdSessionId);
+        await connectWithSignedUrl();
+        if (cancelled) return;
+
+        const initialPhase = getPhaseFromRemainingTime(totalTime, totalTime);
+        prevPhaseRef.current = null;
+        setPhase(initialPhase);
+        setIsRunning(true);
+        timerStartRef.current = Date.now();
+        pausedTotalMsRef.current = 0;
+      } catch {
+        setError(locale === 'ja'
+          ? 'セッション開始に失敗しました。設定画面に戻って再試行してください。'
+          : 'Failed to start session. Go back and try again.');
+        setIsRunning(false);
+      }
+    };
+
+    void initializeSession();
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cancelled = true;
+      if (finishTimeoutRef.current) {
+        window.clearTimeout(finishTimeoutRef.current);
+      }
+      agentRef.current?.disconnect();
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
+  }, [connectWithSignedUrl, foodName, locale, style, totalTime]);
 
-  const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
+  useEffect(() => {
+    if (!isRunning || isPaused || isFinished || !sessionId) return;
+
+    const intervalId = window.setInterval(() => {
+      if (!timerStartRef.current) return;
+
+      const elapsedMs = Date.now() - timerStartRef.current - pausedTotalMsRef.current;
+      const nextRemainingTime = Math.max(totalTime - Math.floor(elapsedMs / 1000), 0);
+
+      setRemainingTime(nextRemainingTime);
+      void handlePhaseTransition(sessionId, nextRemainingTime);
+
+      if (nextRemainingTime <= 0) {
+        window.clearInterval(intervalId);
+        setIsRunning(false);
+        setIsFinished(true);
+        setIsFlashing(true);
+        setShowConfetti(true);
+        playAlarmTone();
+        const finishText = getFinishLine(style, foodName, locale);
+        setBestMoment(finishText);
+        void syncNarration(sessionId, finishText);
+        window.setTimeout(() => setIsFlashing(false), 600);
+        finishTimeoutRef.current = window.setTimeout(() => onFinish(), 4000);
+      }
+    }, 200);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [foodName, handlePhaseTransition, isFinished, isPaused, isRunning, locale, onFinish, playAlarmTone, sessionId, style, syncNarration, totalTime]);
+
+  useEffect(() => {
+    if (!isRunning || isFinished || !sessionId) return;
+
+    if (isPaused) {
+      pausedAtRef.current = Date.now();
+      return;
+    }
+
+    if (pausedAtRef.current) {
+      pausedTotalMsRef.current += Date.now() - pausedAtRef.current;
+      pausedAtRef.current = null;
+    }
+  }, [isFinished, isPaused, isRunning, sessionId]);
+
+  const progressPercent = totalTime > 0 ? (remainingTime / totalTime) * 100 : 0;
 
   const waveSeed = useMemo(() => {
     const textSeed = narrationText
       .split('')
       .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
-    return textSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13;
-  }, [narrationText, totalSeconds, timeLeft, waveBeat]);
+    return textSeed + (totalTime - remainingTime) * 31 + waveBeat * 13;
+  }, [narrationText, totalTime, remainingTime, waveBeat]);
 
   const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
     if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
@@ -149,6 +313,12 @@ export default function CountdownPage({
   return (
       <div
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
+      data-screen={currentScreen}
+      data-session-id={sessionId}
+      data-phase={phase}
+      data-agent-status={agentStatus}
+      data-best-moment={bestMoment}
+      data-latest-narration={latestNarration}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />
@@ -181,7 +351,7 @@ export default function CountdownPage({
               className="text-sm font-bold mt-0.5"
               style={{ color: styleConfig.accentColor }}
             >
-              {dishName}
+              {foodName}
             </span>
           </div>
         </div>
@@ -203,8 +373,8 @@ export default function CountdownPage({
         <div className="flex-1 flex flex-col items-center px-4 py-3">
           <div className="flex h-[250px] w-full flex-col items-center justify-start gap-1 sm:h-[280px] md:h-[320px]">
             <CircularTimer
-              remaining={timeLeft}
-              total={totalSeconds}
+              remaining={remainingTime}
+              total={totalTime}
               size={200}
               style={style}
               locale={locale}
@@ -262,8 +432,21 @@ export default function CountdownPage({
             {isPaused ? t.resume : t.pause}
           </button>
           <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-600'}`}>
-            {totalSeconds - timeLeft} {t.elapsed} / {totalSeconds} {t.seconds}
+            {totalTime - remainingTime} {t.elapsed} / {totalTime} {t.seconds}
           </p>
+          {error && <p className={`mt-1 text-[10px] ${isLight ? 'text-red-600' : 'text-red-400'}`}>{error}</p>}
+          {agentStatus === 'error' && !isFinished && (
+            <button
+              onClick={() => { void connectWithSignedUrl(); }}
+              className={`mt-1 inline-flex items-center gap-2 rounded-lg px-3 py-1 text-[10px] font-bold transition-colors ${
+                isLight
+                  ? 'bg-slate-200/90 text-slate-700 hover:bg-slate-300'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              {locale === 'ja' ? '音声接続を再試行' : 'Retry voice connection'}
+            </button>
+          )}
         </div>
       </div>
     </div>
