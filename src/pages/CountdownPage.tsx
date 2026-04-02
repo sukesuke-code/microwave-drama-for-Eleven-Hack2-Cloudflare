@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
-import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
+import WaveAnimation from '../components/WaveAnimation';
 import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
@@ -42,9 +42,6 @@ export default function CountdownPage({
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
   const isLight = themeMode === 'light';
-  const lightBgGradient = style === 'sports'
-    ? 'from-sky-50 via-blue-50/80 to-slate-100'
-    : 'from-slate-50 via-orange-50/80 to-slate-100';
 
   const playAlarmTone = useCallback(() => {
     const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -116,39 +113,21 @@ export default function CountdownPage({
     };
   }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
 
-  const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
-
-  const waveSeed = useMemo(() => {
-    const textSeed = narrationText
-      .split('')
-      .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
-    return textSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13;
-  }, [narrationText, totalSeconds, timeLeft, waveBeat]);
-
-  const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
-    if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
-    if (narrationText.length > 42) return 'medium';
-    return 'low';
-  }, [isDanger, narrationText]);
-
   useEffect(() => {
     if (isPaused || isFinished) return;
 
-    const punctuationBoost = (narrationText.match(/[!?！？]/g) ?? []).length;
-    const lengthBoost = Math.min(5, Math.floor(narrationText.length / 24));
-    const tempoScore = Math.max(1, punctuationBoost + lengthBoost + (waveIntensity === 'high' ? 3 : waveIntensity === 'medium' ? 2 : 1));
-    const cadenceMs = Math.max(90, 180 - tempoScore * 14);
-
     const beatTimer = setInterval(() => {
       setWaveBeat((prev) => prev + 1);
-    }, cadenceMs);
+    }, 140);
 
     return () => clearInterval(beatTimer);
-  }, [isPaused, isFinished, narrationText, waveIntensity]);
+  }, [isPaused, isFinished]);
+
+  const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
   return (
-      <div
-      className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
+    <div
+      className={`min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? 'from-slate-50 via-orange-50/80 to-slate-100' : styleConfig.bgGradient}`}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />
@@ -164,8 +143,8 @@ export default function CountdownPage({
         />
       )}
 
-      <div className="relative z-20 flex h-full flex-col">
-        <div className={`relative flex items-center justify-center px-4 pt-safe pt-3 pb-2 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
+      <div className="relative z-20 flex flex-col min-h-screen">
+        <div className={`relative flex items-center justify-center px-4 pt-safe pt-4 pb-3 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
           <button
             onClick={onBack}
             className={`absolute left-4 top-4 rounded-lg p-1 transition-colors ${isLight ? 'text-slate-700 hover:bg-slate-200' : 'text-slate-300 hover:bg-white/10'}`}
@@ -173,6 +152,7 @@ export default function CountdownPage({
           >
             <ChevronLeft size={24} />
           </button>
+
           <div className="flex flex-col items-center text-center">
             <span className={`text-xs uppercase tracking-widest font-bold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               {styleConfig.emoji} {styleConfig.label}
@@ -184,12 +164,10 @@ export default function CountdownPage({
               {dishName}
             </span>
           </div>
-        </div>
 
-        <div className="absolute right-4 top-4 z-30">
           <button
             onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-            className={`flex items-center justify-center rounded-xl p-2 transition-colors ${
+            className={`absolute right-4 top-4 flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold transition-colors ${
               isLight
                 ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                 : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
@@ -197,20 +175,20 @@ export default function CountdownPage({
             aria-label="Dark mode switcher"
           >
             {isLight ? <Moon size={14} /> : <Sun size={14} />}
+            {isLight ? 'Dark' : 'Light'}
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center px-4 py-3">
-          <div className="flex h-[250px] w-full flex-col items-center justify-start gap-1 sm:h-[280px] md:h-[320px]">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-8">
+          <div className="flex flex-col items-center gap-2">
             <CircularTimer
               remaining={timeLeft}
               total={totalSeconds}
-              size={200}
               style={style}
               locale={locale}
             />
 
-            <div className="w-full max-w-xs mt-3">
+            <div className="w-full max-w-xs mt-2">
               <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
                 <div
                   className="h-full rounded-full transition-all duration-1000"
@@ -224,22 +202,15 @@ export default function CountdownPage({
             </div>
           </div>
 
-          <div className="mt-1">
-            <AudioWaveVisualizer
-              color={styleConfig.accentColor}
-              barCount={16}
-              intensity={waveIntensity}
-              syncSeed={waveSeed}
-            />
-          </div>
+          <WaveAnimation style={style} active={!isPaused && !isFinished} narrationText={narrationText} beat={waveBeat} />
 
-          <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
+          <div className="w-full max-w-sm h-[120px]">
             <NarrationText text={narrationText} style={style} themeMode={themeMode} />
           </div>
 
           {isDanger && !isFinished && (
             <div
-              className={`mt-2 translate-y-8 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
+              className={`text-center font-display text-lg font-bold tracking-widest uppercase ${styleConfig.textShadowClass}`}
               style={{
                 animation: 'dangerPulse 0.5s ease-in-out infinite',
                 textShadow: `0 0 15px ${styleConfig.accentColor}`,
@@ -248,9 +219,24 @@ export default function CountdownPage({
               {t.almostDone}
             </div>
           )}
+
+          {isFinished && (
+            <div
+              className="text-center font-display text-4xl font-bold animate-scale-in"
+              style={{
+                background: `linear-gradient(135deg, #fff, ${styleConfig.accentColor})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                filter: `drop-shadow(0 0 20px ${styleConfig.accentColor})`,
+              }}
+            >
+              {t.done}
+            </div>
+          )}
         </div>
 
-        <div className="px-4 pb-3 text-center">
+        <div className="px-4 pb-6 text-center">
           <button
             onClick={() => setIsPaused((p) => !p)}
             className={`mb-2 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
