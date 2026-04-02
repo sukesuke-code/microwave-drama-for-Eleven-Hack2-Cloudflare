@@ -1,6 +1,8 @@
 import { NarrationStyle } from '../types';
 
-export const API_BASE = 'https://microwave-show-api.lolololololol.workers.dev';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+
+export const API_BASE = `${SUPABASE_URL}/functions/v1`;
 
 type ApiNarrationStyle = 'sports' | 'horror' | 'documentary' | 'anime';
 
@@ -37,24 +39,42 @@ function mapStyleToApi(style: NarrationStyle): ApiNarrationStyle {
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
+  try {
+    console.log('[requestJson] Fetching:', input);
+    const response = await fetch(input, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+    });
 
-  const data = await response.json() as unknown;
+    console.log('[requestJson] Status:', response.status, response.statusText);
 
-  if (!response.ok) {
-    const errorMessage = typeof data === 'object' && data !== null && 'error' in data
-      ? String((data as Record<string, unknown>).error)
-      : `API request failed: ${response.status}`;
-    throw new Error(errorMessage);
+    let data: unknown;
+    try {
+      data = await response.json();
+      console.log('[requestJson] Response data:', data);
+    } catch (parseError) {
+      console.error('[requestJson] Failed to parse JSON:', parseError);
+      data = null;
+    }
+
+    if (!response.ok) {
+      const errorMessage = typeof data === 'object' && data !== null && 'error' in data
+        ? String((data as Record<string, unknown>).error)
+        : `API request failed: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    return data as T;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error('[requestJson] Network error - CORS or connectivity issue:', error.message);
+      throw new Error(`Network error: ${error.message}`);
+    }
+    throw error;
   }
-
-  return data as T;
 }
 
 export async function startSession(foodName: string, totalTime: number, style: NarrationStyle): Promise<string> {
@@ -69,7 +89,7 @@ export async function startSession(foodName: string, totalTime: number, style: N
   console.log('[startSession] payload:', payload);
 
   try {
-    const data = await requestJson<StartSessionResponse>(`${API_BASE}/api/session/start`, {
+    const data = await requestJson<StartSessionResponse>(`${API_BASE}/session-start`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -90,7 +110,7 @@ export async function startSession(foodName: string, totalTime: number, style: N
 
 export async function getSignedUrl(): Promise<string> {
   try {
-    const data = await requestJson<SignedUrlResponse>(`${API_BASE}/api/elevenlabs/signed-url`, {
+    const data = await requestJson<SignedUrlResponse>(`${API_BASE}/elevenlabs-signed-url`, {
       method: 'POST',
       body: JSON.stringify({}),
     });
@@ -108,21 +128,21 @@ export async function getSignedUrl(): Promise<string> {
 }
 
 export async function updatePhase(sessionId: string, remainingTime: number): Promise<void> {
-  await requestJson(`${API_BASE}/api/session/tick`, {
+  await requestJson(`${API_BASE}/session-tick`, {
     method: 'POST',
     body: JSON.stringify({ sessionId, remainingTime }),
   });
 }
 
 export async function saveNarration(sessionId: string, text: string): Promise<void> {
-  await requestJson(`${API_BASE}/api/session/narration`, {
+  await requestJson(`${API_BASE}/session-narration`, {
     method: 'POST',
     body: JSON.stringify({ sessionId, text }),
   });
 }
 
 export async function getSession(sessionId: string): Promise<SessionSnapshot> {
-  return requestJson<SessionSnapshot>(`${API_BASE}/api/session?sessionId=${encodeURIComponent(sessionId)}`);
+  return requestJson<SessionSnapshot>(`${API_BASE}/session-get?sessionId=${encodeURIComponent(sessionId)}`);
 }
 
 export function getPhaseFromRemainingTime(remainingTime: number, totalTime: number): CountdownPhase {
