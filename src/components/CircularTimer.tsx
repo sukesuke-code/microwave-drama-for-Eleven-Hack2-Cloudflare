@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import { NarrationStyle } from '../types';
+import { Locale, NarrationStyle } from '../types';
 
 interface CircularTimerProps {
   remaining: number;
   total: number;
   size?: number;
   style: NarrationStyle;
+  locale: Locale;
 }
 
 const STYLE_COLORS: Record<NarrationStyle, { stroke: string; track: string; glow: string }> = {
@@ -15,7 +16,7 @@ const STYLE_COLORS: Record<NarrationStyle, { stroke: string; track: string; glow
   nature: { stroke: '#34d399', track: '#064e3b', glow: 'rgba(52,211,153,0.6)' },
 };
 
-export default function CircularTimer({ remaining, total, size = 240, style }: CircularTimerProps) {
+export default function CircularTimer({ remaining, total, size = 240, style, locale }: CircularTimerProps) {
   const strokeWidth = 8;
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -96,7 +97,7 @@ export default function CircularTimer({ remaining, total, size = 240, style }: C
               filter: `drop-shadow(0 0 14px ${colors.glow})`,
             }}
           >
-            チーン！
+            {locale === 'ja' ? 'チーン！' : 'DING!'}
           </span>
         ) : (
           <span className="font-display font-black tracking-tight" style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -121,7 +122,7 @@ export default function CircularTimer({ remaining, total, size = 240, style }: C
         )}
         {!isFinished && (
           <span className="mt-1 text-sm font-bold" style={{ color: '#94a3b8' }}>
-            {showMinutePrefix ? '分:秒' : '秒'}
+            {showMinutePrefix ? (locale === 'ja' ? '分:秒' : 'Min:Sec') : locale === 'ja' ? '秒' : 'Sec'}
           </span>
         )}
       </div>

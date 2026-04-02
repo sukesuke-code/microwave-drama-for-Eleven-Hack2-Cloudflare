@@ -151,6 +151,7 @@ export default function CountdownPage({
               total={totalSeconds}
               size={240}
               style={style}
+              locale={locale}
             />
 
             <div className="w-full max-w-xs mt-2">
