@@ -140,8 +140,8 @@ export default function SettingsPage({
   }, [duration, dishName, style]);
 
   return (
-    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
-      <div className="mx-auto flex h-full w-full max-w-md flex-col p-4">
+    <div className={`h-[100dvh] overflow-y-auto ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col p-4">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
             type="button"
@@ -161,7 +161,7 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="mt-4 flex flex-1 flex-col justify-between gap-4">
+        <div className="mt-4 flex flex-1 flex-col gap-4 pb-4">
           <section className="space-y-4">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
@@ -246,7 +246,7 @@ export default function SettingsPage({
 
           <section className="space-y-4">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
-            <div className="grid h-full max-h-[34vh] grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {STYLE_CARDS.map((card) => {
                 const selected = style === card.id;
                 return (
