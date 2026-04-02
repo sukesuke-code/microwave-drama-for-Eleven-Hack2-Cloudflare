@@ -6,6 +6,9 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const CountdownPage = lazy(() => import('./pages/CountdownPage'));
 const ResultPage = lazy(() => import('./pages/ResultPage'));
 
+const DEFAULT_LOCALE: Locale = 'en';
+const SUPPORTED_LOCALES: Locale[] = ['en', 'ja'];
+
 function readStorage(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -22,10 +25,33 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
+function normalizeLocale(locale: string): Locale | null {
+  const base = locale.toLowerCase().split('-')[0] as Locale;
+  return SUPPORTED_LOCALES.includes(base) ? base : null;
+}
+
 function detectDeviceLocale(): Locale {
-  const lang = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : '';
-  if (lang.startsWith('ja')) return 'ja';
-  return 'en';
+  if (typeof navigator === 'undefined') return DEFAULT_LOCALE;
+
+  const candidates = [...(navigator.languages ?? []), navigator.language]
+    .filter((lang): lang is string => Boolean(lang));
+
+  for (const candidate of candidates) {
+    const normalized = normalizeLocale(candidate);
+    if (normalized) return normalized;
+  }
+
+  return DEFAULT_LOCALE;
+}
+
+function readLocale(): Locale {
+  const saved = readStorage('ching-drama-locale');
+  if (saved) {
+    const normalizedSaved = normalizeLocale(saved);
+    if (normalizedSaved) return normalizedSaved;
+  }
+
+  return detectDeviceLocale();
 }
 
 
@@ -54,11 +80,7 @@ function readSettings(): Settings | null {
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(() => readSettings());
   const [screen, setScreen] = useState<AppScreen>('top');
-  const [locale, setLocale] = useState<Locale>(() => {
-    const saved = readStorage('ching-drama-locale');
-    if (saved === 'en' || saved === 'ja') return saved;
-    return detectDeviceLocale();
-  });
+  const [locale, setLocale] = useState<Locale>(() => readLocale());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStorage('ching-drama-theme');
     return saved === 'light' || saved === 'dark' ? saved : 'dark';
