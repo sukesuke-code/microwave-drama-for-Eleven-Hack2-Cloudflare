@@ -4,6 +4,7 @@ interface AudioWaveVisualizerProps {
   color?: string;
   barCount?: number;
   intensity?: 'low' | 'medium' | 'high';
+  syncSeed?: number;
 }
 
 type WavePattern = {
@@ -55,17 +56,25 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
 ];
 
+function seededUnit(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 export default function AudioWaveVisualizer({
   color = '#f97316',
   barCount = 8,
-  intensity = 'medium'
+  intensity = 'medium',
+  syncSeed,
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
   const delayMultiplier = intensity === 'high' ? 0.06 : intensity === 'low' ? 0.12 : 0.08;
-  const pattern = useMemo(
-    () => WAVE_PATTERNS[Math.floor(Math.random() * WAVE_PATTERNS.length)],
-    []
-  );
+  const pattern = useMemo(() => {
+    if (typeof syncSeed === 'number') {
+      return WAVE_PATTERNS[Math.abs(syncSeed) % WAVE_PATTERNS.length];
+    }
+    return WAVE_PATTERNS[Math.floor(Math.random() * WAVE_PATTERNS.length)];
+  }, [syncSeed]);
 
   return (
     <div
@@ -73,8 +82,9 @@ export default function AudioWaveVisualizer({
       style={{ transform: 'scaleY(-1)' }}
     >
       {bars.map((_, i) => {
+        const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();
         const randomDuration =
-          pattern.durationMin + Math.random() * (pattern.durationMax - pattern.durationMin);
+          pattern.durationMin + randomUnit * (pattern.durationMax - pattern.durationMin);
         const barStyle: CSSProperties & Record<string, string | number> = {
           backgroundColor: color,
           animationDelay: `${i * delayMultiplier}s`,
