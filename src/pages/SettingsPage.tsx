@@ -161,7 +161,7 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="mt-2 flex flex-1 flex-col gap-2">
+        <div className="mt-2 flex flex-1 min-h-0 flex-col justify-between sm:justify-start sm:gap-2">
           <section className="space-y-2">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
