@@ -50,7 +50,7 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
           transition: 'opacity 0.3s ease',
         }}
       />
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute top-0 left-0 -rotate-90">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute top-0 left-0 -rotate-90 overflow-visible">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={colors.stroke} stopOpacity="1" />
