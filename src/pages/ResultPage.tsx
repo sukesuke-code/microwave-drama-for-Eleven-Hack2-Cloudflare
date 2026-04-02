@@ -178,6 +178,13 @@ export default function ResultPage({
           </p>
         </div>
 
+        <p
+          className={`w-full text-left text-base sm:text-lg font-medium ${isLight ? 'text-slate-700' : 'text-slate-300'}`}
+        >
+          <span style={{ color: styleConfig.accentColor }} className="font-bold">{dishName}</span>
+          {locale === 'ja' ? `の${totalSeconds}秒が、ついに幕を閉じたー` : `: ${totalSeconds} seconds have finally come to a close.`}
+        </p>
+
         <div
           className={`w-full rounded-[1.75rem] border px-4 sm:px-6 py-3 sm:py-5 text-left ${
             isLight
