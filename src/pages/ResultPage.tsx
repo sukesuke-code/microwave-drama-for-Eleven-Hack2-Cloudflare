@@ -135,9 +135,9 @@ export default function ResultPage({
         }}
       />
 
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col items-center justify-between px-4 pb-3 pt-14 text-center hero-rise-in sm:px-6 sm:pb-6 sm:pt-16">
+      <div className="relative z-10 flex h-full w-full max-w-md flex-col items-center justify-center px-4 pt-14 text-center hero-rise-in sm:px-6 sm:pt-16">
         <div
-          className="result-complete-orb h-16 w-16 rounded-full flex items-center justify-center mb-2 sm:h-24 sm:w-24 sm:mb-6"
+          className="result-complete-orb h-16 w-16 rounded-full flex items-center justify-center sm:h-24 sm:w-24"
           style={{
             border: `2px solid ${styleConfig.accentColor}40`,
             boxShadow: `0 0 24px ${styleConfig.accentColor}40, inset 0 0 16px ${styleConfig.accentColor}25`,
@@ -156,12 +156,12 @@ export default function ResultPage({
           </span>
         </div>
 
-        <h1 className={`font-display text-3xl sm:text-4xl font-bold mb-1 sm:mb-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+        <h1 className={`font-display text-3xl sm:text-4xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
           {t.dramaDone}
         </h1>
 
         <div
-          className="my-2 sm:my-6 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border w-full"
+          className="px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border w-full"
           style={{
             borderColor: `${styleConfig.accentColor}30`,
             background: `${styleConfig.accentColor}08`,
@@ -176,7 +176,7 @@ export default function ResultPage({
         </div>
 
         <div
-          className={`mb-2 sm:mb-3 w-full rounded-[1.75rem] border px-4 sm:px-6 py-3 sm:py-5 text-left ${
+          className={`w-full rounded-[1.75rem] border px-4 sm:px-6 py-3 sm:py-5 text-left ${
             isLight
               ? 'border-slate-300 bg-slate-100/85'
               : 'border-slate-700/70 bg-slate-900/55'
@@ -203,7 +203,7 @@ export default function ResultPage({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 sm:gap-3 w-full">
+        <div className="flex flex-col w-full">
           <button
             onClick={onReplay}
             className="flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
