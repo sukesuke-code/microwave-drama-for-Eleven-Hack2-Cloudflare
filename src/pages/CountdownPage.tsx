@@ -239,7 +239,7 @@ export default function CountdownPage({
 
           {isDanger && !isFinished && (
             <div
-              className={`mt-2 translate-y-12 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
+              className={`mt-2 translate-y-16 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
               style={{
                 animation: 'dangerPulse 0.5s ease-in-out infinite',
                 textShadow: `0 0 15px ${styleConfig.accentColor}`,
@@ -251,7 +251,7 @@ export default function CountdownPage({
 
           {isFinished && (
             <div
-              className="translate-y-12 text-center font-display text-3xl font-bold animate-scale-in sm:text-4xl"
+              className="translate-y-16 text-center font-display text-3xl font-bold animate-scale-in sm:text-4xl"
               style={{
                 color: '#f97316',
                 textShadow: '0 0 16px rgba(249,115,22,0.7), 0 0 28px rgba(251,146,60,0.45)',
