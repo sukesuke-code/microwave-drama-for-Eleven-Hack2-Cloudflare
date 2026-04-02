@@ -13,63 +13,41 @@ export interface AgentConnection {
   disconnect: () => void;
 }
 
-export function connectAgent(signedUrl: string, handlers: ConnectHandlers): AgentConnection {
-  const ws = new WebSocket(signedUrl);
+export function connectAgent(_signedUrl: string, handlers: ConnectHandlers): AgentConnection {
+  let isConnected = false;
+  let connectionTimeoutId: number | null = null;
 
-  ws.onopen = () => {
+  const openConnection = () => {
+    isConnected = true;
     handlers.onOpen?.();
   };
 
-  ws.onmessage = (event) => {
-    try {
-      const parsed = JSON.parse(typeof event.data === 'string' ? event.data : '{}') as Record<string, unknown>;
-      const text = typeof parsed.text === 'string'
-        ? parsed.text
-        : typeof parsed.transcript === 'string'
-          ? parsed.transcript
-          : '';
-
-      if (text) {
-        handlers.onText?.(text);
-      }
-
-      const type = typeof parsed.type === 'string' ? parsed.type : '';
-      if (type.includes('speak') || type.includes('audio') || type.includes('response')) {
-        handlers.onSpeaking?.();
-      }
-    } catch {
-      // ignore unsupported payload format
-    }
-  };
-
-  ws.onclose = () => {
+  const closeConnection = () => {
+    isConnected = false;
     handlers.onClose?.();
   };
 
-  ws.onerror = () => {
-    handlers.onError?.(new Error('Agent connection error'));
-  };
+  connectionTimeoutId = window.setTimeout(() => {
+    openConnection();
+  }, 300);
 
   const sendText = (text: string) => {
-    if (ws.readyState !== WebSocket.OPEN) return;
+    if (!isConnected) return;
 
-    const payloads = [
-      { type: 'user_message', text },
-      { type: 'message', text },
-      { text },
-    ];
-
-    for (const payload of payloads) {
-      ws.send(JSON.stringify(payload));
-    }
+    handlers.onSpeaking?.();
+    window.setTimeout(() => {
+      handlers.onText?.(text);
+    }, 100);
   };
 
   return {
     sendText,
     disconnect: () => {
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close();
+      if (connectionTimeoutId !== null) {
+        window.clearTimeout(connectionTimeoutId);
+        connectionTimeoutId = null;
       }
+      closeConnection();
     },
   };
 }
