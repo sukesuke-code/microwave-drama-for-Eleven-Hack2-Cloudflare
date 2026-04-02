@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Moon, RotateCcw, Share2, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
@@ -13,6 +13,57 @@ interface ResultPageProps {
   onReplay: () => void;
   onHome: () => void;
   onTop: () => void;
+}
+
+interface AutoFitSingleLineTextProps {
+  text: string;
+  className?: string;
+  minPx?: number;
+  maxPx?: number;
+}
+
+function AutoFitSingleLineText({
+  text,
+  className = '',
+  minPx = 13,
+  maxPx = 26,
+}: AutoFitSingleLineTextProps) {
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [fontPx, setFontPx] = useState(maxPx);
+
+  useLayoutEffect(() => {
+    const el = spanRef.current;
+    if (!el) return;
+
+    const fit = () => {
+      let next = maxPx;
+      el.style.fontSize = `${next}px`;
+
+      while (next > minPx && el.scrollWidth > el.clientWidth) {
+        next -= 1;
+        el.style.fontSize = `${next}px`;
+      }
+      setFontPx(next);
+    };
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    if (el.parentElement) observer.observe(el.parentElement);
+
+    return () => observer.disconnect();
+  }, [text, minPx, maxPx]);
+
+  return (
+    <span
+      ref={spanRef}
+      className={`block w-full whitespace-nowrap overflow-hidden ${className}`}
+      style={{ fontSize: `${fontPx}px` }}
+      title={text}
+    >
+      {text}
+    </span>
+  );
 }
 
 export default function ResultPage({
@@ -133,17 +184,22 @@ export default function ResultPage({
         >
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3.5">
             <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.dish}</p>
-            <p className={`justify-self-end text-[clamp(1rem,5vw,1.6rem)] font-black leading-tight whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-white'}`}>{dishName}</p>
+            <AutoFitSingleLineText
+              text={dishName}
+              className={`justify-self-end text-right font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}
+            />
 
             <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.time}</p>
-            <p className={`justify-self-end text-[clamp(1rem,5vw,1.6rem)] font-black leading-tight whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              {totalSeconds}{locale === 'ja' ? '秒' : 's'}
-            </p>
+            <AutoFitSingleLineText
+              text={`${totalSeconds}${locale === 'ja' ? '秒' : 's'}`}
+              className={`justify-self-end text-right font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}
+            />
 
             <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.narration}</p>
-            <p className={`justify-self-end text-[clamp(1rem,5vw,1.6rem)] font-black leading-tight whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              {styleConfig.emoji} {styleConfig.label}
-            </p>
+            <AutoFitSingleLineText
+              text={`${styleConfig.emoji} ${styleConfig.label}`}
+              className={`justify-self-end text-right font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}
+            />
           </div>
         </div>
 
