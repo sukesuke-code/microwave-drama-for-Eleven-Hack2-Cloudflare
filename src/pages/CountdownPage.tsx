@@ -153,6 +153,7 @@ export default function CountdownPage({
               isDanger={isDanger}
               isFinished={isFinished}
               nearingCompletionLabel={t.nearingCompletion}
+              secondsUnitLabel={t.seconds}
             />
 
             <div className="w-full max-w-xs mt-2">

@@ -8,6 +8,7 @@ interface CircularTimerProps {
   isDanger: boolean;
   isFinished?: boolean;
   nearingCompletionLabel: string;
+  secondsUnitLabel: string;
 }
 
 const STYLE_COLORS: Record<NarrationStyle, { stroke: string; glow: string; text: string }> = {
@@ -24,6 +25,7 @@ export default function CircularTimer({
   isDanger,
   isFinished = false,
   nearingCompletionLabel,
+  secondsUnitLabel,
 }: CircularTimerProps) {
   const size = 240;
   const strokeWidth = 8;
@@ -41,6 +43,7 @@ export default function CircularTimer({
   const secondStr = String(seconds).padStart(2, '0');
   const showMinutePrefix = timeLeft >= 60;
   const isSecondsDanger = timeLeft <= 10;
+  const showSecondsUnit = timeLeft <= 59 && timeLeft > 0 && !isFinished;
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
   const filterId = useMemo(() => `timer-glow-${style}`, [style]);
@@ -141,12 +144,12 @@ export default function CircularTimer({
             {secondStr}
           </span>
         </span>
-        {isDanger && (
+        {(showSecondsUnit || isDanger) && (
           <span
             className="text-xs font-bold tracking-widest mt-1 uppercase"
             style={{ color: colors.text, opacity: 0.8 }}
           >
-            {nearingCompletionLabel}
+            {showSecondsUnit ? secondsUnitLabel : nearingCompletionLabel}
           </span>
         )}
       </div>
