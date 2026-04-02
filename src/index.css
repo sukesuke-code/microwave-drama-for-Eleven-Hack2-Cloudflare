@@ -22,6 +22,29 @@
     background-color: #00031a;
   }
 
+  button {
+    transition:
+      background-color 220ms ease,
+      color 220ms ease,
+      box-shadow 220ms ease,
+      filter 220ms ease,
+      transform 140ms ease;
+  }
+
+  button:hover {
+    filter: brightness(1.08) saturate(1.06);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+      0 0 18px rgba(56, 189, 248, 0.24);
+  }
+
+  button:active {
+    filter: brightness(1.15) saturate(1.1);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+      0 0 22px rgba(249, 115, 22, 0.3);
+  }
+
   ::-webkit-scrollbar {
     width: 4px;
   }
