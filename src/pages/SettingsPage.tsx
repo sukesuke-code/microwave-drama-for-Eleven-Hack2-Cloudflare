@@ -223,7 +223,7 @@ export default function SettingsPage({
               step={1}
               value={duration}
               onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
-              className="h-2 w-full cursor-pointer accent-orange-500"
+              className="time-slider h-2 w-full cursor-pointer accent-orange-500"
             />
             <div className={`flex justify-between text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
               <span>1{t.seconds}</span>
