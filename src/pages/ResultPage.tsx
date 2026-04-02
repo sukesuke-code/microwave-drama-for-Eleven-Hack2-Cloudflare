@@ -124,19 +124,46 @@ export default function ResultPage({
   const t = UI_TEXT[locale];
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isLight = themeMode === 'light';
+  const [isSharing, setIsSharing] = useState(false);
   const summaryLabels = locale === 'ja'
     ? { dish: '料理', time: '加熱時間', narration: '実況スタイル' }
     : { dish: 'Dish', time: 'Cook Time', narration: 'Narration Style' };
 
   const handleShare = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+
     const text = locale === 'ja'
       ? `チンドラマで「${dishName}」を完璧に温め直した！\n\n#チンドラマ #ChingDrama #電子レンジ`
       : `I reheated "${dishName}" perfectly with Ching Show!\n\n#ChingShow #Microwave`;
-    if (navigator.share) {
-      await navigator.share({ text }).catch(() => null);
-    } else {
-      await navigator.clipboard.writeText(text).catch(() => null);
-      alert(t.shareCopied);
+
+    const sharePayload = {
+      title: 'Microwave Show',
+      text,
+      url: window.location.origin,
+    };
+
+    const copyFallback = async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert(t.shareCopied);
+      } catch {
+        window.prompt('Copy this text:', text);
+      }
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(sharePayload);
+      } else {
+        await copyFallback();
+      }
+    } catch (error) {
+      if ((error as DOMException).name !== 'AbortError') {
+        await copyFallback();
+      }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -278,6 +305,7 @@ export default function ResultPage({
 
           <button
             onClick={handleShare}
+            type="button"
             className={`flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-sm sm:text-base border transition-all active:scale-95 ${
               isLight
                 ? 'text-slate-700 bg-white border-slate-200 hover:bg-slate-100'
@@ -285,7 +313,7 @@ export default function ResultPage({
             }`}
           >
             <Share2 size={18} />
-            {t.share}
+            {isSharing ? (locale === 'ja' ? '共有中...' : 'Sharing...') : t.share}
           </button>
 
           <button
