@@ -210,7 +210,7 @@ export default function CountdownPage({
               locale={locale}
             />
 
-            <div className="w-full max-w-xs mt-1">
+            <div className="w-full max-w-xs mt-3">
               <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
                 <div
                   className="h-full rounded-full transition-all duration-1000"
