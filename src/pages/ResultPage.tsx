@@ -99,7 +99,6 @@ export default function ResultPage({
     const messages = RESULT_MESSAGES[locale][style];
     return messages[Math.floor(Math.random() * messages.length)];
   }, [locale, style]);
-
   return (
     <div
       className={`h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
@@ -175,6 +174,15 @@ export default function ResultPage({
           </p>
         </div>
 
+        <p
+          className={`mb-2 sm:mb-3 text-base sm:text-[1.7rem] font-semibold text-center tracking-wide ${
+            isLight ? 'text-slate-700' : 'text-slate-300'
+          }`}
+        >
+          <span className="text-orange-400 font-black">{dishName}</span>
+          {locale === 'ja' ? `の${totalSeconds}秒が、ついに幕を閉じたー` : `'s ${totalSeconds}s has finally come to an end—`}
+        </p>
+
         <div
           className={`mb-2 sm:mb-3 w-full rounded-[1.75rem] border px-4 sm:px-6 py-3 sm:py-5 text-left ${
             isLight
@@ -206,9 +214,10 @@ export default function ResultPage({
         <div className="flex flex-col gap-2 sm:gap-3 w-full">
           <button
             onClick={onReplay}
-            className="flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
+            className="replay-gradient-button flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
             style={{
-              background: `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`,
+              background: `linear-gradient(120deg, ${styleConfig.accentColor}e0, ${styleConfig.accentColor}, #f97316, ${styleConfig.accentColor})`,
+              backgroundSize: '220% 220%',
               boxShadow: `0 0 20px ${styleConfig.accentColor}40`,
             }}
           >
