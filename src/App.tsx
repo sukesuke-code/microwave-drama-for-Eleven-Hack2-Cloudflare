@@ -22,6 +22,12 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
+function detectDeviceLocale(): Locale {
+  const lang = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : '';
+  if (lang.startsWith('ja')) return 'ja';
+  return 'en';
+}
+
 function isValidScreen(value: string | null): value is AppScreen {
   return value === 'top' || value === 'settings' || value === 'countdown' || value === 'result';
 }
@@ -58,7 +64,8 @@ export default function App() {
   });
   const [locale, setLocale] = useState<Locale>(() => {
     const saved = readStorage('ching-drama-locale');
-    return saved === 'en' || saved === 'ja' ? saved : 'ja';
+    if (saved === 'en' || saved === 'ja') return saved;
+    return detectDeviceLocale();
   });
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStorage('ching-drama-theme');

@@ -130,6 +130,7 @@ export default function CircularTimer({
         >
           {showMinutePrefix && <span>{minuteStr}:</span>}
           <span
+            className={isSecondsDanger ? 'timer-seconds-shake' : ''}
             style={{
               color: isSecondsDanger ? '#ef4444' : colors.text,
               textShadow: isSecondsDanger

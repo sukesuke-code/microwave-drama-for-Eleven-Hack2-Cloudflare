@@ -172,7 +172,7 @@ export default function CountdownPage({
           <WaveAnimation style={style} active={!isPaused && !isFinished} />
 
           <div className="w-full max-w-sm">
-            <NarrationText text={narrationText} style={style} />
+            <NarrationText text={narrationText} style={style} themeMode={themeMode} />
           </div>
 
           {isDanger && !isFinished && (
