@@ -99,6 +99,9 @@ export default function ResultPage({
     const messages = RESULT_MESSAGES[locale][style];
     return messages[Math.floor(Math.random() * messages.length)];
   }, [locale, style]);
+  const subtitleText = locale === 'ja'
+    ? `${dishName}の${totalSeconds}秒が、ついに幕を閉じたー`
+    : `${dishName}'s ${totalSeconds}s has finally come to an end—`;
   return (
     <div
       className={`h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
@@ -174,14 +177,16 @@ export default function ResultPage({
           </p>
         </div>
 
-        <p
-          className={`mb-2 sm:mb-3 text-base sm:text-[1.7rem] font-semibold text-center tracking-wide ${
-            isLight ? 'text-slate-700' : 'text-slate-300'
-          }`}
-        >
-          <span className="text-orange-400 font-black">{dishName}</span>
-          {locale === 'ja' ? `の${totalSeconds}秒が、ついに幕を閉じたー` : `'s ${totalSeconds}s has finally come to an end—`}
-        </p>
+        <div className="mb-2 sm:mb-3 w-full px-1">
+          <AutoFitSingleLineText
+            text={subtitleText}
+            minPx={12}
+            maxPx={23}
+            className={`text-center whitespace-nowrap font-normal tracking-tight ${
+              isLight ? 'text-slate-700' : 'text-slate-300'
+            }`}
+          />
+        </div>
 
         <div
           className={`mb-2 sm:mb-3 w-full rounded-[1.75rem] border px-4 sm:px-6 py-3 sm:py-5 text-left ${
