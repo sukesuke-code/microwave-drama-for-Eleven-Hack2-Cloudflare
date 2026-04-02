@@ -170,7 +170,7 @@ export default function TopPage({
 
         <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} hero-rise-in mt-3 text-xs text-center w-full max-w-xs`} style={{ animationDelay: '1.6s' }}>
           <div className="flex flex-col items-center gap-2">
-          <AudioWaveVisualizer color="#f97316" barCount={16} inverted />
+          <AudioWaveVisualizer color="#f97316" barCount={16} />
           <span className="text-xs">{t.startHint}</span>
           </div>
         </div>
