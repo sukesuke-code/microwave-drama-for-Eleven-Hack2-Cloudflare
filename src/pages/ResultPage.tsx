@@ -84,9 +84,9 @@ export default function ResultPage({
         }}
       />
 
-      <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full text-center">
+      <div className="relative z-10 flex flex-col items-center px-6 max-w-md w-full text-center hero-rise-in">
         <div
-          className="result-complete-orb w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-scale-in"
+          className="result-complete-orb w-24 h-24 rounded-full flex items-center justify-center mb-6"
           style={{
             border: `2px solid ${styleConfig.accentColor}40`,
             boxShadow: `0 0 24px ${styleConfig.accentColor}40, inset 0 0 16px ${styleConfig.accentColor}25`,
@@ -105,16 +105,15 @@ export default function ResultPage({
           </span>
         </div>
 
-        <h1 className={`font-display text-4xl font-bold mb-2 animate-fade-up ${isLight ? 'text-slate-900' : 'text-white'}`}>
+        <h1 className={`font-display text-4xl font-bold mb-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
           {t.dramaDone}
         </h1>
 
         <div
-          className="my-6 px-6 py-4 rounded-2xl border animate-fade-up w-full"
+          className="my-6 px-6 py-4 rounded-2xl border w-full"
           style={{
             borderColor: `${styleConfig.accentColor}30`,
             background: `${styleConfig.accentColor}08`,
-            animationDelay: '0.2s',
           }}
         >
           <p
@@ -126,12 +125,11 @@ export default function ResultPage({
         </div>
 
         <div
-          className={`mb-3 w-full rounded-[1.75rem] border px-6 py-5 text-left animate-fade-up ${
+          className={`mb-3 w-full rounded-[1.75rem] border px-6 py-5 text-left ${
             isLight
               ? 'border-slate-300 bg-slate-100/85'
               : 'border-slate-700/70 bg-slate-900/55'
           }`}
-          style={{ animationDelay: '0.15s' }}
         >
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3.5">
             <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.dish}</p>
@@ -149,7 +147,7 @@ export default function ResultPage({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 w-full animate-fade-up" style={{ animationDelay: '0.3s' }}>
+        <div className="flex flex-col gap-3 w-full">
           <button
             onClick={onReplay}
             className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-bold text-white text-lg transition-all active:scale-95"
