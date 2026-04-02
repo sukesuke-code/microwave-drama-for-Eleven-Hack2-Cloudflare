@@ -61,12 +61,12 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
         rounded-2xl border px-6 py-5
         ${STYLE_BG[style]} ${STYLE_BORDER_COLORS[style]}
         backdrop-blur-sm
-        min-h-[100px] flex items-center justify-center
+        min-h-[100px] h-full overflow-hidden flex items-center justify-center
         w-full max-w-sm mx-auto
       `}
     >
       <p
-        className={`text-center text-base leading-relaxed font-medium ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
+        className={`max-h-full overflow-y-auto text-center text-base leading-relaxed font-medium ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
         style={{ whiteSpace: 'pre-line' }}
       >
         {lines.map((line, i) => (

@@ -3,6 +3,7 @@ import { Moon, RotateCcw, Share2, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
 import { RESULT_MESSAGES, UI_TEXT } from '../i18n';
+import microwaveShowIcon from '../assets/microwave-show-icon.svg';
 
 interface ResultPageProps {
   locale: Locale;
@@ -11,6 +12,7 @@ interface ResultPageProps {
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onReplay: () => void;
   onHome: () => void;
+  onTop: () => void;
 }
 
 export default function ResultPage({
@@ -20,6 +22,7 @@ export default function ResultPage({
   onThemeModeChange,
   onReplay,
   onHome,
+  onTop,
 }: ResultPageProps) {
   const { dishName, style } = settings;
   const t = UI_TEXT[locale];
@@ -62,6 +65,15 @@ export default function ResultPage({
           {isLight ? <Moon size={16} /> : <Sun size={16} />}
         </button>
       </div>
+      <button
+        onClick={onTop}
+        className={`absolute left-4 top-4 z-30 rounded-xl p-1.5 transition-colors ${
+          isLight ? 'bg-white/85 hover:bg-white' : 'bg-slate-900/65 hover:bg-slate-900/90'
+        }`}
+        aria-label="Back to landing page"
+      >
+        <img src={microwaveShowIcon} alt="Microwave Show icon" className="h-7 w-7" />
+      </button>
       <div
         className="absolute inset-0 pointer-events-none"
         style={{

@@ -104,6 +104,7 @@ export default function App() {
   };
 
   const handleHome = () => setScreen('settings');
+  const handleTop = () => setScreen('top');
 
   return (
     <div className="font-sans">
@@ -144,6 +145,7 @@ export default function App() {
             onThemeModeChange={setThemeMode}
             onReplay={handleReplay}
             onHome={handleHome}
+            onTop={handleTop}
           />
         )}
       </Suspense>
