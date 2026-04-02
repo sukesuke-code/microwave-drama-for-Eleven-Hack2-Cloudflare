@@ -210,7 +210,7 @@ export default function CountdownPage({
               locale={locale}
             />
 
-            <div className="w-full max-w-xs mt-1">
+            <div className="w-full max-w-xs mt-3">
               <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
                 <div
                   className="h-full rounded-full transition-all duration-1000"
@@ -230,7 +230,6 @@ export default function CountdownPage({
               barCount={16}
               intensity={waveIntensity}
               syncSeed={waveSeed}
-              inverted
             />
           </div>
 
@@ -240,26 +239,13 @@ export default function CountdownPage({
 
           {isDanger && !isFinished && (
             <div
-              className={`mt-2 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
+              className={`mt-2 translate-y-8 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
               style={{
                 animation: 'dangerPulse 0.5s ease-in-out infinite',
                 textShadow: `0 0 15px ${styleConfig.accentColor}`,
               }}
             >
               {t.almostDone}
-            </div>
-          )}
-
-          {isFinished && (
-            <div
-              className="text-center font-display text-3xl font-bold animate-scale-in sm:text-4xl"
-              style={{
-                color: '#f97316',
-                textShadow: '0 0 16px rgba(249,115,22,0.7), 0 0 28px rgba(251,146,60,0.45)',
-                filter: 'drop-shadow(0 0 12px rgba(249,115,22,0.35))',
-              }}
-            >
-              {t.done}
             </div>
           )}
         </div>

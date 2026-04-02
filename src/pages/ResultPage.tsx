@@ -22,6 +22,14 @@ interface AutoFitSingleLineTextProps {
   maxPx?: number;
 }
 
+interface AutoFitSubtitleHighlightProps {
+  dishName: string;
+  suffixText: string;
+  className?: string;
+  minPx?: number;
+  maxPx?: number;
+}
+
 function AutoFitSingleLineText({
   text,
   className = '',
@@ -66,6 +74,43 @@ function AutoFitSingleLineText({
   );
 }
 
+function AutoFitSubtitleHighlight({
+  dishName,
+  suffixText,
+  className = '',
+  minPx = 12,
+  maxPx = 23,
+}: AutoFitSubtitleHighlightProps) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [fontPx, setFontPx] = useState(maxPx);
+
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+
+    let next = maxPx;
+    el.style.fontSize = `${next}px`;
+
+    while (next > minPx && el.scrollWidth > el.clientWidth) {
+      next -= 1;
+      el.style.fontSize = `${next}px`;
+    }
+    setFontPx(next);
+  }, [dishName, suffixText, minPx, maxPx]);
+
+  return (
+    <p
+      ref={textRef}
+      className={`w-full whitespace-nowrap overflow-hidden text-center ${className}`}
+      style={{ fontSize: `${fontPx}px` }}
+      title={`${dishName}${suffixText}`}
+    >
+      <span className="font-black text-orange-400">{dishName}</span>
+      <span>{suffixText}</span>
+    </p>
+  );
+}
+
 export default function ResultPage({
   locale,
   settings,
@@ -79,19 +124,46 @@ export default function ResultPage({
   const t = UI_TEXT[locale];
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isLight = themeMode === 'light';
+  const [isSharing, setIsSharing] = useState(false);
   const summaryLabels = locale === 'ja'
     ? { dish: '料理', time: '加熱時間', narration: '実況スタイル' }
     : { dish: 'Dish', time: 'Cook Time', narration: 'Narration Style' };
 
   const handleShare = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+
     const text = locale === 'ja'
       ? `チンドラマで「${dishName}」を完璧に温め直した！\n\n#チンドラマ #ChingDrama #電子レンジ`
       : `I reheated "${dishName}" perfectly with Ching Show!\n\n#ChingShow #Microwave`;
-    if (navigator.share) {
-      await navigator.share({ text }).catch(() => null);
-    } else {
-      await navigator.clipboard.writeText(text).catch(() => null);
-      alert(t.shareCopied);
+
+    const sharePayload = {
+      title: 'Microwave Show',
+      text,
+      url: window.location.origin,
+    };
+
+    const copyFallback = async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert(t.shareCopied);
+      } catch {
+        window.prompt('Copy this text:', text);
+      }
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(sharePayload);
+      } else {
+        await copyFallback();
+      }
+    } catch (error) {
+      if ((error as DOMException).name !== 'AbortError') {
+        await copyFallback();
+      }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -99,7 +171,9 @@ export default function ResultPage({
     const messages = RESULT_MESSAGES[locale][style];
     return messages[Math.floor(Math.random() * messages.length)];
   }, [locale, style]);
-
+  const subtitleSuffixText = locale === 'ja'
+    ? `の${totalSeconds}秒が、ついに幕を閉じたー`
+    : `'s ${totalSeconds}s has finally come to an end—`;
   return (
     <div
       className={`h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
@@ -175,6 +249,18 @@ export default function ResultPage({
           </p>
         </div>
 
+        <div className="mb-2 sm:mb-3 w-full px-1">
+          <AutoFitSubtitleHighlight
+            dishName={dishName}
+            suffixText={subtitleSuffixText}
+            minPx={12}
+            maxPx={23}
+            className={`font-normal tracking-tight ${
+              isLight ? 'text-slate-700' : 'text-slate-300'
+            }`}
+          />
+        </div>
+
         <div
           className={`mb-2 sm:mb-3 w-full rounded-[1.75rem] border px-4 sm:px-6 py-3 sm:py-5 text-left ${
             isLight
@@ -206,9 +292,10 @@ export default function ResultPage({
         <div className="flex flex-col gap-2 sm:gap-3 w-full">
           <button
             onClick={onReplay}
-            className="flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
+            className="replay-gradient-button flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
             style={{
-              background: `linear-gradient(135deg, ${styleConfig.accentColor}cc, ${styleConfig.accentColor})`,
+              background: `linear-gradient(120deg, ${styleConfig.accentColor}e0, ${styleConfig.accentColor}, #f97316, ${styleConfig.accentColor})`,
+              backgroundSize: '220% 220%',
               boxShadow: `0 0 20px ${styleConfig.accentColor}40`,
             }}
           >
@@ -218,6 +305,7 @@ export default function ResultPage({
 
           <button
             onClick={handleShare}
+            type="button"
             className={`flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-sm sm:text-base border transition-all active:scale-95 ${
               isLight
                 ? 'text-slate-700 bg-white border-slate-200 hover:bg-slate-100'
@@ -225,7 +313,7 @@ export default function ResultPage({
             }`}
           >
             <Share2 size={18} />
-            {t.share}
+            {isSharing ? (locale === 'ja' ? '共有中...' : 'Sharing...') : t.share}
           </button>
 
           <button

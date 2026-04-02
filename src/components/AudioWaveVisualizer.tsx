@@ -80,8 +80,7 @@ export default function AudioWaveVisualizer({
 
   return (
     <div
-      className="flex items-end justify-center gap-1 h-12 px-2"
-      style={inverted ? { transform: 'scaleY(-1)' } : undefined}
+      className={`flex justify-center gap-1 h-12 px-2 ${inverted ? 'items-start' : 'items-end'}`}
     >
       {bars.map((_, i) => {
         const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();
