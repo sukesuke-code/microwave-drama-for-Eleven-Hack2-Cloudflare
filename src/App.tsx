@@ -22,12 +22,50 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
+function detectDeviceLocale(): Locale {
+  const lang = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : '';
+  if (lang.startsWith('ja')) return 'ja';
+  return 'en';
+}
+
+function isValidScreen(value: string | null): value is AppScreen {
+  return value === 'top' || value === 'settings' || value === 'countdown' || value === 'result';
+}
+
+function readSettings(): Settings | null {
+  const raw = readStorage('ching-drama-settings');
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<Settings>;
+    if (
+      typeof parsed.totalSeconds === 'number' &&
+      typeof parsed.dishName === 'string' &&
+      (parsed.style === 'sports' || parsed.style === 'movie' || parsed.style === 'horror' || parsed.style === 'nature')
+    ) {
+      return {
+        totalSeconds: parsed.totalSeconds,
+        dishName: parsed.dishName,
+        style: parsed.style,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<AppScreen>('settings');
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(() => readSettings());
+  const [screen, setScreen] = useState<AppScreen>(() => {
+    const saved = readStorage('ching-drama-screen');
+    if (!isValidScreen(saved)) return 'settings';
+    if ((saved === 'countdown' || saved === 'result') && !readSettings()) return 'settings';
+    return saved;
+  });
   const [locale, setLocale] = useState<Locale>(() => {
     const saved = readStorage('ching-drama-locale');
-    return saved === 'en' || saved === 'ja' ? saved : 'ja';
+    if (saved === 'en' || saved === 'ja') return saved;
+    return detectDeviceLocale();
   });
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStorage('ching-drama-theme');
@@ -43,6 +81,15 @@ export default function App() {
     writeStorage('ching-drama-theme', themeMode);
   }, [themeMode]);
 
+  useEffect(() => {
+    writeStorage('ching-drama-screen', screen);
+  }, [screen]);
+
+  useEffect(() => {
+    if (!settings) return;
+    writeStorage('ching-drama-settings', JSON.stringify(settings));
+  }, [settings]);
+
   const handleStartSettings = () => setScreen('settings');
 
   const handleStartCountdown = (s: Settings) => {
@@ -57,6 +104,7 @@ export default function App() {
   };
 
   const handleHome = () => setScreen('settings');
+  const handleTop = () => setScreen('top');
 
   return (
     <div className="font-sans">
@@ -97,6 +145,7 @@ export default function App() {
             onThemeModeChange={setThemeMode}
             onReplay={handleReplay}
             onHome={handleHome}
+            onTop={handleTop}
           />
         )}
       </Suspense>

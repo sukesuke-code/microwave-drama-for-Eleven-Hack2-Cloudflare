@@ -1,17 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import { NarrationStyle } from '../types';
+import { NarrationStyle, ThemeMode } from '../types';
 
 interface NarrationTextProps {
   text: string;
   style: NarrationStyle;
+  themeMode: ThemeMode;
 }
-
-const STYLE_TEXT_COLORS: Record<NarrationStyle, string> = {
-  sports: 'text-sky-300',
-  movie: 'text-yellow-300',
-  horror: 'text-red-300',
-  nature: 'text-emerald-300',
-};
 
 const STYLE_BORDER_COLORS: Record<NarrationStyle, string> = {
   sports: 'border-sky-500/30',
@@ -27,7 +21,7 @@ const STYLE_BG: Record<NarrationStyle, string> = {
   nature: 'bg-emerald-950/20',
 };
 
-export default function NarrationText({ text, style }: NarrationTextProps) {
+export default function NarrationText({ text, style, themeMode }: NarrationTextProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [key, setKey] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,12 +61,12 @@ export default function NarrationText({ text, style }: NarrationTextProps) {
         rounded-2xl border px-6 py-5
         ${STYLE_BG[style]} ${STYLE_BORDER_COLORS[style]}
         backdrop-blur-sm
-        min-h-[100px] flex items-center justify-center
+        min-h-[100px] h-full overflow-hidden flex items-center justify-center
         w-full max-w-sm mx-auto
       `}
     >
       <p
-        className={`text-center text-base leading-relaxed font-medium ${STYLE_TEXT_COLORS[style]}`}
+        className={`max-h-full overflow-y-auto text-center text-base leading-relaxed font-medium ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
         style={{ whiteSpace: 'pre-line' }}
       >
         {lines.map((line, i) => (
