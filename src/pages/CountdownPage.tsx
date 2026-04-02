@@ -46,6 +46,32 @@ export default function CountdownPage({
     ? 'from-sky-50 via-blue-50/80 to-slate-100'
     : 'from-slate-50 via-orange-50/80 to-slate-100';
 
+  const playAlarmTone = useCallback(() => {
+    const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextImpl) return;
+
+    const ctx = new AudioContextImpl();
+    const scheduleTone = (offset: number, frequency: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(frequency, ctx.currentTime + offset);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + offset + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.24);
+    };
+
+    scheduleTone(0, 880);
+    scheduleTone(0.28, 1046.5);
+    scheduleTone(0.56, 1318.5);
+
+    window.setTimeout(() => void ctx.close(), 1300);
+  }, []);
+
   const updateNarration = useCallback((tl: number, tt: number) => {
     if (tl <= 0) return;
     const text = getCurrentNarration(tl, tt, style, dishName, locale);
@@ -72,6 +98,7 @@ export default function CountdownPage({
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
+          playAlarmTone();
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
@@ -87,7 +114,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
