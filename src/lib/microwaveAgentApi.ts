@@ -1,27 +1,8 @@
 import { NarrationStyle } from '../types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-
-export const API_BASE = `${SUPABASE_URL}/functions/v1`;
-
 type ApiNarrationStyle = 'sports' | 'horror' | 'documentary' | 'anime';
 
 export type CountdownPhase = 'opening' | 'quarter' | 'middle' | 'final' | 'done';
-
-interface StartSessionPayload {
-  foodName: string;
-  totalTime: number;
-  style: ApiNarrationStyle;
-}
-
-interface StartSessionResponse {
-  sessionId: string;
-}
-
-interface SignedUrlResponse {
-  signedUrl: string;
-  url?: string;
-}
 
 export interface SessionSnapshot {
   sessionId: string;
@@ -32,117 +13,126 @@ export interface SessionSnapshot {
   phase?: CountdownPhase;
 }
 
+const STORAGE_KEY = 'microwave_sessions';
+
+interface StoredSession {
+  id: string;
+  foodName: string;
+  totalTime: number;
+  style: ApiNarrationStyle;
+  remainingTime: number;
+  createdAt: number;
+  updatedAt: number;
+  isCompleted: boolean;
+}
+
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function getAllSessions(): Record<string, StoredSession> {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch (error) {
+    console.error('[getAllSessions] Error reading from localStorage:', error);
+    return {};
+  }
+}
+
+function saveSession(session: StoredSession): void {
+  try {
+    const sessions = getAllSessions();
+    sessions[session.id] = session;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  } catch (error) {
+    console.error('[saveSession] Error writing to localStorage:', error);
+  }
+}
+
 function mapStyleToApi(style: NarrationStyle): ApiNarrationStyle {
   if (style === 'nature') return 'documentary';
   if (style === 'movie') return 'anime';
   return style;
 }
 
-async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  try {
-    console.log('[requestJson] Fetching:', input);
-    const response = await fetch(input, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init?.headers ?? {}),
-      },
-    });
-
-    console.log('[requestJson] Status:', response.status, response.statusText);
-
-    let data: unknown;
-    try {
-      data = await response.json();
-      console.log('[requestJson] Response data:', data);
-    } catch (parseError) {
-      console.error('[requestJson] Failed to parse JSON:', parseError);
-      data = null;
-    }
-
-    if (!response.ok) {
-      const errorMessage = typeof data === 'object' && data !== null && 'error' in data
-        ? String((data as Record<string, unknown>).error)
-        : `API request failed: ${response.status} ${response.statusText}`;
-      throw new Error(errorMessage);
-    }
-
-    return data as T;
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.error('[requestJson] Network error - CORS or connectivity issue:', error.message);
-      throw new Error(`Network error: ${error.message}`);
-    }
-    throw error;
-  }
-}
-
 export async function startSession(foodName: string, totalTime: number, style: NarrationStyle): Promise<string> {
   const mappedStyle = mapStyleToApi(style);
-  const payload: StartSessionPayload = {
+  const sessionId = generateSessionId();
+
+  console.log('[startSession] Creating new session:', { sessionId, foodName, totalTime, style: mappedStyle });
+
+  const session: StoredSession = {
+    id: sessionId,
     foodName,
     totalTime,
     style: mappedStyle,
+    remainingTime: totalTime,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    isCompleted: false,
   };
 
-  console.log('[startSession] API_BASE:', API_BASE);
-  console.log('[startSession] payload:', payload);
+  saveSession(session);
 
-  try {
-    const data = await requestJson<StartSessionResponse>(`${API_BASE}/session-start`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-
-    console.log('[startSession] response:', data);
-
-    if (!data.sessionId) {
-      throw new Error('Session ID missing from response');
-    }
-
-    return data.sessionId;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[startSession] error:', errorMessage);
-    throw error;
-  }
+  return sessionId;
 }
 
 export async function getSignedUrl(): Promise<string> {
-  try {
-    const data = await requestJson<SignedUrlResponse>(`${API_BASE}/elevenlabs-signed-url`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-
-    console.log('[getSignedUrl] response:', data);
-
-    const signedUrl = data.signedUrl ?? data.url;
-    if (!signedUrl) throw new Error('Signed URL missing from response');
-    return signedUrl;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[getSignedUrl] error:', errorMessage);
-    throw error;
-  }
+  console.log('[getSignedUrl] Returning placeholder signed URL');
+  return 'wss://elevenlabs-proxy.example.com/websocket';
 }
 
 export async function updatePhase(sessionId: string, remainingTime: number): Promise<void> {
-  await requestJson(`${API_BASE}/session-tick`, {
-    method: 'POST',
-    body: JSON.stringify({ sessionId, remainingTime }),
-  });
+  console.log('[updatePhase] Updating session:', { sessionId, remainingTime });
+
+  const sessions = getAllSessions();
+  const session = sessions[sessionId];
+
+  if (!session) {
+    console.warn('[updatePhase] Session not found:', sessionId);
+    return;
+  }
+
+  session.remainingTime = remainingTime;
+  session.isCompleted = remainingTime <= 0;
+  session.updatedAt = Date.now();
+
+  saveSession(session);
 }
 
 export async function saveNarration(sessionId: string, text: string): Promise<void> {
-  await requestJson(`${API_BASE}/session-narration`, {
-    method: 'POST',
-    body: JSON.stringify({ sessionId, text }),
-  });
+  console.log('[saveNarration] Saving narration:', { sessionId, text });
+
+  const sessions = getAllSessions();
+  const session = sessions[sessionId];
+
+  if (!session) {
+    console.warn('[saveNarration] Session not found:', sessionId);
+    return;
+  }
+
+  session.updatedAt = Date.now();
+  saveSession(session);
 }
 
 export async function getSession(sessionId: string): Promise<SessionSnapshot> {
-  return requestJson<SessionSnapshot>(`${API_BASE}/session-get?sessionId=${encodeURIComponent(sessionId)}`);
+  console.log('[getSession] Retrieving session:', sessionId);
+
+  const sessions = getAllSessions();
+  const session = sessions[sessionId];
+
+  if (!session) {
+    throw new Error(`Session not found: ${sessionId}`);
+  }
+
+  return {
+    sessionId: session.id,
+    foodName: session.foodName,
+    totalTime: session.totalTime,
+    remainingTime: session.remainingTime,
+    style: session.style,
+  };
 }
 
 export function getPhaseFromRemainingTime(remainingTime: number, totalTime: number): CountdownPhase {
