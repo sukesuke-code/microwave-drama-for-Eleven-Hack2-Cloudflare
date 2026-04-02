@@ -53,23 +53,24 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
     };
   }, [text]);
 
-  const singleLineText = displayedText.replace(/\s*\n+\s*/g, ' ').trim();
-
   useLayoutEffect(() => {
     const el = textRef.current;
     if (!el) return;
 
-    const maxPx = 26;
-    const minPx = 10;
+    const maxPx = 24;
+    const minPx = 12;
     let next = maxPx;
     el.style.fontSize = `${next}px`;
 
-    while (next > minPx && el.scrollWidth > el.clientWidth) {
+    while (
+      next > minPx
+      && (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight)
+    ) {
       next -= 1;
       el.style.fontSize = `${next}px`;
     }
     setFontPx(next);
-  }, [singleLineText, key]);
+  }, [displayedText, key]);
 
   return (
     <div
@@ -85,10 +86,10 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
     >
       <p
         ref={textRef}
-        className={`w-full text-center whitespace-nowrap overflow-hidden text-base leading-relaxed font-medium ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
-        style={{ fontSize: `${fontPx}px` }}
+        className={`w-full max-h-full overflow-hidden text-center text-base leading-relaxed font-medium break-words ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
+        style={{ fontSize: `${fontPx}px`, whiteSpace: 'pre-wrap' }}
       >
-        {singleLineText}
+        {displayedText}
         <span className="animate-pulse opacity-70">▌</span>
       </p>
     </div>
