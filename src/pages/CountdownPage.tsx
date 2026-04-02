@@ -147,13 +147,10 @@ export default function CountdownPage({
         <div className="flex-1 flex flex-col items-center px-4 py-6">
           <div className="flex h-[320px] w-full flex-col items-center justify-start gap-2">
             <CircularTimer
-              timeLeft={timeLeft}
-              totalTime={totalSeconds}
+              remaining={timeLeft}
+              total={totalSeconds}
+              size={240}
               style={style}
-              isDanger={isDanger}
-              isFinished={isFinished}
-              nearingCompletionLabel={t.nearingCompletion}
-              secondsUnitLabel={t.seconds}
             />
 
             <div className="w-full max-w-xs mt-2">

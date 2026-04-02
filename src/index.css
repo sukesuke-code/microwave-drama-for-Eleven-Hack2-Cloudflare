@@ -143,6 +143,16 @@
   animation: timerSecondsShake 0.28s ease-in-out infinite;
 }
 
+@keyframes timerUrgentPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.timer-urgent-pulse {
+  display: inline-block;
+  animation: timerUrgentPulse 0.5s ease-in-out infinite;
+}
+
 @keyframes eqBar {
   from {
     height: var(--eq-min-height, 6px);
