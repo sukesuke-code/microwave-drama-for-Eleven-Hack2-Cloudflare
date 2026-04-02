@@ -190,11 +190,9 @@ export default function CountdownPage({
             <div
               className="text-center font-display text-4xl font-bold animate-scale-in"
               style={{
-                background: `linear-gradient(135deg, #fff, ${styleConfig.accentColor})`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                filter: `drop-shadow(0 0 20px ${styleConfig.accentColor})`,
+                color: '#f97316',
+                textShadow: '0 0 16px rgba(249,115,22,0.7), 0 0 28px rgba(251,146,60,0.45)',
+                filter: 'drop-shadow(0 0 12px rgba(249,115,22,0.35))',
               }}
             >
               {t.done}

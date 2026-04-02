@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Moon, RotateCcw, Share2, Sun, Trophy } from 'lucide-react';
+import { Moon, RotateCcw, Share2, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
 import { getStyleConfigs } from '../data/narrations';
 import { RESULT_MESSAGES, UI_TEXT } from '../i18n';
@@ -74,12 +74,20 @@ export default function ResultPage({
           className="result-complete-orb w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-scale-in"
           style={{
             border: `2px solid ${styleConfig.accentColor}40`,
+            boxShadow: `0 0 24px ${styleConfig.accentColor}40, inset 0 0 16px ${styleConfig.accentColor}25`,
           }}
         >
-          <Trophy
-            size={40}
-            style={{ color: styleConfig.accentColor }}
-          />
+          <span
+            role="img"
+            aria-label="celebration"
+            className="text-4xl leading-none select-none"
+            style={{
+              filter: `drop-shadow(0 0 12px ${styleConfig.accentColor}99) drop-shadow(0 0 20px ${styleConfig.accentColor}66)`,
+              transform: 'translateY(-1px)',
+            }}
+          >
+            🎉
+          </span>
         </div>
 
         <h1 className={`font-display text-4xl font-bold mb-2 animate-fade-up ${isLight ? 'text-slate-900' : 'text-white'}`}>
