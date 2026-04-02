@@ -33,6 +33,7 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
   const minuteStr = String(minutes).padStart(2, '0');
   const secondStr = String(seconds).padStart(2, '0');
   const showMinutePrefix = remaining >= 60;
+  const displayedSeconds = showMinutePrefix ? secondStr : String(seconds);
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
   const auraOpacity = isFinished ? 0.9 : 0.62;
@@ -117,7 +118,7 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
                   : 'none',
               }}
             >
-              {secondStr}
+              {displayedSeconds}
             </span>
           </span>
         )}
