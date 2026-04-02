@@ -140,7 +140,7 @@ export default function SettingsPage({
   }, [duration, dishName, style]);
 
   return (
-    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-gray-100 text-gray-900' : 'bg-gray-950 text-white'}`}>
+    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
       <div className="mx-auto flex h-full w-full max-w-md flex-col p-4">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
