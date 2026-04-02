@@ -140,22 +140,22 @@ export default function SettingsPage({
   }, [duration, dishName, style]);
 
   return (
-    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
+    <div className="h-[100dvh] overflow-hidden bg-[#00031a] text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col justify-between p-3">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className={`justify-self-start rounded-lg p-1 transition-colors ${isLight ? 'text-gray-700 hover:bg-gray-200' : 'text-white/80 hover:bg-white/10'}`}
+            className="justify-self-start rounded-lg p-1 text-white/80 transition-colors hover:bg-white/10"
             aria-label="back"
           >
             <ChevronLeft size={24} />
           </button>
-          <h1 className={`text-center text-xl font-black ${isLight ? 'text-gray-900' : 'text-white'}`}>{t.settings}</h1>
+          <h1 className="text-center text-xl font-black text-white">{t.settings}</h1>
           <button
             type="button"
             onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
-            className={`justify-self-end rounded-lg px-2 py-1 text-xs font-bold transition-colors ${isLight ? 'bg-gray-200 text-gray-700' : 'bg-gray-800 text-gray-200'}`}
+            className="justify-self-end rounded-lg bg-gray-800 px-2 py-1 text-xs font-bold text-gray-200 transition-colors"
           >
             {isLight ? <Moon size={14} /> : <Sun size={14} />}
           </button>
@@ -179,9 +179,7 @@ export default function SettingsPage({
                   className={`rounded-lg px-1 py-1 text-[9px] sm:text-[10px] font-black leading-none transition-colors ${
                     selected
                       ? 'bg-orange-500 text-white'
-                      : isLight
-                        ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      : 'bg-[#00031a] text-gray-300 ring-1 ring-gray-700 hover:bg-gray-900'
                   }`}
                 >
                   {preset.label}
@@ -190,7 +188,7 @@ export default function SettingsPage({
             })}
           </div>
 
-          <div className={`rounded-xl border p-2 ${isLight ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-900'}`}>
+          <div className="rounded-xl border border-gray-800 bg-[#00031a] p-2">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
               <div>
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.minutes}</p>
@@ -200,7 +198,7 @@ export default function SettingsPage({
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className="w-full appearance-none bg-transparent text-center text-2xl font-black text-white outline-none sm:text-3xl [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
               <span className="text-2xl font-black sm:text-3xl text-orange-400">:</span>
@@ -212,7 +210,7 @@ export default function SettingsPage({
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className="w-full appearance-none bg-transparent text-center text-2xl font-black text-white outline-none sm:text-3xl [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
             </div>
@@ -228,7 +226,7 @@ export default function SettingsPage({
               onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
               className="time-slider h-2 w-full cursor-pointer accent-orange-500"
             />
-            <div className={`flex justify-between text-[10px] sm:text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
+            <div className="flex justify-between text-[10px] text-gray-500 sm:text-xs">
               <span>1{t.seconds}</span>
               <span>10{t.minutes}</span>
             </div>
@@ -246,7 +244,7 @@ export default function SettingsPage({
               onChange={(e) => setDishName(e.target.value)}
               maxLength={100}
               placeholder={locale === 'ja' ? '例: 冷凍チャーハン、お弁当...' : 'e.g. Frozen fried rice, Bento...'}
-              className={`w-full rounded-xl border px-3 py-2 text-xs sm:text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
+              className="w-full rounded-xl border border-gray-800 bg-[#00031a] px-3 py-2 text-xs text-white placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 sm:text-sm"
             />
           </section>
 
@@ -263,7 +261,7 @@ export default function SettingsPage({
                     key={card.id}
                     type="button"
                     onClick={() => setStyle(card.id)}
-                    className={`relative rounded-xl border bg-gradient-to-br p-2 text-left transition-all ${card.gradient} ${card.border} ${
+                    className={`relative rounded-xl border bg-[#00031a] p-2 text-left transition-all ${card.border} ${
                       selected
                         ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
                         : 'opacity-70 hover:opacity-90'
@@ -285,7 +283,8 @@ export default function SettingsPage({
             disabled={duration < 1}
             className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0"
             style={{
-              background: 'linear-gradient(135deg, #ea580c, #dc2626)',
+              background: '#00031a',
+              border: '1px solid rgba(249, 115, 22, 0.55)',
               boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
             }}
           >
