@@ -3,7 +3,6 @@ import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
 import FloatingSpheres from '../components/FloatingSpheres';
 import { Locale, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
-import microwaveShowIcon from '../assets/microwave-show-icon.svg';
 
 interface TopPageProps {
   onStart: () => void;
@@ -89,13 +88,8 @@ export default function TopPage({
         }}
       />
 
-      <div className="relative z-10 mt-20 md:mt-24 flex flex-col items-center px-6 max-w-2xl w-full">
-        <div className="inline-flex flex-col items-stretch mb-8 hero-rise-in" style={{ animationDelay: '0.05s' }}>
-          <img
-            src={microwaveShowIcon}
-            alt="Microwave Show icon"
-            className="mx-auto mb-4 h-20 w-20 sm:h-24 sm:w-24 select-none drop-shadow-[0_0_20px_rgba(249,115,22,0.45)]"
-          />
+      <div className="relative z-10 mt-60 md:mt-64 flex flex-col items-center px-6 max-w-2xl w-full">
+        <div className="inline-flex flex-col items-stretch mb-8">
           <h1
             className={`font-display ${isLight ? 'hero-light-step-blink' : 'hero-blink'} w-full max-w-full whitespace-nowrap text-[clamp(1.75rem,9.2vw,5.4rem)] font-bold text-center mb-2 tracking-tight leading-none inline-flex items-center justify-center gap-1 sm:gap-2`}
             style={{
@@ -121,19 +115,19 @@ export default function TopPage({
         </div>
 
         <p
-          className={`${isLight ? 'hero-copy-blink hero-copy-light' : 'hero-copy-blink'} hero-rise-in text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
+          className={`${isLight ? 'hero-copy-blink hero-copy-light' : 'hero-copy-blink'} text-center text-base leading-relaxed mb-2 font-medium ${isLight ? 'text-slate-700' : 'text-slate-300/80'}`}
           style={{ animationDelay: '0.35s' }}
         >
           {t.topTagline1}
         </p>
         <p
-          className={`${isLight ? 'hero-copy-blink hero-copy-light' : 'hero-copy-blink'} hero-rise-in text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
+          className={`${isLight ? 'hero-copy-blink hero-copy-light' : 'hero-copy-blink'} text-center text-lg font-bold mb-10 ${isLight ? 'text-slate-900' : 'text-white'}`}
           style={{ animationDelay: '0.7s' }}
         >
           {t.topTagline2}
         </p>
 
-        <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} hero-rise-in mb-4 flex flex-wrap items-center justify-center gap-2 text-xs`} style={{ animationDelay: '1s' }}>
+        <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} mb-4 flex flex-wrap items-center justify-center gap-2 text-xs`}>
           <span>{t.styleShort[0]}</span>
           <span className="text-slate-600">·</span>
           <span>{t.styleShort[1]}</span>
@@ -143,34 +137,32 @@ export default function TopPage({
           <span>{t.styleShort[3]}</span>
         </div>
 
-        <div className="hero-rise-in w-full flex justify-center" style={{ animationDelay: '1.3s' }}>
-          <button
-            onClick={onStart}
-            className={`relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden ${isLight ? 'start-button-blink start-button-blink-light' : 'start-button-blink'}`}
+        <button
+          onClick={onStart}
+          className={`relative group my-10 w-full max-w-xs py-5 rounded-2xl font-display text-2xl font-bold tracking-widest text-white uppercase overflow-hidden ${isLight ? 'start-button-blink start-button-blink-light' : 'start-button-blink'}`}
+          style={{
+            background: isLight
+              ? 'linear-gradient(135deg, #fb923c, #f97316, #facc15)'
+              : 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
+            boxShadow: isLight
+              ? '0 0 30px rgba(251,146,60,0.45), 0 0 60px rgba(250,204,21,0.18)'
+              : '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
+            animationDelay: '1.3s',
+          }}
+        >
+          <span className="relative z-10">{t.startButton}</span>
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{
-              background: isLight
-                ? 'linear-gradient(135deg, #fb923c, #f97316, #facc15)'
-                : 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
-              boxShadow: isLight
-                ? '0 0 30px rgba(251,146,60,0.45), 0 0 60px rgba(250,204,21,0.18)'
-                : '0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2)',
-              animationDelay: '1.3s',
+              background: 'linear-gradient(135deg, #c2410c, #ea580c, #f97316)',
             }}
-          >
-            <span className="relative z-10">{t.startButton}</span>
-            <div
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              style={{
-                background: 'linear-gradient(135deg, #c2410c, #ea580c, #f97316)',
-              }}
-            />
-            <div className="absolute inset-0 group-hover:animate-glow-pulse" />
-          </button>
-        </div>
+          />
+          <div className="absolute inset-0 group-hover:animate-glow-pulse" />
+        </button>
 
-        <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} hero-rise-in mt-3 text-xs text-center w-full max-w-xs`} style={{ animationDelay: '1.6s' }}>
+        <div className={`${isLight ? 'hero-section-blink-light' : 'hero-section-blink'} mt-3 text-xs text-center w-full max-w-xs`}>
           <div className="flex flex-col items-center gap-2">
-          <AudioWaveVisualizer color="#f97316" barCount={16} inverted />
+          <AudioWaveVisualizer color="#f97316" barCount={16} />
           <span className="text-xs">{t.startHint}</span>
           </div>
         </div>
