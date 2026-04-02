@@ -251,7 +251,7 @@ export default function CountdownPage({
 
           {isFinished && (
             <div
-              className="translate-y-20 text-center font-display text-3xl font-bold animate-scale-in sm:text-4xl"
+              className="translate-y-28 text-center font-display text-3xl font-bold animate-scale-in sm:text-4xl"
               style={{
                 color: '#f97316',
                 textShadow: '0 0 16px rgba(249,115,22,0.7), 0 0 28px rgba(251,146,60,0.45)',
