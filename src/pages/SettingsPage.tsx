@@ -141,7 +141,7 @@ export default function SettingsPage({
 
   return (
     <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
-      <div className="mx-auto flex h-full w-full max-w-md flex-col justify-between p-3 sm:justify-start sm:gap-2">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col justify-between p-3">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
             type="button"
@@ -161,8 +161,8 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="contents sm:mt-2 sm:flex sm:flex-1 sm:min-h-0 sm:flex-col sm:justify-start sm:gap-2">
-          <section className="space-y-2">
+        <div className="mt-2 flex flex-1 min-h-0 flex-col justify-between gap-2 sm:gap-2.5">
+          <section className="space-y-2 shrink-0">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1.5">
               <Timer size={13} />
               <span>{t.timeSetting}</span>
@@ -235,7 +235,7 @@ export default function SettingsPage({
           </div>
           </section>
 
-          <section className="space-y-2">
+          <section className="space-y-2 shrink-0">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1.5">
               <UtensilsCrossed size={13} />
               <span>{t.optionalDish}</span>
@@ -250,7 +250,7 @@ export default function SettingsPage({
             />
           </section>
 
-          <section className="space-y-2">
+          <section className="space-y-2 shrink-0">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1.5">
               <Clapperboard size={13} />
               <span>{t.style}</span>
@@ -283,7 +283,7 @@ export default function SettingsPage({
             type="button"
             onClick={handleStart}
             disabled={duration < 1}
-            className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2"
+            className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0"
             style={{
               background: 'linear-gradient(135deg, #ea580c, #dc2626)',
               boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
