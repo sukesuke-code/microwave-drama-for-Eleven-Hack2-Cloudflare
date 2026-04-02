@@ -169,7 +169,7 @@ export default function CountdownPage({
           </div>
 
           <div className="mt-1">
-            <WaveAnimation style={style} active={!isPaused && !isFinished} />
+            <WaveAnimation style={style} active={!isPaused && !isFinished} narrationText={narrationText} beat={totalSeconds - timeLeft} />
           </div>
 
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
