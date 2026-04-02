@@ -239,7 +239,7 @@ export default function CountdownPage({
 
           {isDanger && !isFinished && (
             <div
-              className={`mt-2 translate-y-20 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
+              className={`mt-2 translate-y-16 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
               style={{
                 animation: 'dangerPulse 0.5s ease-in-out infinite',
                 textShadow: `0 0 15px ${styleConfig.accentColor}`,
