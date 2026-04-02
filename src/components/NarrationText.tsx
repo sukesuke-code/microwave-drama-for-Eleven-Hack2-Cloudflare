@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { NarrationStyle, ThemeMode } from '../types';
 
 interface NarrationTextProps {
@@ -24,8 +24,10 @@ const STYLE_BG: Record<NarrationStyle, string> = {
 export default function NarrationText({ text, style, themeMode }: NarrationTextProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [key, setKey] = useState(0);
+  const [fontPx, setFontPx] = useState(26);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevTextRef = useRef('');
+  const textRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     if (text === prevTextRef.current) return;
@@ -51,7 +53,23 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
     };
   }, [text]);
 
-  const lines = displayedText.split('\n');
+  const singleLineText = displayedText.replace(/\s*\n+\s*/g, ' ').trim();
+
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+
+    const maxPx = 26;
+    const minPx = 10;
+    let next = maxPx;
+    el.style.fontSize = `${next}px`;
+
+    while (next > minPx && el.scrollWidth > el.clientWidth) {
+      next -= 1;
+      el.style.fontSize = `${next}px`;
+    }
+    setFontPx(next);
+  }, [singleLineText, key]);
 
   return (
     <div
@@ -66,15 +84,11 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
       `}
     >
       <p
-        className={`max-h-full overflow-y-auto text-center text-base leading-relaxed font-medium ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
-        style={{ whiteSpace: 'pre-line' }}
+        ref={textRef}
+        className={`w-full text-center whitespace-nowrap overflow-hidden text-base leading-relaxed font-medium ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
+        style={{ fontSize: `${fontPx}px` }}
       >
-        {lines.map((line, i) => (
-          <span key={i}>
-            {line}
-            {i < lines.length - 1 && <br />}
-          </span>
-        ))}
+        {singleLineText}
         <span className="animate-pulse opacity-70">▌</span>
       </p>
     </div>
