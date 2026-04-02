@@ -34,19 +34,18 @@ export default function CircularTimer({ remaining, total, size = 240, style }: C
   const showMinutePrefix = remaining >= 60;
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
-  const auraShadow = isFinished
-    ? `0 0 44px ${colors.glow}, 0 0 94px ${colors.glow}`
-    : `0 0 20px ${colors.glow}, 0 0 48px ${colors.glow}`;
+  const auraOpacity = isFinished ? 0.9 : 0.62;
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <div
         className="absolute rounded-full pointer-events-none"
         style={{
-          width: size - 36,
-          height: size - 36,
-          boxShadow: auraShadow,
-          opacity: isFinished ? 0.95 : 0.62,
+          width: size + 36,
+          height: size + 36,
+          background: `radial-gradient(circle, ${colors.glow} 0%, transparent 68%)`,
+          filter: isFinished ? 'blur(10px)' : 'blur(8px)',
+          opacity: auraOpacity,
           transition: 'opacity 0.3s ease',
         }}
       />
