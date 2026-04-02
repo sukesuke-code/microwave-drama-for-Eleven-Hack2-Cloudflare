@@ -24,7 +24,7 @@ const STYLE_BG: Record<NarrationStyle, string> = {
 export default function NarrationText({ text, style, themeMode }: NarrationTextProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [key, setKey] = useState(0);
-  const [fontPx, setFontPx] = useState(26);
+  const [fontPx, setFontPx] = useState(24);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevTextRef = useRef('');
   const textRef = useRef<HTMLParagraphElement>(null);
@@ -69,7 +69,7 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
       next -= 1;
       el.style.fontSize = `${next}px`;
     }
-    setFontPx(next);
+    setFontPx((prev) => Math.max(prev, next));
   }, [displayedText, key]);
 
   return (
