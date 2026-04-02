@@ -89,7 +89,7 @@ export default function TopPage({
         }}
       />
 
-      <div className="relative z-10 mt-36 md:mt-40 flex flex-col items-center px-6 max-w-2xl w-full">
+      <div className="relative z-10 mt-32 md:mt-36 flex flex-col items-center px-6 max-w-2xl w-full">
         <div className="inline-flex flex-col items-stretch mb-8 hero-rise-in" style={{ animationDelay: '0.05s' }}>
           <img
             src={microwaveShowIcon}
