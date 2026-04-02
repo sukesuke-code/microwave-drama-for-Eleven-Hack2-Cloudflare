@@ -140,8 +140,8 @@ export default function SettingsPage({
   }, [duration, dishName, style]);
 
   return (
-    <div className={`h-[100dvh] overflow-y-auto ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col p-4">
+    <div className={`h-[100dvh] overflow-hidden ${isLight ? 'bg-slate-100 text-gray-900' : 'bg-[#00031a] text-white'}`}>
+      <div className="mx-auto flex h-full w-full max-w-md flex-col p-3">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
             type="button"
@@ -161,8 +161,8 @@ export default function SettingsPage({
           </button>
         </header>
 
-        <div className="mt-4 flex flex-1 flex-col gap-4 pb-4">
-          <section className="space-y-4">
+        <div className="mt-2 flex flex-1 flex-col gap-2">
+          <section className="space-y-2">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.timeSetting}</p>
 
           <div className="grid grid-cols-5 gap-2">
@@ -173,7 +173,7 @@ export default function SettingsPage({
                   key={preset.seconds}
                   type="button"
                   onClick={() => setDuration(preset.seconds)}
-                  className={`rounded-lg px-1 py-1.5 text-[10px] font-black leading-none transition-colors ${
+                  className={`rounded-lg px-1 py-1 text-[9px] sm:text-[10px] font-black leading-none transition-colors ${
                     selected
                       ? 'bg-orange-500 text-white'
                       : isLight
@@ -187,8 +187,8 @@ export default function SettingsPage({
             })}
           </div>
 
-          <div className={`rounded-xl border p-3 ${isLight ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-900'}`}>
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+          <div className={`rounded-xl border p-2 ${isLight ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-900'}`}>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
               <div>
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.minutes}</p>
                 <input
@@ -197,10 +197,10 @@ export default function SettingsPage({
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
-              <span className="text-3xl font-black text-orange-400">:</span>
+              <span className="text-2xl font-black sm:text-3xl text-orange-400">:</span>
               <div>
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.seconds}</p>
                 <input
@@ -209,7 +209,7 @@ export default function SettingsPage({
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-3xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
             </div>
@@ -225,14 +225,14 @@ export default function SettingsPage({
               onChange={(e) => setDuration(clampDuration(Number(e.target.value)))}
               className="time-slider h-2 w-full cursor-pointer accent-orange-500"
             />
-            <div className={`flex justify-between text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
+            <div className={`flex justify-between text-[10px] sm:text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
               <span>1{t.seconds}</span>
               <span>10{t.minutes}</span>
             </div>
           </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="space-y-2">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.optionalDish}</p>
             <input
               type="text"
@@ -240,13 +240,13 @@ export default function SettingsPage({
               onChange={(e) => setDishName(e.target.value)}
               maxLength={100}
               placeholder={locale === 'ja' ? '例: 冷凍チャーハン、お弁当...' : 'e.g. Frozen fried rice, Bento...'}
-              className={`w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
+              className={`w-full rounded-xl border px-3 py-2 text-xs sm:text-sm placeholder:text-gray-500 outline-none transition-colors focus:border-orange-500 ${isLight ? 'border-gray-300 bg-white text-gray-900' : 'border-gray-800 bg-gray-900 text-white'}`}
             />
           </section>
 
-          <section className="space-y-4">
+          <section className="space-y-2">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em]">{t.style}</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               {STYLE_CARDS.map((card) => {
                 const selected = style === card.id;
                 return (
@@ -254,16 +254,16 @@ export default function SettingsPage({
                     key={card.id}
                     type="button"
                     onClick={() => setStyle(card.id)}
-                    className={`relative rounded-xl border bg-gradient-to-br p-3 text-left transition-all ${card.gradient} ${card.border} ${
+                    className={`relative rounded-xl border bg-gradient-to-br p-2 text-left transition-all ${card.gradient} ${card.border} ${
                       selected
                         ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
                         : 'opacity-70 hover:opacity-90'
                     }`}
                   >
                     {selected && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-orange-400" />}
-                    <p className="mb-1 text-lg">{card.emoji}</p>
-                    <p className="text-xs font-bold text-white">{card.title[locale]}</p>
-                    <p className="mt-1 text-[10px] text-gray-300">{card.description[locale]}</p>
+                    <p className="mb-0.5 text-base sm:text-lg">{card.emoji}</p>
+                    <p className="text-[11px] font-bold leading-tight text-white sm:text-xs">{card.title[locale]}</p>
+                    <p className="mt-0.5 hidden text-[10px] text-gray-300 sm:block">{card.description[locale]}</p>
                   </button>
                 );
               })}
@@ -274,7 +274,7 @@ export default function SettingsPage({
             type="button"
             onClick={handleStart}
             disabled={duration < 1}
-            className="w-full rounded-xl py-3 text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40"
+            className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40"
             style={{
               background: 'linear-gradient(135deg, #ea580c, #dc2626)',
               boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
