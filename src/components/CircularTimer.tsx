@@ -48,6 +48,16 @@ export default function CircularTimer({
       className={`relative inline-flex items-center justify-center ${isDanger ? 'danger-pulse' : 'timer-pulse'}`}
       style={{ width: size, height: size }}
     >
+      <div
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          width: size - 36,
+          height: size - 36,
+          boxShadow: `0 0 28px ${colors.glow}, 0 0 62px ${colors.glow}`,
+          opacity: isDanger ? 0.78 : 0.55,
+          transition: 'opacity 0.3s ease',
+        }}
+      />
       <svg
         width={size}
         height={size}
@@ -86,7 +96,7 @@ export default function CircularTimer({
           strokeDashoffset={strokeDashoffset}
           style={{
             transition: 'stroke-dashoffset 0.8s ease-in-out',
-            filter: `drop-shadow(0 0 8px ${colors.glow})`,
+            filter: `drop-shadow(0 0 10px ${colors.stroke}) drop-shadow(0 0 18px ${colors.glow}) drop-shadow(0 0 30px ${colors.glow})`,
           }}
         />
 
