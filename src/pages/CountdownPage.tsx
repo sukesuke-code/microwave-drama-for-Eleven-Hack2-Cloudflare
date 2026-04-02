@@ -35,6 +35,7 @@ export default function CountdownPage({
   const [isFinished, setIsFinished] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [waveBeat, setWaveBeat] = useState(0);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -94,14 +95,29 @@ export default function CountdownPage({
     const textSeed = narrationText
       .split('')
       .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
-    return textSeed + (totalSeconds - timeLeft) * 31;
-  }, [narrationText, totalSeconds, timeLeft]);
+    return textSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13;
+  }, [narrationText, totalSeconds, timeLeft, waveBeat]);
 
   const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
     if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
     if (narrationText.length > 42) return 'medium';
     return 'low';
   }, [isDanger, narrationText]);
+
+  useEffect(() => {
+    if (isPaused || isFinished) return;
+
+    const punctuationBoost = (narrationText.match(/[!?！？]/g) ?? []).length;
+    const lengthBoost = Math.min(5, Math.floor(narrationText.length / 24));
+    const tempoScore = Math.max(1, punctuationBoost + lengthBoost + (waveIntensity === 'high' ? 3 : waveIntensity === 'medium' ? 2 : 1));
+    const cadenceMs = Math.max(90, 180 - tempoScore * 14);
+
+    const beatTimer = setInterval(() => {
+      setWaveBeat((prev) => prev + 1);
+    }, cadenceMs);
+
+    return () => clearInterval(beatTimer);
+  }, [isPaused, isFinished, narrationText, waveIntensity]);
 
   return (
       <div
@@ -182,7 +198,13 @@ export default function CountdownPage({
           </div>
 
           <div className="mt-1">
-            <AudioWaveVisualizer color={styleConfig.accentColor} barCount={12} intensity={waveIntensity} syncSeed={waveSeed} />
+            <AudioWaveVisualizer
+              color={styleConfig.accentColor}
+              barCount={16}
+              intensity={waveIntensity}
+              syncSeed={waveSeed}
+              inverted
+            />
           </div>
 
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
