@@ -51,7 +51,7 @@ export default function CircularTimer({
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center ${isDanger ? 'danger-pulse' : 'timer-pulse'}`}
+      className="relative inline-flex items-center justify-center"
       style={{ width: size, height: size }}
     >
       <div
