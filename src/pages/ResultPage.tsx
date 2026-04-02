@@ -24,10 +24,13 @@ export default function ResultPage({
   onHome,
   onTop,
 }: ResultPageProps) {
-  const { dishName, style } = settings;
+  const { dishName, style, totalSeconds } = settings;
   const t = UI_TEXT[locale];
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isLight = themeMode === 'light';
+  const summaryLabels = locale === 'ja'
+    ? { dish: '料理', time: '加熱時間', narration: '実況スタイル' }
+    : { dish: 'Dish', time: 'Cook Time', narration: 'Narration Style' };
 
   const handleShare = async () => {
     const text = locale === 'ja'
@@ -122,19 +125,29 @@ export default function ResultPage({
           </p>
         </div>
 
-        <p
-          className="text-lg font-bold mb-1 animate-fade-up"
-          style={{
-            color: styleConfig.accentColor,
-            animationDelay: '0.1s',
-          }}
+        <div
+          className={`mb-3 w-full rounded-[1.75rem] border px-6 py-5 text-left animate-fade-up ${
+            isLight
+              ? 'border-slate-300 bg-slate-100/85'
+              : 'border-slate-700/70 bg-slate-900/55'
+          }`}
+          style={{ animationDelay: '0.15s' }}
         >
-          {dishName}
-        </p>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3.5">
+            <p className={`text-lg font-semibold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.dish}</p>
+            <p className={`justify-self-end text-3xl sm:text-4xl font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>{dishName}</p>
 
-        <p className={`text-sm mb-2 animate-fade-up ${isLight ? 'text-slate-500' : 'text-slate-400'}`} style={{ animationDelay: '0.15s' }}>
-          {styleConfig.emoji} {styleConfig.label}
-        </p>
+            <p className={`text-lg font-semibold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.time}</p>
+            <p className={`justify-self-end text-3xl sm:text-4xl font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              {totalSeconds}{locale === 'ja' ? '秒' : 's'}
+            </p>
+
+            <p className={`text-lg font-semibold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.narration}</p>
+            <p className={`justify-self-end text-3xl sm:text-4xl font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              {styleConfig.emoji} {styleConfig.label}
+            </p>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-3 w-full animate-fade-up" style={{ animationDelay: '0.3s' }}>
           <button
