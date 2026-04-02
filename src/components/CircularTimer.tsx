@@ -6,6 +6,7 @@ interface CircularTimerProps {
   totalTime: number;
   style: NarrationStyle;
   isDanger: boolean;
+  isFinished?: boolean;
   nearingCompletionLabel: string;
 }
 
@@ -21,6 +22,7 @@ export default function CircularTimer({
   totalTime,
   style,
   isDanger,
+  isFinished = false,
   nearingCompletionLabel,
 }: CircularTimerProps) {
   const size = 240;
@@ -28,7 +30,7 @@ export default function CircularTimer({
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  const progress = totalTime > 0 ? timeLeft / totalTime : 0;
+  const progress = isFinished ? 1 : totalTime > 0 ? timeLeft / totalTime : 0;
   const strokeDashoffset = circumference * (1 - progress);
 
   const colors = STYLE_COLORS[style];
@@ -42,6 +44,10 @@ export default function CircularTimer({
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
   const filterId = useMemo(() => `timer-glow-${style}`, [style]);
+  const auraOpacity = isFinished ? 0.9 : isDanger ? 0.78 : 0.55;
+  const auraShadow = isFinished
+    ? `0 0 36px ${colors.glow}, 0 0 86px ${colors.glow}`
+    : `0 0 28px ${colors.glow}, 0 0 62px ${colors.glow}`;
 
   return (
     <div
@@ -53,8 +59,8 @@ export default function CircularTimer({
         style={{
           width: size - 36,
           height: size - 36,
-          boxShadow: `0 0 28px ${colors.glow}, 0 0 62px ${colors.glow}`,
-          opacity: isDanger ? 0.78 : 0.55,
+          boxShadow: auraShadow,
+          opacity: auraOpacity,
           transition: 'opacity 0.3s ease',
         }}
       />
@@ -67,7 +73,7 @@ export default function CircularTimer({
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={colors.stroke} stopOpacity="1" />
-            <stop offset="100%" stopColor={colors.stroke} stopOpacity="0.4" />
+            <stop offset="100%" stopColor={colors.stroke} stopOpacity={isFinished ? '0.85' : '0.4'} />
           </linearGradient>
           <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
@@ -96,7 +102,9 @@ export default function CircularTimer({
           strokeDashoffset={strokeDashoffset}
           style={{
             transition: 'stroke-dashoffset 0.8s ease-in-out',
-            filter: `drop-shadow(0 0 10px ${colors.stroke}) drop-shadow(0 0 18px ${colors.glow}) drop-shadow(0 0 30px ${colors.glow})`,
+            filter: isFinished
+              ? `drop-shadow(0 0 14px ${colors.stroke}) drop-shadow(0 0 26px ${colors.glow}) drop-shadow(0 0 40px ${colors.glow})`
+              : `drop-shadow(0 0 10px ${colors.stroke}) drop-shadow(0 0 18px ${colors.glow}) drop-shadow(0 0 30px ${colors.glow})`,
           }}
         />
 
@@ -107,7 +115,7 @@ export default function CircularTimer({
           fill="none"
           stroke={colors.stroke}
           strokeWidth="1"
-          strokeOpacity="0.1"
+          strokeOpacity={isFinished ? '0.24' : '0.1'}
         />
       </svg>
 

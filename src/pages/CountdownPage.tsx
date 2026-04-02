@@ -151,6 +151,7 @@ export default function CountdownPage({
               totalTime={totalSeconds}
               style={style}
               isDanger={isDanger}
+              isFinished={isFinished}
               nearingCompletionLabel={t.nearingCompletion}
             />
 
