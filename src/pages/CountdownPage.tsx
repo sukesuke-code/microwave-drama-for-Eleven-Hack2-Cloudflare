@@ -94,7 +94,7 @@ export default function CountdownPage({
       <div
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
     >
-      <BackgroundEffect style={style} isDanger={isDanger} />
+      <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />
       {showConfetti && <Confetti />}
 

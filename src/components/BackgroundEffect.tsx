@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { NarrationStyle } from '../types';
+import { NarrationStyle, ThemeMode } from '../types';
 
 interface BackgroundEffectProps {
   style: NarrationStyle;
   isDanger: boolean;
+  themeMode: ThemeMode;
 }
 
-export default function BackgroundEffect({ style, isDanger }: BackgroundEffectProps) {
+export default function BackgroundEffect({ style, isDanger, themeMode }: BackgroundEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
 
@@ -21,11 +22,13 @@ export default function BackgroundEffect({ style, isDanger }: BackgroundEffectPr
 
     const particles: { x: number; y: number; vx: number; vy: number; r: number; alpha: number }[] = [];
 
+    const isLight = themeMode === 'light';
+
     const configs: Record<NarrationStyle, { color: string; count: number; speed: number }> = {
-      sports: { color: '#38bdf8', count: 30, speed: 1.5 },
-      movie: { color: '#f59e0b', count: 20, speed: 0.5 },
-      horror: { color: '#dc2626', count: 25, speed: 0.8 },
-      nature: { color: '#10b981', count: 35, speed: 0.7 },
+      sports: { color: isLight ? '#0284c7' : '#38bdf8', count: 30, speed: 1.5 },
+      movie: { color: isLight ? '#b45309' : '#f59e0b', count: 20, speed: 0.5 },
+      horror: { color: isLight ? '#b91c1c' : '#dc2626', count: 25, speed: 0.8 },
+      nature: { color: isLight ? '#047857' : '#10b981', count: 35, speed: 0.7 },
     };
 
     const config = configs[style];
@@ -37,7 +40,7 @@ export default function BackgroundEffect({ style, isDanger }: BackgroundEffectPr
         vx: (Math.random() - 0.5) * config.speed,
         vy: (Math.random() - 0.5) * config.speed,
         r: Math.random() * 2 + 1,
-        alpha: Math.random() * 0.4 + 0.1,
+        alpha: isLight ? Math.random() * 0.4 + 0.22 : Math.random() * 0.4 + 0.1,
       });
     }
 
@@ -85,13 +88,13 @@ export default function BackgroundEffect({ style, isDanger }: BackgroundEffectPr
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', handleResize);
     };
-  }, [style, isDanger]);
+  }, [style, isDanger, themeMode]);
 
   return (
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-0"
-      style={{ opacity: 0.6 }}
+      style={{ opacity: themeMode === 'light' ? 0.86 : 0.6 }}
     />
   );
 }
