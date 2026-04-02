@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Microwave Show",
+    "slug": "microwave-show",
+    "scheme": "microwaveshow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

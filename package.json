@@ -1,37 +1,40 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "microwave-show-rn",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
+  "main": "expo/AppEntry",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "e2e": "playwright test",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "dev": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
-    "lucide-react": "^0.344.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "expo": "~53.0.9",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.9.1",
-    "@playwright/test": "^1.59.1",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.18",
-    "eslint": "^9.9.1",
-    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
-    "eslint-plugin-react-refresh": "^0.4.11",
-    "globals": "^15.9.0",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^8.3.0",
-    "vite": "^5.4.2"
+    "@babel/core": "^7.25.2",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.0.10",
+    "@types/react-test-renderer": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "eslint": "^9.23.0",
+    "eslint-config-expo": "~9.2.0",
+    "jest": "^29.7.0",
+    "jest-expo": "~53.0.5",
+    "react-test-renderer": "19.0.0",
+    "typescript": "~5.8.3"
+  },
+  "jest": {
+    "preset": "jest-expo"
   }
 }
