@@ -28,9 +28,6 @@ function detectDeviceLocale(): Locale {
   return 'en';
 }
 
-function isValidScreen(value: string | null): value is AppScreen {
-  return value === 'top' || value === 'settings' || value === 'countdown' || value === 'result';
-}
 
 function readSettings(): Settings | null {
   const raw = readStorage('ching-drama-settings');
@@ -56,12 +53,7 @@ function readSettings(): Settings | null {
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(() => readSettings());
-  const [screen, setScreen] = useState<AppScreen>(() => {
-    const saved = readStorage('ching-drama-screen');
-    if (!isValidScreen(saved)) return 'settings';
-    if ((saved === 'countdown' || saved === 'result') && !readSettings()) return 'settings';
-    return saved;
-  });
+  const [screen, setScreen] = useState<AppScreen>('top');
   const [locale, setLocale] = useState<Locale>(() => {
     const saved = readStorage('ching-drama-locale');
     if (saved === 'en' || saved === 'ja') return saved;
