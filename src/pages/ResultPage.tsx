@@ -22,6 +22,14 @@ interface AutoFitSingleLineTextProps {
   maxPx?: number;
 }
 
+interface AutoFitSubtitleHighlightProps {
+  dishName: string;
+  suffixText: string;
+  className?: string;
+  minPx?: number;
+  maxPx?: number;
+}
+
 function AutoFitSingleLineText({
   text,
   className = '',
@@ -66,6 +74,43 @@ function AutoFitSingleLineText({
   );
 }
 
+function AutoFitSubtitleHighlight({
+  dishName,
+  suffixText,
+  className = '',
+  minPx = 12,
+  maxPx = 23,
+}: AutoFitSubtitleHighlightProps) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [fontPx, setFontPx] = useState(maxPx);
+
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+
+    let next = maxPx;
+    el.style.fontSize = `${next}px`;
+
+    while (next > minPx && el.scrollWidth > el.clientWidth) {
+      next -= 1;
+      el.style.fontSize = `${next}px`;
+    }
+    setFontPx(next);
+  }, [dishName, suffixText, minPx, maxPx]);
+
+  return (
+    <p
+      ref={textRef}
+      className={`w-full whitespace-nowrap overflow-hidden text-center ${className}`}
+      style={{ fontSize: `${fontPx}px` }}
+      title={`${dishName}${suffixText}`}
+    >
+      <span className="font-black text-orange-400">{dishName}</span>
+      <span>{suffixText}</span>
+    </p>
+  );
+}
+
 export default function ResultPage({
   locale,
   settings,
@@ -99,9 +144,9 @@ export default function ResultPage({
     const messages = RESULT_MESSAGES[locale][style];
     return messages[Math.floor(Math.random() * messages.length)];
   }, [locale, style]);
-  const subtitleText = locale === 'ja'
-    ? `${dishName}の${totalSeconds}秒が、ついに幕を閉じたー`
-    : `${dishName}'s ${totalSeconds}s has finally come to an end—`;
+  const subtitleSuffixText = locale === 'ja'
+    ? `の${totalSeconds}秒が、ついに幕を閉じたー`
+    : `'s ${totalSeconds}s has finally come to an end—`;
   return (
     <div
       className={`h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
@@ -178,11 +223,12 @@ export default function ResultPage({
         </div>
 
         <div className="mb-2 sm:mb-3 w-full px-1">
-          <AutoFitSingleLineText
-            text={subtitleText}
+          <AutoFitSubtitleHighlight
+            dishName={dishName}
+            suffixText={subtitleSuffixText}
             minPx={12}
             maxPx={23}
-            className={`text-center whitespace-nowrap font-normal tracking-tight ${
+            className={`font-normal tracking-tight ${
               isLight ? 'text-slate-700' : 'text-slate-300'
             }`}
           />
