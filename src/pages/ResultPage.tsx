@@ -134,16 +134,16 @@ export default function ResultPage({
           style={{ animationDelay: '0.15s' }}
         >
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3.5">
-            <p className={`text-lg font-semibold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.dish}</p>
-            <p className={`justify-self-end text-3xl sm:text-4xl font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>{dishName}</p>
+            <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.dish}</p>
+            <p className={`justify-self-end text-[clamp(1rem,5vw,1.6rem)] font-black leading-tight whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-white'}`}>{dishName}</p>
 
-            <p className={`text-lg font-semibold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.time}</p>
-            <p className={`justify-self-end text-3xl sm:text-4xl font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.time}</p>
+            <p className={`justify-self-end text-[clamp(1rem,5vw,1.6rem)] font-black leading-tight whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
               {totalSeconds}{locale === 'ja' ? '秒' : 's'}
             </p>
 
-            <p className={`text-lg font-semibold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.narration}</p>
-            <p className={`justify-self-end text-3xl sm:text-4xl font-black leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            <p className={`text-sm sm:text-base font-semibold whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{summaryLabels.narration}</p>
+            <p className={`justify-self-end text-[clamp(1rem,5vw,1.6rem)] font-black leading-tight whitespace-nowrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
               {styleConfig.emoji} {styleConfig.label}
             </p>
           </div>
