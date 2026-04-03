@@ -136,19 +136,35 @@ export default function SettingsPage({
         : style === 'horror' ? 'horror'
         : 'anime';
 
-      const session = await api.startSession(
-        dishName.trim() || t.mysteryDish,
-        duration,
-        mappedStyle as "sports" | "horror" | "documentary" | "anime"
-      );
+      const nextDishName = dishName.trim() || t.mysteryDish;
+      let sessionId = '';
+
+      try {
+        const session = await api.startSession(
+          nextDishName,
+          duration,
+          mappedStyle as "sports" | "horror" | "documentary" | "anime"
+        );
+        sessionId = session.sessionId;
+      } catch (startError) {
+        const localSessionIdFactory = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? () => crypto.randomUUID()
+          : () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        sessionId = `local-${localSessionIdFactory()}`;
+
+        console.warn('Session API unavailable. Falling back to local session mode.', {
+          error: startError instanceof Error ? startError.message : String(startError),
+          fallbackSessionId: sessionId,
+        });
+      }
 
       const settings: Settings = {
         totalSeconds: duration,
-        dishName: dishName.trim() || t.mysteryDish,
+        dishName: nextDishName,
         style,
       };
 
-      sessionStorage.setItem('sessionId', session.sessionId);
+      sessionStorage.setItem('sessionId', sessionId);
       onStart(settings);
     } catch (err) {
       const userMessage = locale === 'ja'
