@@ -371,15 +371,30 @@ function generateNarrationTextFallback(
   return isJa ? phaseLine.ja : phaseLine.en;
 }
 
+function getVoiceId(style: string): string {
+  switch (style) {
+    case "horror":
+      return "29vD33N1CtxCmqQRPOHJ";
+    case "anime":
+      return "pNInz6obpgDQGcFmaJgB";
+    case "documentary":
+    case "nature":
+      return "21m00Tcm4TlvDq8ikWAM";
+    case "sports":
+      return "VR6AewLTigWG4xSOukaG";
+    case "movie":
+    default:
+      return "ErXwobaYiN019PkySvjV";
+  }
+}
+
 async function generateAudioFromText(
   apiKey: string,
   text: string,
   style: string,
-  locale: string
+  _locale: string
 ): Promise<string> {
-  const voiceId = locale.includes("ja")
-    ? "XB0fDUnXU5powFXDhCwa"
-    : "cgSgspJ2msLzdYWZ5kZo";
+  const voiceId = getVoiceId(style);
 
   const voiceSettings = getVoiceSettings(style);
 
