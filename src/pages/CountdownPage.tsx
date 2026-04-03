@@ -120,56 +120,9 @@ export default function CountdownPage({
   }, [style, dishName, locale]);
 
   const handlePhaseEffects = useCallback(async (phase: Phase) => {
-    const phasePlans: Record<Settings['style'], { musicPrompt?: string; sfxPrompt?: string; stopMusic?: boolean }> = {
-      movie: phase === 'done'
-        ? { stopMusic: true, sfxPrompt: 'cinematic ending impact, short trailer hit' }
-        : phase === 'opening'
-          ? { musicPrompt: 'cinematic trailer underscore, tense and dramatic' }
-          : phase === 'middle' || phase === 'final'
-            ? { sfxPrompt: 'cinematic whoosh rise, short transition' }
-            : {},
-      nature: phase === 'done'
-        ? { stopMusic: true, sfxPrompt: 'soft forest chime, gentle resolution' }
-        : phase === 'opening'
-          ? { musicPrompt: 'calm nature ambience, soft wind and birds' }
-          : phase === 'middle' || phase === 'final'
-            ? { sfxPrompt: 'light natural rustle and airy swell' }
-            : {},
-      sports: phase === 'done'
-        ? { stopMusic: true, sfxPrompt: 'stadium cheer hit, short victory blast' }
-        : phase === 'opening'
-          ? { musicPrompt: 'upbeat stadium rhythm, low intensity crowd bed' }
-          : phase === 'quarter' || phase === 'middle' || phase === 'final'
-            ? { sfxPrompt: 'short crowd swell and whistle accent' }
-            : {},
-      horror: phase === 'done'
-        ? { stopMusic: true, sfxPrompt: 'cold sting and low boom resolve' }
-        : phase === 'opening'
-          ? { musicPrompt: 'dark drone ambience, subtle tension pulse' }
-          : phase === 'quarter' || phase === 'middle' || phase === 'final'
-            ? { sfxPrompt: 'quiet eerie riser, distant metallic tick' }
-            : {},
-    };
-
-    // Playback competition rule:
-    // - On each phase transition, stop previous SFX before starting next phase SFX.
-    // - Keep BGM unless explicit stop/restart is required by the style plan.
     api.stopSfx();
-    const plan = phasePlans[style];
-    const tasks: Promise<void>[] = [];
-    if (plan.stopMusic) {
-      api.stopMusic();
-    }
-    if (plan.musicPrompt) {
-      tasks.push(api.playMusic(plan.musicPrompt));
-    }
-    if (plan.sfxPrompt) {
-      tasks.push(api.playSfx(plan.sfxPrompt));
-    }
-    if (tasks.length > 0) {
-      await Promise.all(tasks);
-    }
-  }, [style]);
+    api.stopMusic();
+  }, []);
 
   const agentInstructionText = useMemo(() => {
     const localeLabel = locale.startsWith('ja') ? 'Japanese' : 'English';
@@ -230,10 +183,7 @@ export default function CountdownPage({
             console.error('Failed to save narration:', saveError);
           });
         }
-        await Promise.allSettled([
-          narration.play(),
-          handlePhaseEffects(phase),
-        ]);
+        await narration.play();
       })
       .catch(async (err) => {
         const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
@@ -258,17 +208,12 @@ export default function CountdownPage({
           });
         }
 
-        await Promise.allSettled([
-          api.playTts(fallbackLine).catch((ttsError) => {
-            console.error('Failed to play fallback TTS:', ttsError);
-            setSubtitleModeDebug('subtitle-only fallback(local TTS failed)');
-          }),
-          handlePhaseEffects(phase).catch((effectError) => {
-            console.error('Failed to run fallback phase effects:', effectError);
-          }),
-        ]);
+        await api.playTts(fallbackLine).catch((ttsError) => {
+          console.error('Failed to play fallback TTS:', ttsError);
+          setSubtitleModeDebug('subtitle-only fallback(local TTS failed)');
+        });
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, buildAgentNarrationContext]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
