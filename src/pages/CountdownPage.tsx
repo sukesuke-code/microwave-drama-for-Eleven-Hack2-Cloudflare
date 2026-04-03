@@ -10,8 +10,6 @@ import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
 import { api } from '../api/client';
-import { ElevenLabsAgent } from '../api/elevenlab-agent';
-import { AudioPlayer } from '../api/audio-player';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -39,14 +37,10 @@ export default function CountdownPage({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
-  const pendingNarrationsRef = useRef<string[]>([]);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  const agentRef = useRef<ElevenLabsAgent | null>(null);
-  const audioPlayerRef = useRef<AudioPlayer | null>(null);
-  const unsubscribeRef = useRef<Array<() => void>>([]);
-  const audioContextResumedRef = useRef(false);
+  const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -54,13 +48,6 @@ export default function CountdownPage({
   const lightBgGradient = style === 'sports'
     ? 'from-sky-50 via-blue-50/80 to-slate-100'
     : 'from-slate-50 via-orange-50/80 to-slate-100';
-
-  const resumeAudioContext = useCallback(() => {
-    if (audioPlayerRef.current && !audioContextResumedRef.current) {
-      audioContextResumedRef.current = true;
-      console.log('AudioContext resumed by user interaction');
-    }
-  }, []);
 
   const playAlarmTone = useCallback(() => {
     const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -101,105 +88,24 @@ export default function CountdownPage({
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
-    pendingNarrationsRef.current = [];
-
     sessionIdRef.current = sessionStorage.getItem('sessionId');
-
-    const initializeAgent = async () => {
-      try {
-        if (!sessionIdRef.current) {
-          console.warn('No session ID found');
-          return;
-        }
-
-        const signedUrlResponse = await api.getSignedUrl();
-        console.log('Got signed URL:', signedUrlResponse.signedUrl);
-
-        agentRef.current = new ElevenLabsAgent(signedUrlResponse.signedUrl);
-        await agentRef.current.connect();
-        console.log('ElevenLabs agent connected successfully');
-
-        audioPlayerRef.current = new AudioPlayer();
-        await audioPlayerRef.current.initialize();
-        console.log('AudioPlayer initialized');
-
-        const unsubAudio = agentRef.current.on('audio', (event) => {
-          if ('data' in event && audioPlayerRef.current) {
-            console.log('Received audio chunk from agent');
-            audioPlayerRef.current.queueAudio(event.data);
-          }
-        });
-
-        const unsubAgentTranscript = agentRef.current.on('agent_transcript', (event) => {
-          if ('data' in event) {
-            console.log('Agent transcript:', event.data);
-          }
-        });
-
-        const unsubError = agentRef.current.on('error', (event) => {
-          if ('error' in event) {
-            console.error('Agent error:', event.error);
-          }
-        });
-
-        const unsubConnected = agentRef.current.on('connected', () => {
-          console.log('Agent connected event received, flushing pending narrations');
-          while (pendingNarrationsRef.current.length > 0) {
-            const nextNarration = pendingNarrationsRef.current.shift();
-            if (!nextNarration) break;
-            if (agentRef.current && agentRef.current.isConnected()) {
-              console.log('Flushing pending narration:', nextNarration);
-              agentRef.current.send(nextNarration);
-            }
-          }
-        });
-
-        unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError, unsubConnected];
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        while (pendingNarrationsRef.current.length > 0) {
-          const nextNarration = pendingNarrationsRef.current.shift();
-          if (!nextNarration) break;
-          console.log('Sending pending narration:', nextNarration);
-          agentRef.current.send(nextNarration);
-        }
-      } catch (error) {
-        console.error('Failed to initialize agent:', error);
-        setTimeout(() => initializeAgent(), 2000);
-      }
-    };
-
-    initializeAgent();
-
-    return () => {
-      unsubscribeRef.current.forEach((unsub) => unsub());
-      if (agentRef.current) {
-        agentRef.current.disconnect();
-        agentRef.current = null;
-      }
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.destroy();
-        audioPlayerRef.current = null;
-      }
-    };
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
     if (!narrationText || isPaused) return;
+    const line = narrationText;
+    sessionIdRef.current = sessionStorage.getItem('sessionId');
 
-    const sendNarration = () => {
-      if (agentRef.current && agentRef.current.isConnected()) {
-        console.log('Sending narration to agent:', narrationText);
-        agentRef.current.send(narrationText);
-      } else {
-        console.warn('AI narration agent is not connected yet. Narration queued for AI TTS playback.');
-        pendingNarrationsRef.current.push(narrationText);
-      }
-    };
-
-    const timer = setTimeout(sendNarration, 100);
-    return () => clearTimeout(timer);
+    ttsQueueRef.current = ttsQueueRef.current
+      .then(async () => {
+        if (sessionIdRef.current) {
+          await api.saveNarration(sessionIdRef.current, line);
+        }
+        await api.playTts(line);
+      })
+      .catch((err) => {
+        console.error('Failed to process narration event:', err);
+      });
   }, [narrationText, isPaused]);
 
   useEffect(() => {
@@ -278,8 +184,6 @@ export default function CountdownPage({
   return (
       <div
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
-      onClick={resumeAudioContext}
-      onTouchStart={resumeAudioContext}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />

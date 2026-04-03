@@ -18,12 +18,6 @@ export interface StartSessionPayload {
   style: "sports" | "horror" | "documentary" | "anime";
 }
 
-export interface GetSignedUrlResponse {
-  ok: boolean;
-  signedUrl: string;
-  agentId: string;
-}
-
 async function startSession(
   foodName: string,
   totalTime: number,
@@ -121,27 +115,42 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   }
 }
 
-async function getSignedUrl(): Promise<GetSignedUrlResponse> {
-  const res = await fetch(`${API_BASE}/api/elevenlabs/signed-url`, {
+async function playTts(text: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      text,
+      modelId: "eleven_multilingual_v2",
+      outputFormat: "mp3_44100_128",
+    }),
   });
 
-  const data = (await res.json()) as GetSignedUrlResponse & { error?: string };
-  console.log("getSignedUrl response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.signedUrl) {
-    throw new Error(data?.error || "Failed to get signed URL");
+  if (!res.ok) {
+    let err: { error?: string } = {};
+    try {
+      err = (await res.json()) as { error?: string };
+    } catch {
+      // Ignore invalid/non-JSON error body.
+    }
+    throw new Error(err?.error || "TTS failed");
   }
 
-  return {
-    ok: data.ok,
-    signedUrl: data.signedUrl,
-    agentId: data.agentId,
-  };
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  try {
+    const audio = new Audio(url);
+    audio.muted = false;
+    audio.volume = 1;
+    await audio.play();
+    audio.onended = () => URL.revokeObjectURL(url);
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
 }
 
 export const api = {
@@ -149,6 +158,6 @@ export const api = {
   getSession,
   tickSession,
   saveNarration,
-  getSignedUrl,
+  playTts,
   API_BASE,
 };
