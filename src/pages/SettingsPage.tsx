@@ -319,7 +319,7 @@ export default function SettingsPage({
                     key={card.id}
                     type="button"
                     onClick={() => setStyle(card.id)}
-                    className={`relative rounded-xl border bg-gradient-to-br p-2 text-left transition-all ${card.gradient} ${card.border} ${
+                    className={`relative rounded-xl border bg-gradient-to-br p-2 text-center transition-all ${card.gradient} ${card.border} ${
                       selected
                         ? 'scale-[1.02] shadow-lg ring-2 ring-orange-400 opacity-100'
                         : 'opacity-70 hover:opacity-90'
