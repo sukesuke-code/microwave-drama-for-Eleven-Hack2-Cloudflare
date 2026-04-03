@@ -54,25 +54,25 @@ export default function CountdownPage({
     if (!AudioContextImpl) return;
 
     const ctx = new AudioContextImpl();
-    const scheduleTone = (offset: number, frequency: number) => {
+    const scheduleTone = (offset: number, frequency: number, duration: number, peakGain: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'triangle';
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(frequency, ctx.currentTime + offset);
       gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
-      gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + offset + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.22);
+      gain.gain.exponentialRampToValueAtTime(peakGain, ctx.currentTime + offset + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(ctx.currentTime + offset);
-      osc.stop(ctx.currentTime + offset + 0.24);
+      osc.stop(ctx.currentTime + offset + duration + 0.02);
     };
 
-    scheduleTone(0, 880);
-    scheduleTone(0.28, 1046.5);
-    scheduleTone(0.56, 1318.5);
+    // Microwave-like "ding-dong" chime.
+    scheduleTone(0, 1320, 0.22, 0.22);
+    scheduleTone(0.25, 980, 0.28, 0.18);
 
-    window.setTimeout(() => void ctx.close(), 1300);
+    window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
   const updateNarration = useCallback((tl: number, tt: number) => {
