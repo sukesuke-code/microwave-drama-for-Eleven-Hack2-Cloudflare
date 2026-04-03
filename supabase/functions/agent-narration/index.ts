@@ -55,14 +55,7 @@ async function generateAgentNarrationWithAudio(
   const isJapanese = locale.includes("ja");
   const timePercent = Math.round((remainingTime / totalTime) * 100);
 
-  const voiceIds: Record<string, string> = {
-    sports: "cgSgspJ2msLzdYWZ5kZo",
-    horror: "cgSgspJ2msLzdYWZ5kZo",
-    documentary: "cgSgspJ2msLzdYWZ5kZo",
-    anime: "cgSgspJ2msLzdYWZ5kZo",
-    movie: "cgSgspJ2msLzdYWZ5kZo",
-    nature: "cgSgspJ2msLzdYWZ5kZo",
-  };
+  const voiceId = "cgSgspJ2msLzdYWZ5kZo";
 
   const styleDescriptions: Record<string, string> = {
     sports: isJapanese
@@ -93,49 +86,66 @@ async function generateAgentNarrationWithAudio(
     done: isJapanese ? "完成時" : "at completion",
   };
 
-  let narrationText: string;
+  const systemPrompt = isJapanese
+    ? `あなたはマイクロウェーブ料理番組のナレーターです。${styleDescriptions[style] || styleDescriptions.sports}でナレーションを提供してください。短く、洞察に富み、エネルギッシュなコメントを作成してください。${agentInstructionText ? `ユーザーの指示: ${agentInstructionText}` : ""}`
+    : `You are a microwave cooking show narrator. Provide narration in ${styleDescriptions[style] || styleDescriptions.sports}. Create short, insightful, and energetic commentary. Keep responses brief and engaging. ${agentInstructionText ? `User instructions: ${agentInstructionText}` : ""}`;
+
+  let userMessage: string;
   if (isJapanese) {
-    narrationText = `「${dishName}」の調理を${styleDescriptions[style] || styleDescriptions.sports}で実況します。現在は${phaseDescriptions[phase] || phaseDescriptions.done}です。`;
+    userMessage = `「${dishName}」を調理中。${phaseDescriptions[phase] || phaseDescriptions.done}です。短いナレーションを提供してください。`;
   } else {
-    narrationText = `Narrating the cooking of "${dishName}" in ${styleDescriptions[style] || styleDescriptions.sports}. Currently ${phaseDescriptions[phase] || phaseDescriptions.done}.`;
+    userMessage = `Currently cooking "${dishName}". ${phaseDescriptions[phase] || phaseDescriptions.done}. Provide brief narration.`;
   }
 
-  const voiceId = voiceIds[style] || "cgSgspJ2msLzdYWZ5kZo";
+  console.log("ElevenLabs Agent Request:", { voiceId, phase, language: isJapanese ? "ja" : "en" });
 
-  console.log("ElevenLabs TTS Request:", { voiceId, textLength: narrationText.length, language: isJapanese ? "ja" : "en" });
-
-  const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+  const agentResponse = await fetch("https://api.elevenlabs.io/v1/convai/conversation", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "xi-api-key": apiKey,
     },
     body: JSON.stringify({
-      text: narrationText,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-      },
+      agent_id: voiceId,
+      user_message: userMessage,
+      conversation_history: [
+        {
+          role: "system",
+          message: systemPrompt,
+        },
+      ],
     }),
   });
 
-  console.log("ElevenLabs Response Status:", ttsResponse.status);
+  console.log("ElevenLabs Agent Response Status:", agentResponse.status);
 
-  if (!ttsResponse.ok) {
-    const errorData = await ttsResponse.text();
-    console.error("ElevenLabs Error Response:", errorData);
-    logSafeError("elevenlabs_tts_error", { status: ttsResponse.status, error: errorData });
-    throw new Error("Failed to generate narration audio");
+  if (!agentResponse.ok) {
+    const errorData = await agentResponse.text();
+    console.error("ElevenLabs Agent Error Response:", errorData);
+    logSafeError("elevenlabs_agent_error", { status: agentResponse.status, error: errorData });
+    throw new Error("Failed to generate agent narration");
   }
 
-  const audioBuffer = await ttsResponse.arrayBuffer();
-  console.log("Audio Buffer Size:", audioBuffer.byteLength);
+  const data = (await agentResponse.json()) as {
+    agent_response?: string;
+    audio?: string;
+    audio_base64?: string;
+  };
 
-  const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+  const text = String(data.agent_response || "").trim();
+  if (!text) {
+    throw new Error("Agent response is missing");
+  }
+
+  const audioBase64 = data.audio_base64 || data.audio || "";
+  if (!audioBase64) {
+    throw new Error("Agent audio is missing");
+  }
+
+  console.log("Agent Narration Generated:", { textLength: text.length, hasAudio: Boolean(audioBase64) });
 
   return {
-    text: narrationText,
+    text,
     audioBase64,
   };
 }
@@ -145,6 +155,18 @@ Deno.serve(async (req: Request) => {
     return new Response(null, {
       status: 200,
       headers: corsHeaders,
+    });
+  }
+
+  const urlPath = new URL(req.url).pathname;
+
+  if (urlPath.includes("/ping")) {
+    return new Response(JSON.stringify({ ok: true, pong: true }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
     });
   }
 

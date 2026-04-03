@@ -742,6 +742,22 @@ async function playMusic(prompt: string): Promise<void> {
   await audio.play();
 }
 
+function getSignedUrl(url: string, expiresIn: number = 3600): string {
+  if (!url) return "";
+  const urlObj = new URL(url, "https://example.com");
+  return urlObj.pathname + urlObj.search;
+}
+
+function buildNarrationCue(
+  text: string,
+  displayDuration: number = 3000
+): { text: string; duration: number } {
+  return {
+    text: text.trim(),
+    duration: displayDuration,
+  };
+}
+
 export const api = {
   startSession,
   getSession,
@@ -756,5 +772,7 @@ export const api = {
   stopTtsPlayback,
   subscribeTtsLevel,
   subscribeTtsMeter,
+  getSignedUrl,
+  buildNarrationCue,
   API_BASE,
 };
