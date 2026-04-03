@@ -1,6 +1,10 @@
 import type { NarrationStyle } from "../types";
 
 const API_BASE = "https://microwave-show-api.lolololololol.workers.dev";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://aaqahuauovsykozowifh.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhcWFodWF1b3ZzeWtvem93aWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTQzNTQsImV4cCI6MjA5MDczMDM1NH0.sjTM-7oGtRoRWv1pXPtQroeAR9ro1PxPMDJ6esW_3wk";
+const ELEVENLABS_TTS_ENDPOINT = `${SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+const ELEVENLABS_NARRATION_ENDPOINT = `${SUPABASE_URL}/functions/v1/elevenlabs-narration`;
 const DEFAULT_TTS_TIMEOUT_MS = 30000;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -9,7 +13,6 @@ let stopRequested = false;
 let activeMeterCleanup: (() => void) | null = null;
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
-let agentNarrationEndpointMissing = false;
 
 type TtsLevelListener = (level: number) => void;
 type TtsMeterSnapshot = {
@@ -32,12 +35,6 @@ export interface AgentNarrationResponse {
   play: () => Promise<void>;
 }
 
-class AgentNarrationUnavailableError extends Error {
-  constructor() {
-    super("AGENT_NARRATION_UNAVAILABLE");
-    this.name = "AgentNarrationUnavailableError";
-  }
-}
 const ttsLevelListeners = new Set<TtsLevelListener>();
 const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
 
@@ -307,15 +304,16 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
 
 async function playTts(text: string): Promise<void> {
   stopRequested = false;
-  const res = await fetch(`${API_BASE}/api/tts`, {
+  const res = await fetch(ELEVENLABS_TTS_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify({
       text,
-      modelId: "eleven_multilingual_v2",
-      outputFormat: "mp3_44100_128",
+      voice_id: "21m00Tcm4TlvDq8ikWAM",
+      model_id: "eleven_multilingual_v2",
     }),
   });
 
@@ -328,7 +326,18 @@ async function playTts(text: string): Promise<void> {
     throw new Error("TTS failed");
   }
 
-  const blob = await res.blob();
+  const data = (await res.json()) as { audio_base64?: string; error?: string };
+  if (!data.audio_base64) {
+    throw new Error(data.error || "No audio returned from TTS");
+  }
+
+  const rawBase64 = data.audio_base64.includes(",") ? data.audio_base64.split(",").pop() ?? "" : data.audio_base64;
+  const binary = atob(rawBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: "audio/mpeg" });
   console.log("playTts blob", {
     type: blob.type,
     size: blob.size,
@@ -454,64 +463,43 @@ async function playTts(text: string): Promise<void> {
 }
 
 async function requestAgentNarration(request: AgentNarrationRequest): Promise<AgentNarrationResponse> {
-  if (agentNarrationEndpointMissing) {
-    throw new AgentNarrationUnavailableError();
-  }
-
   const payload = {
     sessionId: request.sessionId,
-    send_user_message: true,
-    user_message: JSON.stringify({
-      event: "countdown_tick",
-      style: request.style,
-      dishName: request.dishName,
-      totalTime: request.totalTime,
-      remainingTime: request.remainingTime,
-      phase: request.phase,
-      locale: request.locale,
-    }),
-    dynamic_variables: {
-      style: request.style,
-      dish_name: request.dishName,
-      total_time: request.totalTime,
-      remaining_time: request.remainingTime,
-      phase: request.phase,
-      locale: request.locale,
-    },
+    style: request.style,
+    dishName: request.dishName,
+    totalTime: request.totalTime,
+    remainingTime: request.remainingTime,
+    phase: request.phase,
+    locale: request.locale,
   };
 
-  const res = await fetch(`${API_BASE}/api/agent/narrate`, {
+  const res = await fetch(ELEVENLABS_NARRATION_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
-    if (res.status === 404) {
-      agentNarrationEndpointMissing = true;
-      throw new AgentNarrationUnavailableError();
-    }
     const errText = await res.text();
-    throw new Error(errText || "Agent narration failed");
+    throw new Error(errText || "Narration generation failed");
   }
 
   const data = (await res.json()) as {
     ok?: boolean;
-    agent_response?: string;
     text?: string;
-    audioBase64?: string;
-    audio?: string;
+    audio_base64?: string;
     error?: string;
   };
 
-  const text = String(data.agent_response || data.text || "").trim();
+  const text = String(data.text || "").trim();
   if (!data.ok || !text) {
-    throw new Error(data.error || "Agent response is missing");
+    throw new Error(data.error || "Narration response is missing");
   }
 
-  const base64Audio = data.audioBase64 || data.audio;
+  const base64Audio = data.audio_base64;
 
   return {
     text,
@@ -519,99 +507,103 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
       stopRequested = false;
 
       if (!base64Audio) {
-        throw new Error("Agent audio payload is missing");
-      }
-
-      const rawBase64 = base64Audio.includes(",") ? base64Audio.split(",").pop() ?? "" : base64Audio;
-      const binary = atob(rawBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: "audio/mpeg" });
-      const url = URL.createObjectURL(blob);
-
-      if (activeObjectUrl) {
-        URL.revokeObjectURL(activeObjectUrl);
-        activeObjectUrl = null;
+        return;
       }
 
       try {
-        const audio = new Audio();
-        audio.preload = "auto";
-        audio.src = url;
-        audio.muted = false;
-        audio.volume = 1;
-        audio.setAttribute("playsinline", "true");
-        activeTtsAudio = audio;
-        activeObjectUrl = url;
-        activeMeterCleanup = attachAudioMeter(audio);
+        const rawBase64 = base64Audio.includes(",") ? base64Audio.split(",").pop() ?? "" : base64Audio;
+        const binary = atob(rawBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: "audio/mpeg" });
+        const url = URL.createObjectURL(blob);
 
-        await audio.play();
+        if (activeObjectUrl) {
+          URL.revokeObjectURL(activeObjectUrl);
+          activeObjectUrl = null;
+        }
 
-        await new Promise<void>((resolve, reject) => {
-          let completed = false;
-          let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-            if (completed) return;
-            completed = true;
-            cleanup();
-            reject(new Error("Audio playback timed out"));
-          }, DEFAULT_TTS_TIMEOUT_MS);
+        try {
+          const audio = new Audio();
+          audio.preload = "auto";
+          audio.src = url;
+          audio.muted = false;
+          audio.volume = 1;
+          audio.setAttribute("playsinline", "true");
+          activeTtsAudio = audio;
+          activeObjectUrl = url;
+          activeMeterCleanup = attachAudioMeter(audio);
 
-          const cleanup = () => {
-            audio.onended = null;
-            audio.onerror = null;
-            audio.onpause = null;
-            if (timeoutId) {
-              clearTimeout(timeoutId);
-              timeoutId = null;
-            }
-          };
+          await audio.play();
 
-          audio.onpause = () => {
-            if (audio.ended || completed) return;
-            if (stopRequested) {
-              completed = true;
-              cleanup();
-              reject(new Error("Audio playback stopped"));
-              return;
-            }
-            void audio.play().catch((err) => {
+          await new Promise<void>((resolve, reject) => {
+            let completed = false;
+            let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
               if (completed) return;
               completed = true;
               cleanup();
-              reject(err);
-            });
-          };
+              reject(new Error("Audio playback timed out"));
+            }, DEFAULT_TTS_TIMEOUT_MS);
 
-          audio.onended = () => {
-            if (completed) return;
-            completed = true;
-            cleanup();
-            resolve();
-          };
+            const cleanup = () => {
+              audio.onended = null;
+              audio.onerror = null;
+              audio.onpause = null;
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+              }
+            };
 
-          audio.onerror = () => {
-            if (completed) return;
-            completed = true;
-            cleanup();
-            reject(audio.error ?? new Error("Unknown audio playback error"));
-          };
-        });
-      } finally {
-        if (activeObjectUrl === url) {
-          URL.revokeObjectURL(url);
-          activeObjectUrl = null;
+            audio.onpause = () => {
+              if (audio.ended || completed) return;
+              if (stopRequested) {
+                completed = true;
+                cleanup();
+                reject(new Error("Audio playback stopped"));
+                return;
+              }
+              void audio.play().catch((err) => {
+                if (completed) return;
+                completed = true;
+                cleanup();
+                reject(err);
+              });
+            };
+
+            audio.onended = () => {
+              if (completed) return;
+              completed = true;
+              cleanup();
+              resolve();
+            };
+
+            audio.onerror = () => {
+              if (completed) return;
+              completed = true;
+              cleanup();
+              reject(audio.error ?? new Error("Unknown audio playback error"));
+            };
+          });
+        } finally {
+          if (activeObjectUrl === url) {
+            URL.revokeObjectURL(url);
+            activeObjectUrl = null;
+          }
+          if (activeTtsAudio) {
+            activeTtsAudio.src = "";
+            activeTtsAudio.load();
+            activeTtsAudio = null;
+          }
+          if (activeMeterCleanup) {
+            activeMeterCleanup();
+            activeMeterCleanup = null;
+          }
         }
-        if (activeTtsAudio) {
-          activeTtsAudio.src = "";
-          activeTtsAudio.load();
-          activeTtsAudio = null;
-        }
-        if (activeMeterCleanup) {
-          activeMeterCleanup();
-          activeMeterCleanup = null;
-        }
+      } catch (error) {
+        console.error("Error playing narration audio:", error);
       }
     },
   };
