@@ -52,29 +52,37 @@ async function generateAgentNarrationWithAudio(
     throw new Error("AGENT_NARRATION_UNAVAILABLE");
   }
 
-  const agentId = "BkGJhwzCyPIMVKJPQa0T";
   const isJapanese = locale.includes("ja");
   const timePercent = Math.round((remainingTime / totalTime) * 100);
+
+  const voiceIds: Record<string, string> = {
+    sports: "SOZ5d8W2v3U34Z7isYXr",
+    horror: "EXAVITQu4vr4xnSDxMaL",
+    documentary: "21m00Tcm4TlvDq8ikWAM",
+    anime: "nPczCjzI2devNBz1zQrb",
+    movie: "N2lVSFnlFdCoeSqpIHcl",
+    nature: "zcAOhNBS3c14rBihQnS1",
+  };
 
   const styleDescriptions: Record<string, string> = {
     sports: isJapanese
       ? "スポーツ実況風のエネルギッシュで熱い解説"
-      : "Sports commentary style with energetic and passionate narration",
+      : "Sports commentary style, energetic and passionate",
     horror: isJapanese
       ? "ホラー風の不気味で暗い雰囲気の解説"
-      : "Horror style with eerie and dark atmosphere",
+      : "Horror style, eerie and dark atmosphere",
     documentary: isJapanese
       ? "ドキュメンタリー風の落ち着いた知的な解説"
-      : "Documentary style with calm and intellectual narration",
+      : "Documentary style, calm and intellectual",
     anime: isJapanese
       ? "アニメ風の熱血でドラマチックな解説"
-      : "Anime style with passionate and dramatic narration",
+      : "Anime style, passionate and dramatic",
     movie: isJapanese
       ? "映画予告風の壮大でドラマチックな解説"
-      : "Movie trailer style with epic and dramatic narration",
+      : "Movie trailer style, epic and dramatic",
     nature: isJapanese
       ? "自然番組風の穏やかで神秘的な解説"
-      : "Nature documentary style with calm and mysterious narration",
+      : "Nature documentary style, calm and mysterious",
   };
 
   const phaseDescriptions: Record<string, string> = {
@@ -85,128 +93,42 @@ async function generateAgentNarrationWithAudio(
     done: isJapanese ? "完成時" : "at completion",
   };
 
-  const promptText = isJapanese
-    ? `「${dishName}」の調理を${styleDescriptions[style] || styleDescriptions.sports}で実況してください。現在は${phaseDescriptions[phase] || phaseDescriptions.done}です。1〜2文で簡潔に。`
-    : `Please narrate the cooking of "${dishName}" in ${styleDescriptions[style] || styleDescriptions.sports}. Currently ${phaseDescriptions[phase] || phaseDescriptions.done}. Keep it to 1-2 sentences.`;
+  let narrationText: string;
+  if (isJapanese) {
+    narrationText = `「${dishName}」の調理を${styleDescriptions[style] || styleDescriptions.sports}で実況します。現在は${phaseDescriptions[phase] || phaseDescriptions.done}です。`;
+  } else {
+    narrationText = `Narrating the cooking of "${dishName}" in ${styleDescriptions[style] || styleDescriptions.sports}. Currently ${phaseDescriptions[phase] || phaseDescriptions.done}.`;
+  }
 
-  const conversationConfig = {
-    agent: {
-      prompt: {
-        prompt: promptText,
-      },
-      first_message: "",
-      language: isJapanese ? "ja" : "en",
-    },
-  };
+  const voiceId = voiceIds[style] || voiceIds.documentary;
 
-  const agentUrl = `https://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}`;
-
-  const startResponse = await fetch(agentUrl, {
+  const ttsResponse = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "xi-api-key": apiKey,
     },
     body: JSON.stringify({
-      conversation_config_override: conversationConfig,
+      text: narrationText,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+      },
     }),
   });
 
-  if (!startResponse.ok) {
-    const errorData = await startResponse.text();
-    logSafeError("elevenlabs_agent_start_error", { status: startResponse.status, error: errorData });
-    throw new Error("Failed to start agent conversation");
+  if (!ttsResponse.ok) {
+    const errorData = await ttsResponse.text();
+    logSafeError("elevenlabs_tts_error", { status: ttsResponse.status, error: errorData });
+    throw new Error("Failed to generate narration audio");
   }
 
-  const startData = await startResponse.json() as { conversation_id?: string };
-  const conversationId = startData.conversation_id;
-
-  if (!conversationId) {
-    throw new Error("No conversation ID returned from agent");
-  }
-
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  const audioChunks: Uint8Array[] = [];
-  let fullText = "";
-  let hasReceivedAudio = false;
-
-  const getAudioUrl = `https://api.elevenlabs.io/v1/convai/conversation/${conversationId}?output_format=mp3_44100_128`;
-
-  const audioResponse = await fetch(getAudioUrl, {
-    method: "GET",
-    headers: {
-      "xi-api-key": apiKey,
-    },
-  });
-
-  if (!audioResponse.ok) {
-    logSafeError("elevenlabs_agent_audio_error", { status: audioResponse.status });
-    throw new Error("Failed to get agent audio");
-  }
-
-  const reader = audioResponse.body?.getReader();
-  if (!reader) {
-    throw new Error("No audio stream available");
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    hasReceivedAudio = true;
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (!line.trim() || !line.startsWith("data: ")) continue;
-
-      try {
-        const jsonStr = line.slice(6);
-        const data = JSON.parse(jsonStr) as {
-          type?: string;
-          audio_event?: { audio_base_64?: string };
-          agent_response_event?: { agent_response?: string };
-        };
-
-        if (data.type === "audio" && data.audio_event?.audio_base_64) {
-          const audioData = Uint8Array.from(
-            atob(data.audio_event.audio_base_64),
-            c => c.charCodeAt(0)
-          );
-          audioChunks.push(audioData);
-        }
-
-        if (data.type === "agent_response" && data.agent_response_event?.agent_response) {
-          fullText = data.agent_response_event.agent_response;
-        }
-      } catch (e) {
-        console.error("Error parsing SSE line:", e);
-      }
-    }
-  }
-
-  if (!hasReceivedAudio || audioChunks.length === 0) {
-    throw new Error("No audio received from agent");
-  }
-
-  const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const combinedAudio = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of audioChunks) {
-    combinedAudio.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  const audioBase64 = btoa(String.fromCharCode(...combinedAudio));
+  const audioBuffer = await ttsResponse.arrayBuffer();
+  const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
   return {
-    text: fullText || promptText,
+    text: narrationText,
     audioBase64,
   };
 }
