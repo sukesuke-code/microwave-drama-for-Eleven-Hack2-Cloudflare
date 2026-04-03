@@ -40,11 +40,15 @@ export default function CountdownPage({
   const speechAudioRef = useRef<HTMLAudioElement | null>(null);
   const speechRequestAbortRef = useRef<AbortController | null>(null);
   const speechCacheRef = useRef<Map<string, string>>(new Map());
+  const speechSocketRef = useRef<WebSocket | null>(null);
+  const audioUnlockedRef = useRef(false);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aiTtsEndpoint = import.meta.env.VITE_AI_TTS_ENDPOINT as string | undefined;
   const aiTtsApiKey = import.meta.env.VITE_AI_TTS_API_KEY as string | undefined;
+  const aiTtsWsUrl = import.meta.env.VITE_AI_TTS_WS_URL as string | undefined;
   const aiVoiceSupported = Boolean(aiTtsEndpoint);
+  const aiVoiceWebSocketSupported = Boolean(aiTtsWsUrl);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -97,6 +101,7 @@ export default function CountdownPage({
 
   useEffect(() => {
     if (!aiVoiceSupported || !narrationText || isPaused) return;
+    if (aiVoiceWebSocketSupported) return;
 
     let disposed = false;
     const cacheKey = `${locale}:${style}:${narrationText}`;
@@ -174,10 +179,116 @@ export default function CountdownPage({
       controller.abort();
       currentAudio.pause();
     };
-  }, [narrationText, locale, style, isPaused, aiVoiceSupported, aiTtsEndpoint, aiTtsApiKey]);
+  }, [narrationText, locale, style, isPaused, aiVoiceSupported, aiVoiceWebSocketSupported, aiTtsEndpoint, aiTtsApiKey]);
+
+  const base64ToUint8Array = useCallback((base64: string) => {
+    const normalized = base64.replace(/\s/g, '');
+    const binaryString = window.atob(normalized);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i += 1) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }, []);
+
+  const ensureAudioUnlocked = useCallback(async () => {
+    if (audioUnlockedRef.current) return;
+    try {
+      const testAudio = new Audio();
+      testAudio.muted = true;
+      testAudio.volume = 0;
+      await testAudio.play().catch(() => undefined);
+      testAudio.pause();
+      audioUnlockedRef.current = true;
+    } catch {
+      // no-op: unlock can fail until browser receives trusted user gesture
+    }
+  }, []);
+
+  const audioRefCleanup = useCallback((audio: HTMLAudioElement) => {
+    const currentUrl = audio.src;
+    audio.onended = () => {
+      if (currentUrl.startsWith('blob:')) URL.revokeObjectURL(currentUrl);
+    };
+    audio.onerror = () => {
+      if (currentUrl.startsWith('blob:')) URL.revokeObjectURL(currentUrl);
+    };
+  }, []);
+
+  const playAgentAudio = useCallback(async (audioBase64: string) => {
+    console.debug('[agent-audio] audio playback starting');
+    await ensureAudioUnlocked();
+    const audioBytes = base64ToUint8Array(audioBase64);
+    const audioBlob = new Blob([audioBytes], { type: 'audio/mpeg' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    audio.muted = false;
+    audio.volume = 1;
+    audioRefCleanup(audio);
+
+    try {
+      await audio.play();
+      speechAudioRef.current = audio;
+      console.debug('[agent-audio] audio playback success');
+    } catch (error) {
+      console.error('[agent-audio] audio playback failure', error);
+      URL.revokeObjectURL(audioUrl);
+    }
+  }, [audioRefCleanup, base64ToUint8Array, ensureAudioUnlocked]);
+
+  useEffect(() => {
+    if (!aiVoiceWebSocketSupported) return;
+
+    const ws = new WebSocket(aiTtsWsUrl!);
+    speechSocketRef.current = ws;
+
+    ws.onmessage = (event) => {
+      console.debug('[agent-audio] raw websocket message', event.data);
+      try {
+        const message = JSON.parse(String(event.data)) as {
+          type?: string;
+          audio_event?: { audio_base_64?: string };
+          ping_event?: { event_id?: string };
+        };
+        console.debug('[agent-audio] parsed websocket message', message);
+
+        if (message.type === 'ping' && message.ping_event?.event_id) {
+          ws.send(JSON.stringify({ type: 'pong', event_id: message.ping_event.event_id }));
+          return;
+        }
+
+        if (message.type === 'audio') {
+          console.debug('[agent-audio] audio event payload', message.audio_event);
+          const audioBase64 = message.audio_event?.audio_base_64;
+          if (audioBase64) void playAgentAudio(audioBase64);
+        }
+      } catch (error) {
+        console.error('[agent-audio] websocket message parse failure', error);
+      }
+    };
+
+    return () => {
+      ws.close();
+      speechSocketRef.current = null;
+    };
+  }, [aiTtsWsUrl, aiVoiceWebSocketSupported, playAgentAudio]);
+
+  useEffect(() => {
+    if (!aiVoiceWebSocketSupported || !narrationText || isPaused) return;
+    const socket = speechSocketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+    socket.send(JSON.stringify({
+      type: 'session/narration',
+      text: narrationText,
+      locale,
+      style,
+    }));
+  }, [aiVoiceWebSocketSupported, narrationText, locale, style, isPaused]);
 
   useEffect(() => () => {
     speechRequestAbortRef.current?.abort();
+    speechSocketRef.current?.close();
     if (speechAudioRef.current) {
       speechAudioRef.current.pause();
       speechAudioRef.current.src = '';
