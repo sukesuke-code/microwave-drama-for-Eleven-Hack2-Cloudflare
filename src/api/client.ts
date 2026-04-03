@@ -1,4 +1,8 @@
 const API_BASE = "https://microwave-show-api.lolololololol.workers.dev";
+const DEFAULT_TTS_TIMEOUT_MS = 30000;
+
+let activeTtsAudio: HTMLAudioElement | null = null;
+let activeObjectUrl: string | null = null;
 
 export interface Session {
   foodName: string;
@@ -146,12 +150,20 @@ async function playTts(text: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   console.log("playTts object url", url);
 
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl);
+    activeObjectUrl = null;
+  }
+
   try {
     const audio = new Audio();
     audio.preload = "auto";
     audio.src = url;
     audio.muted = false;
     audio.volume = 1;
+    audio.setAttribute("playsinline", "true");
+    activeTtsAudio = audio;
+    activeObjectUrl = url;
 
     audio.onloadedmetadata = () => {
       console.log("audio loadedmetadata");
@@ -172,14 +184,74 @@ async function playTts(text: string): Promise<void> {
     await audio.play();
     console.log("audio playback success");
 
-    audio.onended = () => {
-      console.log("audio playback ended");
-      URL.revokeObjectURL(url);
-    };
+    await new Promise<void>((resolve, reject) => {
+      let completed = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        if (completed) return;
+        completed = true;
+        cleanup();
+        reject(new Error("Audio playback timed out"));
+      }, DEFAULT_TTS_TIMEOUT_MS);
+
+      const cleanup = () => {
+        audio.onended = null;
+        audio.onerror = null;
+        audio.onpause = null;
+        audio.onstalled = null;
+        audio.onwaiting = null;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
+      audio.onstalled = () => {
+        console.warn("audio playback stalled");
+      };
+
+      audio.onwaiting = () => {
+        console.warn("audio playback waiting for data");
+      };
+
+      audio.onpause = () => {
+        if (audio.ended || completed) return;
+        console.warn("audio unexpectedly paused before completion; retrying play()");
+        void audio.play().catch((err) => {
+          if (completed) return;
+          completed = true;
+          cleanup();
+          reject(err);
+        });
+      };
+
+      audio.onended = () => {
+        if (completed) return;
+        completed = true;
+        cleanup();
+        console.log("audio playback ended");
+        resolve();
+      };
+
+      audio.onerror = () => {
+        if (completed) return;
+        completed = true;
+        cleanup();
+        reject(audio.error ?? new Error("Unknown audio playback error"));
+      };
+    });
   } catch (error) {
     console.error("audio playback failed", error);
-    URL.revokeObjectURL(url);
     throw error;
+  } finally {
+    if (activeObjectUrl === url) {
+      URL.revokeObjectURL(url);
+      activeObjectUrl = null;
+    }
+    if (activeTtsAudio) {
+      activeTtsAudio.src = "";
+      activeTtsAudio.load();
+      activeTtsAudio = null;
+    }
   }
 }
 
