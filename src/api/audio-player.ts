@@ -1,6 +1,6 @@
 export class AudioPlayer {
   private audioContext: AudioContext | null = null;
-  private audioQueue: Float32Array[] = [];
+  private audioQueue: AudioBuffer[] = [];
   private isPlaying = false;
   private sourceNode: AudioBufferSourceNode | null = null;
 
@@ -14,25 +14,42 @@ export class AudioPlayer {
     }
   }
 
-  private decodeAudioData(base64Data: string): Float32Array {
+  private async decodeAudioData(base64Data: string): Promise<AudioBuffer> {
+    if (!this.audioContext) {
+      throw new Error('AudioContext not initialized');
+    }
+
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
-    return new Float32Array(bytes.buffer);
+
+    return new Promise((resolve, reject) => {
+      this.audioContext!.decodeAudioData(
+        bytes.buffer,
+        (audioBuffer) => {
+          resolve(audioBuffer);
+        },
+        (error) => {
+          console.error('Failed to decode audio data:', error);
+          reject(error);
+        }
+      );
+    });
   }
 
   queueAudio(base64Chunk: string): void {
-    try {
-      const audioData = this.decodeAudioData(base64Chunk);
-      this.audioQueue.push(audioData);
-      if (!this.isPlaying) {
-        this.playNextChunk();
-      }
-    } catch (error) {
-      console.error('Error queuing audio:', error);
-    }
+    this.decodeAudioData(base64Chunk)
+      .then((audioBuffer) => {
+        this.audioQueue.push(audioBuffer);
+        if (!this.isPlaying) {
+          this.playNextChunk();
+        }
+      })
+      .catch((error) => {
+        console.error('Error queuing audio:', error);
+      });
   }
 
   private async playNextChunk(): Promise<void> {
@@ -54,16 +71,8 @@ export class AudioPlayer {
     }
 
     try {
-      const audioBuffer = this.audioContext.createBuffer(
-        1,
-        audioData.length,
-        this.audioContext.sampleRate
-      );
-      const channelData = audioBuffer.getChannelData(0);
-      channelData.set(audioData);
-
       this.sourceNode = this.audioContext.createBufferSource();
-      this.sourceNode.buffer = audioBuffer;
+      this.sourceNode.buffer = audioData;
       this.sourceNode.connect(this.audioContext.destination);
 
       this.sourceNode.onended = () => {

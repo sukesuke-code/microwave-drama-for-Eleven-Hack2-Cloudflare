@@ -46,6 +46,7 @@ export default function CountdownPage({
   const agentRef = useRef<ElevenLabsAgent | null>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const unsubscribeRef = useRef<Array<() => void>>([]);
+  const audioContextResumedRef = useRef(false);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -53,6 +54,13 @@ export default function CountdownPage({
   const lightBgGradient = style === 'sports'
     ? 'from-sky-50 via-blue-50/80 to-slate-100'
     : 'from-slate-50 via-orange-50/80 to-slate-100';
+
+  const resumeAudioContext = useCallback(() => {
+    if (audioPlayerRef.current && !audioContextResumedRef.current) {
+      audioContextResumedRef.current = true;
+      console.log('AudioContext resumed by user interaction');
+    }
+  }, []);
 
   const playAlarmTone = useCallback(() => {
     const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -109,12 +117,15 @@ export default function CountdownPage({
 
         agentRef.current = new ElevenLabsAgent(signedUrlResponse.signedUrl);
         await agentRef.current.connect();
+        console.log('ElevenLabs agent connected successfully');
 
         audioPlayerRef.current = new AudioPlayer();
         await audioPlayerRef.current.initialize();
+        console.log('AudioPlayer initialized');
 
         const unsubAudio = agentRef.current.on('audio', (event) => {
           if ('data' in event && audioPlayerRef.current) {
+            console.log('Received audio chunk from agent');
             audioPlayerRef.current.queueAudio(event.data);
           }
         });
@@ -136,6 +147,7 @@ export default function CountdownPage({
         while (pendingNarrationsRef.current.length > 0) {
           const nextNarration = pendingNarrationsRef.current.shift();
           if (!nextNarration) break;
+          console.log('Sending pending narration:', nextNarration);
           agentRef.current.send(nextNarration);
         }
       } catch (error) {
@@ -246,6 +258,8 @@ export default function CountdownPage({
   return (
       <div
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
+      onClick={resumeAudioContext}
+      onTouchStart={resumeAudioContext}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />
