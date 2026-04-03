@@ -1,4 +1,7 @@
-const API_BASE = "https://microwave-show-api-v2.lolololololol.workers.dev";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  "https://microwave-show-api-v2.lolololololol.workers.dev";
+
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -18,10 +21,6 @@ type TtsMeterSnapshot = {
 
 const ttsLevelListeners = new Set<TtsLevelListener>();
 const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
-
-/* =========================
-   Types
-========================= */
 
 export type NarrationStyle =
   | "sports"
@@ -79,10 +78,6 @@ export interface AgentNarrationResponse {
   text: string;
   play: () => Promise<void>;
 }
-
-/* =========================
-   Meter Helpers
-========================= */
 
 function emitTtsLevel(level: number): void {
   ttsLevelListeners.forEach((listener) => {
@@ -217,10 +212,6 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
   };
 }
 
-/* =========================
-   Audio Utilities
-========================= */
-
 function stopTtsPlayback(): void {
   stopRequested = true;
 
@@ -289,110 +280,129 @@ async function parseAudioBlob(res: Response): Promise<Blob> {
   return res.blob();
 }
 
-async function playAudioBlob(blob: Blob, loop = false, volume = 1): Promise<void> {
+async function playAudioBlob(
+  blob: Blob,
+  options?: {
+    loop?: boolean;
+    volume?: number;
+    isMusic?: boolean;
+  }
+): Promise<void> {
+  const loop = options?.loop ?? false;
+  const volume = options?.volume ?? 1;
+  const isMusic = options?.isMusic ?? false;
+
   stopRequested = false;
 
   const url = URL.createObjectURL(blob);
+  const audio = new Audio();
 
-  if (activeObjectUrl) {
-    URL.revokeObjectURL(activeObjectUrl);
-    activeObjectUrl = null;
-  }
+  audio.preload = "auto";
+  audio.src = url;
+  audio.loop = loop;
+  audio.volume = volume;
+  audio.muted = false;
+  audio.setAttribute("playsinline", "true");
 
-  try {
-    const audio = new Audio();
-    audio.preload = "auto";
-    audio.src = url;
-    audio.loop = loop;
-    audio.volume = volume;
-    audio.muted = false;
-    audio.setAttribute("playsinline", "true");
+  if (isMusic) {
+    stopMusic();
+    activeMusicAudio = audio;
+    activeMusicObjectUrl = url;
+  } else {
+    if (activeObjectUrl) {
+      URL.revokeObjectURL(activeObjectUrl);
+      activeObjectUrl = null;
+    }
 
     activeTtsAudio = audio;
     activeObjectUrl = url;
     activeMeterCleanup = attachAudioMeter(audio);
+  }
 
-    await audio.play();
+  await audio.play();
 
-    if (loop) {
-      return;
+  if (loop) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let completed = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      if (completed) return;
+      completed = true;
+      cleanup();
+      reject(new Error("Audio playback timed out"));
+    }, DEFAULT_AUDIO_TIMEOUT_MS);
+
+    const cleanup = () => {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.onpause = null;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    audio.onpause = () => {
+      if (audio.ended || completed) return;
+
+      if (stopRequested) {
+        completed = true;
+        cleanup();
+        reject(new Error("Audio playback stopped"));
+        return;
+      }
+
+      void audio.play().catch((err) => {
+        if (completed) return;
+        completed = true;
+        cleanup();
+        reject(err);
+      });
+    };
+
+    audio.onended = () => {
+      if (completed) return;
+      completed = true;
+      cleanup();
+      resolve();
+    };
+
+    audio.onerror = () => {
+      if (completed) return;
+      completed = true;
+      cleanup();
+      reject(audio.error ?? new Error("Unknown audio playback error"));
+    };
+  });
+
+  if (isMusic) {
+    if (activeMusicObjectUrl === url) {
+      URL.revokeObjectURL(url);
+      activeMusicObjectUrl = null;
     }
-
-    await new Promise<void>((resolve, reject) => {
-      let completed = false;
-      let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        reject(new Error("Audio playback timed out"));
-      }, DEFAULT_AUDIO_TIMEOUT_MS);
-
-      const cleanup = () => {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.onpause = null;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-      };
-
-      audio.onpause = () => {
-        if (audio.ended || completed) return;
-
-        if (stopRequested) {
-          completed = true;
-          cleanup();
-          reject(new Error("Audio playback stopped"));
-          return;
-        }
-
-        void audio.play().catch((err) => {
-          if (completed) return;
-          completed = true;
-          cleanup();
-          reject(err);
-        });
-      };
-
-      audio.onended = () => {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        resolve();
-      };
-
-      audio.onerror = () => {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        reject(audio.error ?? new Error("Unknown audio playback error"));
-      };
-    });
-  } finally {
-    if (!loop) {
-      if (activeObjectUrl === url) {
-        URL.revokeObjectURL(url);
-        activeObjectUrl = null;
-      }
-
-      if (activeTtsAudio) {
-        activeTtsAudio.src = "";
-        activeTtsAudio.load();
-        activeTtsAudio = null;
-      }
-
-      if (activeMeterCleanup) {
-        activeMeterCleanup();
-        activeMeterCleanup = null;
-      }
+    if (activeMusicAudio) {
+      activeMusicAudio.src = "";
+      activeMusicAudio.load();
+      activeMusicAudio = null;
+    }
+  } else {
+    if (activeObjectUrl === url) {
+      URL.revokeObjectURL(url);
+      activeObjectUrl = null;
+    }
+    if (activeTtsAudio) {
+      activeTtsAudio.src = "";
+      activeTtsAudio.load();
+      activeTtsAudio = null;
+    }
+    if (activeMeterCleanup) {
+      activeMeterCleanup();
+      activeMeterCleanup = null;
     }
   }
 }
-
-/* =========================
-   Session APIs
-========================= */
 
 async function startSession(
   foodName: string,
@@ -509,10 +519,6 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   }
 }
 
-/* =========================
-   ElevenLabs APIs
-========================= */
-
 async function getSignedUrl(): Promise<string> {
   const res = await fetch(`${API_BASE}/api/get-signed-url`, {
     method: "GET",
@@ -535,24 +541,6 @@ async function getSignedUrl(): Promise<string> {
   }
 
   return data.signedUrl;
-}
-
-async function playTts(text: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/elevenlabs-tts`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ text }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(errText || "TTS generation failed");
-  }
-
-  const blob = await parseAudioBlob(res);
-  await playAudioBlob(blob, false, 1);
 }
 
 function buildNarrationCue(input: BuildNarrationCueInput): string {
@@ -615,18 +603,13 @@ async function requestAgentNarration(
   return {
     text: data.text,
     play: async () => {
-      // Agent側が音声を出すのでここでは何もしない
       return;
     },
   };
 }
 
-/* =========================
-   ElevenLabs SFX / Music APIs
-========================= */
-
 async function playSfx(prompt: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/elevenlabs-sfx`, {
+  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -640,29 +623,11 @@ async function playSfx(prompt: string): Promise<void> {
   }
 
   const blob = await parseAudioBlob(res);
-  const url = URL.createObjectURL(blob);
-
-  const audio = new Audio(url);
-  audio.preload = "auto";
-  audio.volume = 0.55;
-  audio.setAttribute("playsinline", "true");
-
-  audio.onended = () => {
-    URL.revokeObjectURL(url);
-  };
-
-  try {
-    await audio.play();
-  } catch (error) {
-    URL.revokeObjectURL(url);
-    throw error;
-  }
+  await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
 }
 
 async function playMusic(prompt: string): Promise<void> {
-  stopMusic();
-
-  const res = await fetch(`${API_BASE}/api/elevenlabs-music`, {
+  const res = await fetch(`${API_BASE}/api/generate-music`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -676,32 +641,12 @@ async function playMusic(prompt: string): Promise<void> {
   }
 
   const blob = await parseAudioBlob(res);
-  const url = URL.createObjectURL(blob);
-
-  const audio = new Audio(url);
-  audio.preload = "auto";
-  audio.loop = true;
-  audio.volume = 0.3;
-  audio.setAttribute("playsinline", "true");
-
-  activeMusicAudio = audio;
-  activeMusicObjectUrl = url;
-
-  await audio.play();
+  await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
 }
-
-/* =========================
-   Optional Local Playback Utility
-   (使わなくてもOK)
-========================= */
 
 async function playTtsFromBlob(blob: Blob): Promise<void> {
-  await playAudioBlob(blob, false, 1);
+  await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
 }
-
-/* =========================
-   Named Exports
-========================= */
 
 export {
   API_BASE,
@@ -712,7 +657,6 @@ export {
   getSignedUrl,
   buildNarrationCue,
   requestAgentNarration,
-  playTts,
   playSfx,
   playMusic,
   stopMusic,
@@ -721,10 +665,6 @@ export {
   subscribeTtsMeter,
   playTtsFromBlob,
 };
-
-/* =========================
-   Default-like grouped export
-========================= */
 
 export const api = {
   API_BASE,
@@ -735,7 +675,6 @@ export const api = {
   getSignedUrl,
   buildNarrationCue,
   requestAgentNarration,
-  playTts,
   playSfx,
   playMusic,
   stopMusic,
