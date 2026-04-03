@@ -109,43 +109,172 @@ const generateNarrationText = (
   return context[phase as keyof typeof context] || context.done;
 };
 
-async function generateSpeechFromElevenLabs(
-  text: string,
-  voiceId: string = "21m00Tcm4TlvDq8ikWAM"
-): Promise<string> {
+async function generateAgentResponse(
+  style: string,
+  dishName: string,
+  remainingTime: number,
+  totalTime: number,
+  phase: string,
+  locale: string,
+  sessionId?: string
+): Promise<{ text: string; audio_base64: string }> {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
   if (!apiKey) {
     throw new Error("ElevenLabs API key is not configured");
   }
 
-  const elevenLabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  const agentId = "BkGJhwzCyPIMVKJPQa0T";
+  const isJapanese = locale.includes("ja");
+  const timePercent = Math.round((remainingTime / totalTime) * 100);
 
-  const response = await fetch(elevenLabsUrl, {
+  const styleDescriptions: Record<string, string> = {
+    sports: isJapanese
+      ? "スポーツ実況風のエネルギッシュで熱い解説"
+      : "Sports commentary style with energetic and passionate narration",
+    horror: isJapanese
+      ? "ホラー風の不気味で暗い雰囲気の解説"
+      : "Horror style with eerie and dark atmosphere",
+    documentary: isJapanese
+      ? "ドキュメンタリー風の落ち着いた知的な解説"
+      : "Documentary style with calm and intellectual narration",
+    anime: isJapanese
+      ? "アニメ風の熱血でドラマチックな解説"
+      : "Anime style with passionate and dramatic narration",
+    movie: isJapanese
+      ? "映画予告風の壮大でドラマチックな解説"
+      : "Movie trailer style with epic and dramatic narration",
+    nature: isJapanese
+      ? "自然番組風の穏やかで神秘的な解説"
+      : "Nature documentary style with calm and mysterious narration",
+  };
+
+  const phaseDescriptions: Record<string, string> = {
+    opening: isJapanese ? "開始時" : "at the start",
+    quarter: isJapanese ? `進行${timePercent}%時点` : `at ${timePercent}% progress`,
+    middle: isJapanese ? "中盤" : "at midpoint",
+    final: isJapanese ? "最終段階" : "at final stage",
+    done: isJapanese ? "完成時" : "at completion",
+  };
+
+  const promptText = isJapanese
+    ? `「${dishName}」の調理を${styleDescriptions[style] || styleDescriptions.sports}で実況してください。現在は${phaseDescriptions[phase] || phaseDescriptions.done}です。1〜2文で簡潔に。`
+    : `Please narrate the cooking of "${dishName}" in ${styleDescriptions[style] || styleDescriptions.sports}. Currently ${phaseDescriptions[phase] || phaseDescriptions.done}. Keep it to 1-2 sentences.`;
+
+  const conversationConfig = {
+    agent: {
+      prompt: {
+        prompt: promptText,
+      },
+      first_message: "",
+      language: isJapanese ? "ja" : "en",
+    },
+  };
+
+  const agentUrl = `https://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}`;
+
+  const startResponse = await fetch(agentUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "xi-api-key": apiKey,
     },
     body: JSON.stringify({
-      text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-      },
+      conversation_config_override: conversationConfig,
     }),
   });
 
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error("ElevenLabs API error:", response.status, errorData);
-    throw new Error("Failed to generate speech");
+  if (!startResponse.ok) {
+    const errorData = await startResponse.text();
+    console.error("ElevenLabs Agent start error:", startResponse.status, errorData);
+    throw new Error("Failed to start agent conversation");
   }
 
-  const audioBuffer = await response.arrayBuffer();
-  const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+  const startData = await startResponse.json();
+  const conversationId = startData.conversation_id;
 
-  return audioBase64;
+  if (!conversationId) {
+    throw new Error("No conversation ID returned from agent");
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const audioChunks: Uint8Array[] = [];
+  let fullText = "";
+  let hasReceivedAudio = false;
+
+  const getAudioUrl = `https://api.elevenlabs.io/v1/convai/conversation/${conversationId}?output_format=mp3_44100_128`;
+
+  const audioResponse = await fetch(getAudioUrl, {
+    method: "GET",
+    headers: {
+      "xi-api-key": apiKey,
+    },
+  });
+
+  if (!audioResponse.ok) {
+    throw new Error("Failed to get agent audio");
+  }
+
+  const reader = audioResponse.body?.getReader();
+  if (!reader) {
+    throw new Error("No audio stream available");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    hasReceivedAudio = true;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim() || !line.startsWith("data: ")) continue;
+
+      try {
+        const jsonStr = line.slice(6);
+        const data = JSON.parse(jsonStr);
+
+        if (data.type === "audio" && data.audio_event?.audio_base_64) {
+          const audioData = Uint8Array.from(
+            atob(data.audio_event.audio_base_64),
+            c => c.charCodeAt(0)
+          );
+          audioChunks.push(audioData);
+        }
+
+        if (data.type === "agent_response" && data.agent_response_event?.agent_response) {
+          fullText = data.agent_response_event.agent_response;
+        }
+      } catch (e) {
+        console.error("Error parsing SSE line:", e);
+      }
+    }
+  }
+
+  if (!hasReceivedAudio || audioChunks.length === 0) {
+    throw new Error("No audio received from agent");
+  }
+
+  const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const combinedAudio = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of audioChunks) {
+    combinedAudio.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const audioBase64 = btoa(String.fromCharCode(...combinedAudio));
+
+  return {
+    text: fullText || promptText,
+    audio_base64: audioBase64,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -159,24 +288,23 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json() as NarrationRequest;
 
-    const { style, dishName, totalTime, remainingTime, phase, locale } = body;
-
-    const narrationText = generateNarrationText(
-      style,
-      dishName,
-      remainingTime,
-      totalTime,
-      phase,
-      locale
-    );
+    const { sessionId, style, dishName, totalTime, remainingTime, phase, locale } = body;
 
     try {
-      const audioBase64 = await generateSpeechFromElevenLabs(narrationText);
+      const agentResult = await generateAgentResponse(
+        style,
+        dishName,
+        remainingTime,
+        totalTime,
+        phase,
+        locale,
+        sessionId
+      );
 
       return new Response(JSON.stringify({
         ok: true,
-        text: narrationText,
-        audio_base64: audioBase64,
+        text: agentResult.text,
+        audio_base64: agentResult.audio_base64,
       }), {
         status: 200,
         headers: {
@@ -184,7 +312,18 @@ Deno.serve(async (req: Request) => {
           "Content-Type": "application/json",
         },
       });
-    } catch (_audioError) {
+    } catch (agentError) {
+      console.error("Agent generation failed, falling back to template:", agentError);
+
+      const narrationText = generateNarrationText(
+        style,
+        dishName,
+        remainingTime,
+        totalTime,
+        phase,
+        locale
+      );
+
       return new Response(JSON.stringify({
         ok: true,
         text: narrationText,
