@@ -18,12 +18,6 @@ export interface StartSessionPayload {
   style: "sports" | "horror" | "documentary" | "anime";
 }
 
-export interface GetSignedUrlResponse {
-  ok: boolean;
-  signedUrl: string;
-  agentId: string;
-}
-
 async function startSession(
   foodName: string,
   totalTime: number,
@@ -121,27 +115,72 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   }
 }
 
-async function getSignedUrl(): Promise<GetSignedUrlResponse> {
-  const res = await fetch(`${API_BASE}/api/elevenlabs/signed-url`, {
+async function playTts(text: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      text,
+      modelId: "eleven_multilingual_v2",
+      outputFormat: "mp3_44100_128",
+    }),
   });
 
-  const data = (await res.json()) as GetSignedUrlResponse & { error?: string };
-  console.log("getSignedUrl response", res.status, data);
+  console.log("playTts status", res.status);
+  console.log("playTts content-type", res.headers.get("content-type"));
 
-  if (!res.ok || !data.ok || !data.signedUrl) {
-    throw new Error(data?.error || "Failed to get signed URL");
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("playTts error response", errText);
+    throw new Error("TTS failed");
   }
 
-  return {
-    ok: data.ok,
-    signedUrl: data.signedUrl,
-    agentId: data.agentId,
-  };
+  const blob = await res.blob();
+  console.log("playTts blob", {
+    type: blob.type,
+    size: blob.size,
+  });
+
+  const url = URL.createObjectURL(blob);
+  console.log("playTts object url", url);
+
+  try {
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.src = url;
+    audio.muted = false;
+    audio.volume = 1;
+
+    audio.onloadedmetadata = () => {
+      console.log("audio loadedmetadata");
+    };
+
+    audio.oncanplay = () => {
+      console.log("audio canplay");
+    };
+
+    audio.oncanplaythrough = () => {
+      console.log("audio canplaythrough");
+    };
+
+    audio.onerror = () => {
+      console.error("audio element error", audio.error);
+    };
+
+    await audio.play();
+    console.log("audio playback success");
+
+    audio.onended = () => {
+      console.log("audio playback ended");
+      URL.revokeObjectURL(url);
+    };
+  } catch (error) {
+    console.error("audio playback failed", error);
+    URL.revokeObjectURL(url);
+    throw error;
+  }
 }
 
 export const api = {
@@ -149,6 +188,6 @@ export const api = {
   getSession,
   tickSession,
   saveNarration,
-  getSignedUrl,
+  playTts,
   API_BASE,
 };
