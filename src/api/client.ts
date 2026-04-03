@@ -4,9 +4,71 @@ const DEFAULT_TTS_TIMEOUT_MS = 30000;
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 let stopRequested = false;
+let activeMeterCleanup: (() => void) | null = null;
+
+type TtsLevelListener = (level: number) => void;
+const ttsLevelListeners = new Set<TtsLevelListener>();
+
+function emitTtsLevel(level: number): void {
+  ttsLevelListeners.forEach((listener) => {
+    listener(level);
+  });
+}
+
+function subscribeTtsLevel(listener: TtsLevelListener): () => void {
+  ttsLevelListeners.add(listener);
+  return () => {
+    ttsLevelListeners.delete(listener);
+  };
+}
+
+function attachAudioMeter(audio: HTMLAudioElement): () => void {
+  const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextImpl) {
+    return () => {};
+  }
+
+  const audioContext = new AudioContextImpl();
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 256;
+  const data = new Uint8Array(analyser.fftSize);
+  const source = audioContext.createMediaElementSource(audio);
+  source.connect(analyser);
+  analyser.connect(audioContext.destination);
+
+  let frameId = 0;
+  const tick = () => {
+    analyser.getByteTimeDomainData(data);
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i += 1) {
+      const normalized = (data[i] - 128) / 128;
+      sumSquares += normalized * normalized;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
+    const level = Math.min(1, rms * 3.8);
+    emitTtsLevel(level);
+    frameId = window.requestAnimationFrame(tick);
+  };
+
+  frameId = window.requestAnimationFrame(tick);
+
+  return () => {
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+    }
+    source.disconnect();
+    analyser.disconnect();
+    emitTtsLevel(0);
+    void audioContext.close();
+  };
+}
 
 function stopTtsPlayback(): void {
   stopRequested = true;
+  if (activeMeterCleanup) {
+    activeMeterCleanup();
+    activeMeterCleanup = null;
+  }
   if (activeTtsAudio) {
     activeTtsAudio.pause();
     activeTtsAudio.src = "";
@@ -180,6 +242,7 @@ async function playTts(text: string): Promise<void> {
     audio.setAttribute("playsinline", "true");
     activeTtsAudio = audio;
     activeObjectUrl = url;
+    activeMeterCleanup = attachAudioMeter(audio);
 
     audio.onloadedmetadata = () => {
       console.log("audio loadedmetadata");
@@ -274,6 +337,10 @@ async function playTts(text: string): Promise<void> {
       activeTtsAudio.load();
       activeTtsAudio = null;
     }
+    if (activeMeterCleanup) {
+      activeMeterCleanup();
+      activeMeterCleanup = null;
+    }
   }
 }
 
@@ -284,5 +351,6 @@ export const api = {
   saveNarration,
   playTts,
   stopTtsPlayback,
+  subscribeTtsLevel,
   API_BASE,
 };

@@ -5,6 +5,7 @@ interface AudioWaveVisualizerProps {
   barCount?: number;
   intensity?: 'low' | 'medium' | 'high';
   syncSeed?: number;
+  audioLevel?: number;
   inverted?: boolean;
 }
 
@@ -67,6 +68,7 @@ export default function AudioWaveVisualizer({
   barCount = 8,
   intensity = 'medium',
   syncSeed,
+  audioLevel,
   inverted = false,
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
@@ -86,6 +88,10 @@ export default function AudioWaveVisualizer({
         const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();
         const randomDuration =
           pattern.durationMin + randomUnit * (pattern.durationMax - pattern.durationMin);
+        const level = typeof audioLevel === 'number' ? Math.max(0, Math.min(1, audioLevel)) : null;
+        const dynamicScale = level === null
+          ? 1
+          : 0.35 + level * 1.35 + Math.sin((syncSeed ?? 0) + i) * 0.08;
         const barStyle: CSSProperties & Record<string, string | number> = {
           backgroundColor: color,
           animationDelay: `${i * delayMultiplier}s`,
@@ -99,6 +105,9 @@ export default function AudioWaveVisualizer({
           '--eq-max-height': `${pattern.maxHeight}px`,
           '--eq-opacity-min': pattern.opacityMin,
           '--eq-opacity-max': pattern.opacityMax,
+          transform: `scaleY(${Math.max(0.2, dynamicScale)})`,
+          willChange: 'transform, opacity',
+          ...(level === null ? {} : { opacity: Math.min(1, 0.35 + level * 0.95) }),
         };
 
         return <div key={i} className="w-1 rounded-full" style={barStyle} />;
