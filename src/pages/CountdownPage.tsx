@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
 import { Locale, Settings, ThemeMode } from '../types';
-import { getFinishLine, getStyleConfigs } from '../data/narrations';
+import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
 import AudioWaveVisualizer from '../components/AudioWaveVisualizer';
@@ -10,7 +10,6 @@ import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
 import { api } from '../api/client';
-import { agentNarrate, AgentPhase } from '../api/agent';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -19,29 +18,6 @@ interface CountdownPageProps {
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onBack: () => void;
   onFinish: () => void;
-}
-
-let activeAgentAudio: HTMLAudioElement | null = null;
-let activeAgentObjectUrl: string | null = null;
-let agentStopRequested = false;
-let activeAgentMeterCleanup: (() => void) | null = null;
-
-function stopAgentAudio(): void {
-  agentStopRequested = true;
-  if (activeAgentMeterCleanup) {
-    activeAgentMeterCleanup();
-    activeAgentMeterCleanup = null;
-  }
-  if (activeAgentAudio) {
-    activeAgentAudio.pause();
-    activeAgentAudio.src = "";
-    activeAgentAudio.load();
-    activeAgentAudio = null;
-  }
-  if (activeAgentObjectUrl) {
-    URL.revokeObjectURL(activeAgentObjectUrl);
-    activeAgentObjectUrl = null;
-  }
 }
 
 export default function CountdownPage({
@@ -63,10 +39,12 @@ export default function CountdownPage({
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+  const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  const narrationQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const lastQueuedPhaseRef = useRef<AgentPhase | null>(null);
+  const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastQueuedNarrationRef = useRef('');
+  const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -94,13 +72,14 @@ export default function CountdownPage({
       osc.stop(ctx.currentTime + offset + duration + 0.02);
     };
 
+    // Microwave-like "ding-dong" chime.
     scheduleTone(0, 1320, 0.22, 0.22);
     scheduleTone(0.25, 980, 0.28, 0.18);
 
     window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
-  const getPhase = useCallback((tl: number, tt: number): AgentPhase => {
+  const getPhase = useCallback((tl: number, tt: number): 'opening' | 'quarter' | 'middle' | 'final' | 'done' => {
     if (tl <= 0) return 'done';
     const percent = tt > 0 ? (tl / tt) * 100 : 0;
     if (percent > 75) return 'opening';
@@ -109,157 +88,14 @@ export default function CountdownPage({
     return 'final';
   }, []);
 
-  const attachAgentAudioMeter = useCallback((audio: HTMLAudioElement): () => void => {
-    const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextImpl) return () => {};
-
-    const audioContext = new AudioContextImpl();
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.8;
-    const waveformData = new Uint8Array(analyser.fftSize);
-    const frequencyData = new Uint8Array(analyser.frequencyBinCount);
-    const source = audioContext.createMediaElementSource(audio);
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
-
-    let frameId = 0;
-    const tick = () => {
-      analyser.getByteTimeDomainData(waveformData);
-      analyser.getByteFrequencyData(frequencyData);
-      let sumSquares = 0;
-      for (let i = 0; i < waveformData.length; i += 1) {
-        const normalized = (waveformData[i] - 128) / 128;
-        sumSquares += normalized * normalized;
-      }
-      const rms = Math.sqrt(sumSquares / waveformData.length);
-      const level = Math.min(1, rms * 3.8);
-      const spectrumBins = 16;
-      const nyquist = audioContext.sampleRate / 2;
-      const minHz = 90;
-      const maxHz = Math.min(9000, nyquist);
-      const logMin = Math.log10(minHz);
-      const logMax = Math.log10(maxHz);
-      const spectrum = Array.from({ length: spectrumBins }, (_, index) => {
-        const startRatio = index / spectrumBins;
-        const endRatio = (index + 1) / spectrumBins;
-        const startHz = Math.pow(10, logMin + (logMax - logMin) * startRatio);
-        const endHz = Math.pow(10, logMin + (logMax - logMin) * endRatio);
-        const startBin = Math.max(0, Math.floor((startHz / nyquist) * frequencyData.length));
-        const endBin = Math.min(
-          frequencyData.length,
-          Math.max(startBin + 1, Math.ceil((endHz / nyquist) * frequencyData.length))
-        );
-        let sum = 0;
-        for (let i = startBin; i < endBin; i += 1) {
-          sum += frequencyData[i];
-        }
-        const avg = sum / Math.max(1, endBin - startBin);
-        return Math.min(1, (avg / 255) * 2.2);
-      });
-
-      setTtsLevel(level);
-      setTtsSpectrum(spectrum);
-      frameId = window.requestAnimationFrame(tick);
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-
-    return () => {
-      if (frameId) window.cancelAnimationFrame(frameId);
-      source.disconnect();
-      analyser.disconnect();
-      setTtsLevel(0);
-      setTtsSpectrum([]);
-      void audioContext.close();
-    };
-  }, []);
-
-  const playAgentAudioBlob = useCallback(async (blob: Blob): Promise<void> => {
-    agentStopRequested = false;
-    const url = URL.createObjectURL(blob);
-
-    if (activeAgentObjectUrl) {
-      URL.revokeObjectURL(activeAgentObjectUrl);
-      activeAgentObjectUrl = null;
+  const buildNarrationLine = useCallback((tl: number, tt: number) => {
+    if (tl <= 0) {
+      return getFinishLine(style, dishName, locale);
     }
+    return getCurrentNarration(tl, tt, style, dishName, locale);
+  }, [style, dishName, locale]);
 
-    const audio = new Audio();
-    audio.preload = "auto";
-    audio.src = url;
-    audio.muted = false;
-    audio.volume = 1;
-    audio.setAttribute("playsinline", "true");
-    activeAgentAudio = audio;
-    activeAgentObjectUrl = url;
-    activeAgentMeterCleanup = attachAgentAudioMeter(audio);
-
-    try {
-      await audio.play();
-      await new Promise<void>((resolve, reject) => {
-        let completed = false;
-        let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-          if (completed) return;
-          completed = true;
-          cleanup();
-          reject(new Error("Agent audio timed out"));
-        }, 30000);
-
-        const cleanup = () => {
-          audio.onended = null;
-          audio.onerror = null;
-          audio.onpause = null;
-          if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
-        };
-
-        audio.onpause = () => {
-          if (audio.ended || completed) return;
-          if (agentStopRequested) {
-            completed = true;
-            cleanup();
-            reject(new Error("Agent audio stopped"));
-            return;
-          }
-          void audio.play().catch((err) => {
-            if (completed) return;
-            completed = true;
-            cleanup();
-            reject(err);
-          });
-        };
-
-        audio.onended = () => {
-          if (completed) return;
-          completed = true;
-          cleanup();
-          resolve();
-        };
-
-        audio.onerror = () => {
-          if (completed) return;
-          completed = true;
-          cleanup();
-          reject(audio.error ?? new Error("Agent audio playback error"));
-        };
-      });
-    } finally {
-      if (activeAgentObjectUrl === url) {
-        URL.revokeObjectURL(url);
-        activeAgentObjectUrl = null;
-      }
-      if (activeAgentAudio === audio) {
-        activeAgentAudio.src = "";
-        activeAgentAudio.load();
-        activeAgentAudio = null;
-      }
-      if (activeAgentMeterCleanup) {
-        activeAgentMeterCleanup();
-        activeAgentMeterCleanup = null;
-      }
-    }
-  }, [attachAgentAudioMeter]);
-
-  const handlePhaseEffects = useCallback(async (phase: AgentPhase) => {
+  const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
     if (style === 'movie') {
       if (phase === 'done') {
         api.stopMusic();
@@ -290,49 +126,60 @@ export default function CountdownPage({
     }
   }, [style]);
 
+  const updateNarration = useCallback((tl: number, tt: number) => {
+    if (tl <= 0) return;
+    const text = getCurrentNarration(tl, tt, style, dishName, locale);
+    if (text !== prevNarrationRef.current) {
+      prevNarrationRef.current = text;
+      setNarrationText(text);
+    }
+  }, [style, dishName, locale]);
+
   useEffect(() => {
+    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
+    prevNarrationRef.current = initial;
+    setNarrationText(initial);
     sessionIdRef.current = sessionStorage.getItem('sessionId');
-  }, []);
+  }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
     if (isPaused) return;
-
     const phase = getPhase(timeLeft, totalSeconds);
-    if (lastQueuedPhaseRef.current === phase) return;
-    lastQueuedPhaseRef.current = phase;
+    if (phaseRef.current === phase) {
+      return;
+    }
+    phaseRef.current = phase;
 
-    if (phase === 'done') return;
+    const line = buildNarrationLine(timeLeft, totalSeconds);
+    if (line === lastQueuedNarrationRef.current) {
+      return;
+    }
+    lastQueuedNarrationRef.current = line;
+    prevNarrationRef.current = line;
+    setNarrationText(line);
+    sessionIdRef.current = sessionStorage.getItem('sessionId');
 
-    narrationQueueRef.current = narrationQueueRef.current
+    ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
-        const situation = {
-          foodName: dishName,
-          totalTime: totalSeconds,
-          remainingTime: timeLeft,
-          phase,
-          style,
-          locale,
-        };
-
-        const result = await agentNarrate(situation);
-
-        setNarrationText(result.text);
-
         if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, result.text);
+          await api.saveNarration(sessionIdRef.current, line);
         }
-
-        await playAgentAudioBlob(result.audioBlob);
+        await api.playTts(line);
         await handlePhaseEffects(phase);
       })
       .catch((err) => {
-        console.error('Agent narration failed:', err);
+        console.error('Failed to process phase narration event:', err);
       });
-  }, [isPaused, timeLeft, totalSeconds, dishName, style, locale, getPhase, handlePhaseEffects, playAgentAudioBlob]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects]);
 
   useEffect(() => {
+    const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
+      setTtsLevel(level);
+      setTtsSpectrum(spectrum);
+    });
     return () => {
-      stopAgentAudio();
+      unsubscribe();
+      api.stopTtsPlayback();
       api.stopMusic();
     };
   }, []);
@@ -350,6 +197,7 @@ export default function CountdownPage({
           setShowConfetti(true);
           playAlarmTone();
           const finishText = getFinishLine(style, dishName, locale);
+          prevNarrationRef.current = finishText;
           setNarrationText(finishText);
 
           if (sessionIdRef.current) {
@@ -362,6 +210,7 @@ export default function CountdownPage({
           setTimeout(() => onFinish(), 4000);
           return 0;
         }
+        updateNarration(next, totalSeconds);
 
         if (sessionIdRef.current) {
           api.tickSession(sessionIdRef.current, next).catch((err) => {
@@ -376,7 +225,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
