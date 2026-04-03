@@ -138,6 +138,7 @@ export default function SettingsPage({
 
       const nextDishName = dishName.trim() || t.mysteryDish;
       let sessionId = '';
+      let usedLocalFallback = false;
 
       try {
         const session = await api.startSession(
@@ -147,6 +148,7 @@ export default function SettingsPage({
         );
         sessionId = session.sessionId;
       } catch (startError) {
+        usedLocalFallback = true;
         const localSessionIdFactory = typeof crypto !== 'undefined' && 'randomUUID' in crypto
           ? () => crypto.randomUUID()
           : () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -165,6 +167,7 @@ export default function SettingsPage({
       };
 
       sessionStorage.setItem('sessionId', sessionId);
+      sessionStorage.setItem('sessionMode', usedLocalFallback ? 'local-fallback' : 'remote');
       onStart(settings);
     } catch (err) {
       const userMessage = locale === 'ja'

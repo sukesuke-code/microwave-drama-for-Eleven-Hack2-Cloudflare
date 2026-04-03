@@ -39,6 +39,7 @@ export default function CountdownPage({
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>('remote');
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -144,6 +145,8 @@ export default function CountdownPage({
     prevNarrationRef.current = initial;
     setNarrationText(initial);
     sessionIdRef.current = sessionStorage.getItem('sessionId');
+    const mode = sessionStorage.getItem('sessionMode');
+    setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
@@ -324,6 +327,17 @@ export default function CountdownPage({
             </span>
           </div>
         </div>
+
+        {sessionMode === 'local-fallback' && (
+          <div className={`mx-4 mt-2 rounded-lg border px-3 py-2 text-center text-xs font-bold ${
+            isLight
+              ? 'border-amber-300 bg-amber-50 text-amber-800'
+              : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+          }`}>
+            <p>{t.aiConnectionError}</p>
+            <p>{t.localSessionFallback}</p>
+          </div>
+        )}
 
         <div className="absolute right-4 top-4 z-30">
           <button
