@@ -45,6 +45,7 @@ export interface AgentNarrationResponse {
   text: string;
   audioAvailable: boolean;
   fallbackReason: string | null;
+  audioDurationMs: number | null;
   play: () => Promise<void>;
 }
 
@@ -534,10 +535,32 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
     console.warn(`[narration-warning] ${JSON.stringify(warningContext)}`);
   }
 
+  let audioDurationMs: number | null = null;
+  if (audioAvailable && base64Audio) {
+    try {
+      const rawBase64Pre = base64Audio.includes(",") ? base64Audio.split(",").pop() ?? "" : base64Audio;
+      const binaryPre = atob(rawBase64Pre);
+      const bytesPre = new Uint8Array(binaryPre.length);
+      for (let i = 0; i < binaryPre.length; i += 1) {
+        bytesPre[i] = binaryPre.charCodeAt(i);
+      }
+      const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextImpl) {
+        const tmpCtx = new AudioContextImpl();
+        const audioBuffer = await tmpCtx.decodeAudioData(bytesPre.buffer);
+        audioDurationMs = Math.round(audioBuffer.duration * 1000);
+        await tmpCtx.close();
+      }
+    } catch {
+      audioDurationMs = null;
+    }
+  }
+
   return {
     text,
     audioAvailable,
     fallbackReason,
+    audioDurationMs,
     play: async () => {
       stopRequested = false;
 

@@ -6,6 +6,7 @@ interface NarrationTextProps {
   style: NarrationStyle;
   themeMode: ThemeMode;
   isPlaying?: boolean;
+  audioDurationMs?: number;
 }
 
 const STYLE_BORDER_COLORS: Record<NarrationStyle, string> = {
@@ -22,7 +23,10 @@ const STYLE_BG: Record<NarrationStyle, string> = {
   nature: 'bg-emerald-950/20',
 };
 
-export default function NarrationText({ text, style, themeMode, isPlaying }: NarrationTextProps) {
+const DEFAULT_REVEAL_MS = 4000;
+const MIN_CHAR_INTERVAL_MS = 18;
+
+export default function NarrationText({ text, style, themeMode, audioDurationMs }: NarrationTextProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [key, setKey] = useState(0);
   const [fontPx, setFontPx] = useState(24);
@@ -38,10 +42,16 @@ export default function NarrationText({ text, style, themeMode, isPlaying }: Nar
     setDisplayedText('');
     setKey((k) => k + 1);
 
-    let i = 0;
     const chars = Array.from(text);
-    const charDuration = isPlaying ? Math.max(20, Math.floor(3000 / chars.length)) : 40;
+    if (chars.length === 0) return;
 
+    const targetMs = audioDurationMs && audioDurationMs > 500
+      ? Math.min(audioDurationMs * 0.88, audioDurationMs - 300)
+      : DEFAULT_REVEAL_MS;
+
+    const charDuration = Math.max(MIN_CHAR_INTERVAL_MS, Math.floor(targetMs / chars.length));
+
+    let i = 0;
     intervalRef.current = setInterval(() => {
       i++;
       setDisplayedText(chars.slice(0, i).join(''));
@@ -53,7 +63,7 @@ export default function NarrationText({ text, style, themeMode, isPlaying }: Nar
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [text, isPlaying]);
+  }, [text, audioDurationMs]);
 
   useLayoutEffect(() => {
     const el = textRef.current;
@@ -71,7 +81,7 @@ export default function NarrationText({ text, style, themeMode, isPlaying }: Nar
       next -= 1;
       el.style.fontSize = `${next}px`;
     }
-    setFontPx((prev) => Math.max(prev, next));
+    setFontPx(next);
   }, [displayedText, key]);
 
   return (

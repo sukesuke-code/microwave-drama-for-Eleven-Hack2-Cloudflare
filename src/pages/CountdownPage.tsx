@@ -54,6 +54,7 @@ export default function CountdownPage({
   const t = UI_TEXT[locale];
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
   const [narrationText, setNarrationText] = useState('');
+  const [narrationAudioMs, setNarrationAudioMs] = useState<number | null>(null);
   const [isFlashing, setIsFlashing] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -120,10 +121,61 @@ export default function CountdownPage({
     return getCurrentNarration(tl, tt, style, dishName, locale);
   }, [style, dishName, locale]);
 
+  const getMusicPrompt = useCallback((phase: Phase): string => {
+    const base: Record<string, string> = {
+      sports: 'energetic upbeat stadium crowd music',
+      horror: 'eerie suspenseful horror ambient music',
+      movie: 'dramatic cinematic orchestral music',
+      nature: 'calm peaceful nature ambient music',
+    };
+    const suffix: Record<Phase, string> = {
+      opening: 'intro build-up',
+      quarter: 'moderate tension building',
+      middle: 'mid-intensity rising',
+      final: 'intense climax countdown',
+      done: 'triumphant victory fanfare',
+    };
+    return `${base[style] ?? 'background ambient music'} ${suffix[phase]}`;
+  }, [style]);
+
+  const getSfxPrompt = useCallback((phase: Phase): string => {
+    const sfxMap: Record<string, Record<Phase, string>> = {
+      sports: {
+        opening: 'crowd cheer stadium ambient',
+        quarter: 'whistle blow sports crowd',
+        middle: 'crowd chanting rising intensity',
+        final: 'countdown beep rapid urgent',
+        done: 'crowd explosion victory celebration',
+      },
+      horror: {
+        opening: 'creaking door eerie silence',
+        quarter: 'heartbeat pulse low thump',
+        middle: 'tension sting horror stab',
+        final: 'rapid heartbeat panic intense',
+        done: 'monster roar jump scare',
+      },
+      movie: {
+        opening: 'cinematic whoosh transition',
+        quarter: 'dramatic stinger brass hit',
+        middle: 'ticking clock suspense',
+        final: 'rapid ticking urgent alarm',
+        done: 'triumphant brass fanfare',
+      },
+      nature: {
+        opening: 'birds chirping forest breeze',
+        quarter: 'stream flowing wind rustle',
+        middle: 'thunder distant storm building',
+        final: 'rain intensifying urgency',
+        done: 'birds singing peaceful resolution',
+      },
+    };
+    return sfxMap[style]?.[phase] ?? 'ambient transition sound effect';
+  }, [style]);
+
   const handlePhaseEffects = useCallback(async (phase: Phase) => {
-    api.stopSfx();
-    api.stopMusic();
-  }, []);
+    api.playMusic(getMusicPrompt(phase)).catch(() => {});
+    api.playSfx(getSfxPrompt(phase)).catch(() => {});
+  }, [getMusicPrompt, getSfxPrompt]);
 
   const agentInstructionText = useMemo(() => {
     const localeLabel = locale.startsWith('ja') ? 'Japanese' : 'English';
@@ -169,9 +221,11 @@ export default function CountdownPage({
 
     ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
+        handlePhaseEffects(phase).catch(() => {});
         const narration = await api.requestAgentNarration(context);
         prevNarrationRef.current = narration.text;
         setNarrationText(narration.text);
+        setNarrationAudioMs(narration.audioDurationMs);
         if (!narration.audioAvailable) {
           const debugInfo = `subtitle-only mode (reason=${narration.fallbackReason ?? 'AUDIO_MISSING'}, phase=${phase}, t=${timeLeft}s)`;
           setSubtitleModeDebug(debugInfo);
@@ -214,7 +268,7 @@ export default function CountdownPage({
           setSubtitleModeDebug('subtitle-only fallback(local TTS failed)');
         });
       });
-  }, [isPaused, isFinished, timeLeft, totalSeconds, buildNarrationLine, getPhase, buildAgentNarrationContext]);
+  }, [isPaused, isFinished, timeLeft, totalSeconds, buildNarrationLine, getPhase, buildAgentNarrationContext, handlePhaseEffects]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -392,7 +446,7 @@ export default function CountdownPage({
           </div>
 
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
-            <NarrationText text={narrationText} style={style} themeMode={themeMode} isPlaying={isNarrationPlaying} />
+            <NarrationText text={narrationText} style={style} themeMode={themeMode} isPlaying={isNarrationPlaying} audioDurationMs={narrationAudioMs ?? undefined} />
           </div>
           {subtitleModeDebug && (
             <p className={`mt-1 text-center text-[10px] tracking-wide ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>
