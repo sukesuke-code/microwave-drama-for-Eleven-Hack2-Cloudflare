@@ -220,6 +220,10 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
 function stopTtsPlayback(): void {
   stopRequested = true;
 
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
   if (activeMeterCleanup) {
     activeMeterCleanup();
     activeMeterCleanup = null;
@@ -687,6 +691,44 @@ async function playTtsFromBlob(blob: Blob): Promise<void> {
   await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
 }
 
+async function playTts(text: string): Promise<void> {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return;
+
+  const hasSpeechSynthesis =
+    typeof window !== "undefined" &&
+    "speechSynthesis" in window &&
+    typeof SpeechSynthesisUtterance !== "undefined";
+
+  if (!hasSpeechSynthesis) {
+    return;
+  }
+
+  stopTtsPlayback();
+  stopRequested = false;
+
+  await new Promise<void>((resolve, reject) => {
+    const utterance = new SpeechSynthesisUtterance(trimmed);
+    utterance.lang =
+      (typeof navigator !== "undefined" && navigator.language) || "en-US";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    utterance.onend = () => {
+      if (stopRequested) return resolve();
+      resolve();
+    };
+
+    utterance.onerror = (event) => {
+      if (stopRequested) return resolve();
+      reject(event.error || new Error("Speech synthesis failed"));
+    };
+
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 export {
   API_BASE,
   startSession,
@@ -703,6 +745,7 @@ export {
   subscribeTtsLevel,
   subscribeTtsMeter,
   playTtsFromBlob,
+  playTts,
 };
 
 export const api = {
@@ -721,4 +764,5 @@ export const api = {
   subscribeTtsLevel,
   subscribeTtsMeter,
   playTtsFromBlob,
+  playTts,
 };
