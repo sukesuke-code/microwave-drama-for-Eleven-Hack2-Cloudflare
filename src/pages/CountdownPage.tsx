@@ -40,6 +40,8 @@ interface CountdownPageProps {
   onFinish: () => void;
 }
 
+type Phase = 'opening' | 'quarter' | 'middle' | 'final' | 'done';
+
 export default function CountdownPage({
   locale,
   settings,
@@ -100,7 +102,7 @@ export default function CountdownPage({
     window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
-  const getPhase = useCallback((tl: number, tt: number): 'opening' | 'quarter' | 'middle' | 'final' | 'done' => {
+  const getPhase = useCallback((tl: number, tt: number): Phase => {
     if (tl <= 0) return 'done';
     const percent = tt > 0 ? (tl / tt) * 100 : 0;
     if (percent > 75) return 'opening';
@@ -116,34 +118,55 @@ export default function CountdownPage({
     return getCurrentNarration(tl, tt, style, dishName, locale);
   }, [style, dishName, locale]);
 
-  const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
-    if (style === 'movie') {
-      if (phase === 'done') {
-        api.stopMusic();
-        await api.playSfx('cinematic ending impact, short trailer hit');
-        return;
-      }
-      if (phase === 'opening') {
-        await api.playMusic('cinematic trailer underscore, tense and dramatic');
-      }
-      if (phase === 'middle' || phase === 'final') {
-        await api.playSfx('cinematic whoosh rise, short transition');
-      }
-      return;
-    }
+  const handlePhaseEffects = useCallback(async (phase: Phase) => {
+    const phasePlans: Record<Settings['style'], { musicPrompt?: string; sfxPrompt?: string; stopMusic?: boolean }> = {
+      movie: phase === 'done'
+        ? { stopMusic: true, sfxPrompt: 'cinematic ending impact, short trailer hit' }
+        : phase === 'opening'
+          ? { musicPrompt: 'cinematic trailer underscore, tense and dramatic' }
+          : phase === 'middle' || phase === 'final'
+            ? { sfxPrompt: 'cinematic whoosh rise, short transition' }
+            : {},
+      nature: phase === 'done'
+        ? { stopMusic: true, sfxPrompt: 'soft forest chime, gentle resolution' }
+        : phase === 'opening'
+          ? { musicPrompt: 'calm nature ambience, soft wind and birds' }
+          : phase === 'middle' || phase === 'final'
+            ? { sfxPrompt: 'light natural rustle and airy swell' }
+            : {},
+      sports: phase === 'done'
+        ? { stopMusic: true, sfxPrompt: 'stadium cheer hit, short victory blast' }
+        : phase === 'opening'
+          ? { musicPrompt: 'upbeat stadium rhythm, low intensity crowd bed' }
+          : phase === 'quarter' || phase === 'middle' || phase === 'final'
+            ? { sfxPrompt: 'short crowd swell and whistle accent' }
+            : {},
+      horror: phase === 'done'
+        ? { stopMusic: true, sfxPrompt: 'cold sting and low boom resolve' }
+        : phase === 'opening'
+          ? { musicPrompt: 'dark drone ambience, subtle tension pulse' }
+          : phase === 'quarter' || phase === 'middle' || phase === 'final'
+            ? { sfxPrompt: 'quiet eerie riser, distant metallic tick' }
+            : {},
+    };
 
-    if (style === 'nature') {
-      if (phase === 'done') {
-        api.stopMusic();
-        await api.playSfx('soft forest chime, gentle resolution');
-        return;
-      }
-      if (phase === 'opening') {
-        await api.playMusic('calm nature ambience, soft wind and birds');
-      }
-      if (phase === 'middle' || phase === 'final') {
-        await api.playSfx('light natural rustle and airy swell');
-      }
+    // Playback competition rule:
+    // - On each phase transition, stop previous SFX before starting next phase SFX.
+    // - Keep BGM unless explicit stop/restart is required by the style plan.
+    api.stopSfx();
+    const plan = phasePlans[style];
+    const tasks: Promise<void>[] = [];
+    if (plan.stopMusic) {
+      api.stopMusic();
+    }
+    if (plan.musicPrompt) {
+      tasks.push(api.playMusic(plan.musicPrompt));
+    }
+    if (plan.sfxPrompt) {
+      tasks.push(api.playSfx(plan.sfxPrompt));
+    }
+    if (tasks.length > 0) {
+      await Promise.all(tasks);
     }
   }, [style]);
 
@@ -153,7 +176,7 @@ export default function CountdownPage({
     return sanitizeAgentInstructionText(instruction);
   }, [style, locale, totalSeconds, dishName]);
 
-  const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+  const buildAgentNarrationContext = useCallback((tl: number, phase: Phase) => {
     return {
       sessionId: sessionIdRef.current ?? undefined,
       style,
@@ -197,8 +220,10 @@ export default function CountdownPage({
         if (sessionIdRef.current) {
           await api.saveNarration(sessionIdRef.current, narration.text);
         }
-        await narration.play();
-        await handlePhaseEffects(phase);
+        await Promise.allSettled([
+          narration.play(),
+          handlePhaseEffects(phase),
+        ]);
       })
       .catch(async (err) => {
         const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
@@ -219,13 +244,14 @@ export default function CountdownPage({
           });
         }
 
-        await api.playTts(fallbackLine).catch((ttsError) => {
-          console.error('Failed to play fallback TTS:', ttsError);
-        });
-
-        await handlePhaseEffects(phase).catch((effectError) => {
-          console.error('Failed to run fallback phase effects:', effectError);
-        });
+        await Promise.allSettled([
+          api.playTts(fallbackLine).catch((ttsError) => {
+            console.error('Failed to play fallback TTS:', ttsError);
+          }),
+          handlePhaseEffects(phase).catch((effectError) => {
+            console.error('Failed to run fallback phase effects:', effectError);
+          }),
+        ]);
       });
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
 
@@ -237,6 +263,7 @@ export default function CountdownPage({
     return () => {
       unsubscribe();
       api.stopTtsPlayback();
+      api.stopSfx();
       api.stopMusic();
     };
   }, []);

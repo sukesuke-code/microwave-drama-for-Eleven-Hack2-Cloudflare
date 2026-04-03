@@ -13,6 +13,16 @@ let stopRequested = false;
 let activeMeterCleanup: (() => void) | null = null;
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+let activeSfxAudio: HTMLAudioElement | null = null;
+let activeSfxObjectUrl: string | null = null;
+let narrationPlaybackDepth = 0;
+let currentMusicBaseVolume = 0.3;
+let currentSfxBaseVolume = 0.55;
+
+const MUSIC_BASE_VOLUME = 0.3;
+const SFX_BASE_VOLUME = 0.55;
+const DUCKED_MUSIC_VOLUME = 0.12;
+const DUCKED_SFX_VOLUME = 0.25;
 
 type TtsLevelListener = (level: number) => void;
 type TtsMeterSnapshot = {
@@ -168,6 +178,43 @@ function stopMusic(): void {
   }
 }
 
+function stopSfx(): void {
+  if (activeSfxAudio) {
+    activeSfxAudio.pause();
+    activeSfxAudio.src = "";
+    activeSfxAudio.load();
+    activeSfxAudio = null;
+  }
+  if (activeSfxObjectUrl) {
+    URL.revokeObjectURL(activeSfxObjectUrl);
+    activeSfxObjectUrl = null;
+  }
+}
+
+function applyNarrationDucking(): void {
+  const shouldDuck = narrationPlaybackDepth > 0;
+  if (activeMusicAudio) {
+    activeMusicAudio.volume = shouldDuck
+      ? Math.min(currentMusicBaseVolume, DUCKED_MUSIC_VOLUME)
+      : currentMusicBaseVolume;
+  }
+  if (activeSfxAudio) {
+    activeSfxAudio.volume = shouldDuck
+      ? Math.min(currentSfxBaseVolume, DUCKED_SFX_VOLUME)
+      : currentSfxBaseVolume;
+  }
+}
+
+function beginNarrationPlayback(): void {
+  narrationPlaybackDepth += 1;
+  applyNarrationDucking();
+}
+
+function endNarrationPlayback(): void {
+  narrationPlaybackDepth = Math.max(0, narrationPlaybackDepth - 1);
+  applyNarrationDucking();
+}
+
 async function parseAudioBlob(res: Response): Promise<Blob> {
   const contentType = res.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
@@ -301,127 +348,131 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
 
 async function playTts(text: string): Promise<void> {
   stopRequested = false;
-  const res = await fetch(ELEVENLABS_TTS_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      text,
-      voice_id: "21m00Tcm4TlvDq8ikWAM",
-      model_id: "eleven_multilingual_v2",
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error("TTS failed:", errText);
-    throw new Error("TTS failed");
-  }
-
-  const data = (await res.json()) as { audio_base64?: string; error?: string };
-  if (!data.audio_base64) {
-    throw new Error(data.error || "No audio returned from TTS");
-  }
-
-  const rawBase64 = data.audio_base64.includes(",") ? data.audio_base64.split(",").pop() ?? "" : data.audio_base64;
-  const binary = atob(rawBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  const blob = new Blob([bytes], { type: "audio/mpeg" });
-
-  const url = URL.createObjectURL(blob);
-
-  if (activeObjectUrl) {
-    URL.revokeObjectURL(activeObjectUrl);
-    activeObjectUrl = null;
-  }
-
+  beginNarrationPlayback();
   try {
-    const audio = new Audio();
-    audio.preload = "auto";
-    audio.src = url;
-    audio.muted = false;
-    audio.volume = 1;
-    audio.setAttribute("playsinline", "true");
-    activeTtsAudio = audio;
-    activeObjectUrl = url;
-    activeMeterCleanup = attachAudioMeter(audio);
+    const res = await fetch(ELEVENLABS_TTS_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        text,
+        voice_id: "21m00Tcm4TlvDq8ikWAM",
+        model_id: "eleven_multilingual_v2",
+      }),
+    });
 
-    audio.onerror = () => {
-      console.error("audio element error", audio.error);
-    };
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("TTS failed:", errText);
+      throw new Error("TTS failed");
+    }
 
-    await audio.play();
+    const data = (await res.json()) as { audio_base64?: string; error?: string };
+    if (!data.audio_base64) {
+      throw new Error(data.error || "No audio returned from TTS");
+    }
 
-    await new Promise<void>((resolve, reject) => {
-      let completed = false;
-      let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        reject(new Error("Audio playback timed out"));
-      }, DEFAULT_TTS_TIMEOUT_MS);
+    const rawBase64 = data.audio_base64.includes(",") ? data.audio_base64.split(",").pop() ?? "" : data.audio_base64;
+    const binary = atob(rawBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "audio/mpeg" });
+    const url = URL.createObjectURL(blob);
 
-      const cleanup = () => {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.onpause = null;
-        audio.onstalled = null;
-        audio.onwaiting = null;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
+    if (activeObjectUrl) {
+      URL.revokeObjectURL(activeObjectUrl);
+      activeObjectUrl = null;
+    }
+
+    try {
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.src = url;
+      audio.muted = false;
+      audio.volume = 1;
+      audio.setAttribute("playsinline", "true");
+      activeTtsAudio = audio;
+      activeObjectUrl = url;
+      activeMeterCleanup = attachAudioMeter(audio);
+
+      audio.onerror = () => {
+        console.error("audio element error", audio.error);
       };
 
-      audio.onpause = () => {
-        if (audio.ended || completed) return;
-        if (stopRequested) {
-          completed = true;
-          cleanup();
-          reject(new Error("Audio playback stopped"));
-          return;
-        }
-        void audio.play().catch((err) => {
+      await audio.play();
+
+      await new Promise<void>((resolve, reject) => {
+        let completed = false;
+        let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
           if (completed) return;
           completed = true;
           cleanup();
-          reject(err);
-        });
-      };
+          reject(new Error("Audio playback timed out"));
+        }, DEFAULT_TTS_TIMEOUT_MS);
 
-      audio.onended = () => {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        resolve();
-      };
+        const cleanup = () => {
+          audio.onended = null;
+          audio.onerror = null;
+          audio.onpause = null;
+          audio.onstalled = null;
+          audio.onwaiting = null;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+        };
 
-      audio.onerror = () => {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        reject(audio.error ?? new Error("Unknown audio playback error"));
-      };
-    });
+        audio.onpause = () => {
+          if (audio.ended || completed) return;
+          if (stopRequested) {
+            completed = true;
+            cleanup();
+            reject(new Error("Audio playback stopped"));
+            return;
+          }
+          void audio.play().catch((err) => {
+            if (completed) return;
+            completed = true;
+            cleanup();
+            reject(err);
+          });
+        };
+
+        audio.onended = () => {
+          if (completed) return;
+          completed = true;
+          cleanup();
+          resolve();
+        };
+
+        audio.onerror = () => {
+          if (completed) return;
+          completed = true;
+          cleanup();
+          reject(audio.error ?? new Error("Unknown audio playback error"));
+        };
+      });
+    } finally {
+      if (activeObjectUrl === url) {
+        URL.revokeObjectURL(url);
+        activeObjectUrl = null;
+      }
+      if (activeTtsAudio) {
+        activeTtsAudio.src = "";
+        activeTtsAudio.load();
+        activeTtsAudio = null;
+      }
+      if (activeMeterCleanup) {
+        activeMeterCleanup();
+        activeMeterCleanup = null;
+      }
+    }
   } finally {
-    if (activeObjectUrl === url) {
-      URL.revokeObjectURL(url);
-      activeObjectUrl = null;
-    }
-    if (activeTtsAudio) {
-      activeTtsAudio.src = "";
-      activeTtsAudio.load();
-      activeTtsAudio = null;
-    }
-    if (activeMeterCleanup) {
-      activeMeterCleanup();
-      activeMeterCleanup = null;
-    }
+    endNarrationPlayback();
   }
 }
 
@@ -475,6 +526,7 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
       }
 
       try {
+        beginNarrationPlayback();
         const rawBase64 = base64Audio.includes(",") ? base64Audio.split(",").pop() ?? "" : base64Audio;
         const binary = atob(rawBase64);
         const bytes = new Uint8Array(binary.length);
@@ -568,12 +620,17 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
         }
       } catch (error) {
         console.error("Error playing narration audio:", error);
+      } finally {
+        endNarrationPlayback();
       }
     },
   };
 }
 
 async function playSfx(prompt: string): Promise<void> {
+  // Playback rule: stop any previous phase SFX before starting a new one.
+  stopSfx();
+
   const res = await fetch(`${API_BASE}/api/generate-sfx`, {
     method: "POST",
     headers: {
@@ -591,16 +648,45 @@ async function playSfx(prompt: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   audio.preload = "auto";
-  audio.volume = 0.55;
+  currentSfxBaseVolume = SFX_BASE_VOLUME;
+  audio.volume = currentSfxBaseVolume;
   audio.setAttribute("playsinline", "true");
-  audio.onended = () => {
-    URL.revokeObjectURL(url);
-  };
+  activeSfxAudio = audio;
+  activeSfxObjectUrl = url;
+  applyNarrationDucking();
 
   try {
     await audio.play();
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => {
+        if (activeSfxObjectUrl === url) {
+          URL.revokeObjectURL(url);
+          activeSfxObjectUrl = null;
+        }
+        if (activeSfxAudio === audio) {
+          activeSfxAudio = null;
+        }
+        resolve();
+      };
+      audio.onerror = () => {
+        if (activeSfxObjectUrl === url) {
+          URL.revokeObjectURL(url);
+          activeSfxObjectUrl = null;
+        }
+        if (activeSfxAudio === audio) {
+          activeSfxAudio = null;
+        }
+        reject(audio.error ?? new Error("Unknown SFX playback error"));
+      };
+    });
   } catch (error) {
-    URL.revokeObjectURL(url);
+    if (activeSfxObjectUrl === url) {
+      URL.revokeObjectURL(url);
+      activeSfxObjectUrl = null;
+    }
+    if (activeSfxAudio === audio) {
+      activeSfxAudio = null;
+    }
     throw error;
   }
 }
@@ -626,11 +712,13 @@ async function playMusic(prompt: string): Promise<void> {
   const audio = new Audio(url);
   audio.preload = "auto";
   audio.loop = true;
-  audio.volume = 0.3;
+  currentMusicBaseVolume = MUSIC_BASE_VOLUME;
+  audio.volume = currentMusicBaseVolume;
   audio.setAttribute("playsinline", "true");
 
   activeMusicAudio = audio;
   activeMusicObjectUrl = url;
+  applyNarrationDucking();
   await audio.play();
 }
 
@@ -644,6 +732,7 @@ export const api = {
   playSfx,
   playMusic,
   stopMusic,
+  stopSfx,
   stopTtsPlayback,
   subscribeTtsLevel,
   subscribeTtsMeter,
