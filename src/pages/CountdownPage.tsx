@@ -62,6 +62,7 @@ export default function CountdownPage({
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
   const [subtitleModeDebug, setSubtitleModeDebug] = useState<string | null>(null);
+  const [isNarrationPlaying, setIsNarrationPlaying] = useState(false);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -151,7 +152,7 @@ export default function CountdownPage({
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused || isFinished) return;
     const phase = getPhase(timeLeft, totalSeconds);
     if (phaseRef.current === phase) {
       return;
@@ -213,12 +214,13 @@ export default function CountdownPage({
           setSubtitleModeDebug('subtitle-only fallback(local TTS failed)');
         });
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, buildAgentNarrationContext]);
+  }, [isPaused, isFinished, timeLeft, totalSeconds, buildNarrationLine, getPhase, buildAgentNarrationContext]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
       setTtsLevel(level);
       setTtsSpectrum(spectrum);
+      setIsNarrationPlaying(level > 0.01);
     });
     return () => {
       unsubscribe();
@@ -236,6 +238,7 @@ export default function CountdownPage({
         const next = prev - 1;
         if (next <= 0) {
           clearInterval(intervalRef.current!);
+          api.stopTtsPlayback();
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
@@ -389,7 +392,7 @@ export default function CountdownPage({
           </div>
 
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
-            <NarrationText text={narrationText} style={style} themeMode={themeMode} />
+            <NarrationText text={narrationText} style={style} themeMode={themeMode} isPlaying={isNarrationPlaying} />
           </div>
           {subtitleModeDebug && (
             <p className={`mt-1 text-center text-[10px] tracking-wide ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>

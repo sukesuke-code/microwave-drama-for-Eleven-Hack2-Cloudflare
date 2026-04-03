@@ -5,6 +5,7 @@ interface NarrationTextProps {
   text: string;
   style: NarrationStyle;
   themeMode: ThemeMode;
+  isPlaying?: boolean;
 }
 
 const STYLE_BORDER_COLORS: Record<NarrationStyle, string> = {
@@ -21,7 +22,7 @@ const STYLE_BG: Record<NarrationStyle, string> = {
   nature: 'bg-emerald-950/20',
 };
 
-export default function NarrationText({ text, style, themeMode }: NarrationTextProps) {
+export default function NarrationText({ text, style, themeMode, isPlaying }: NarrationTextProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [key, setKey] = useState(0);
   const [fontPx, setFontPx] = useState(24);
@@ -39,6 +40,7 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
 
     let i = 0;
     const chars = Array.from(text);
+    const charDuration = isPlaying ? Math.max(20, Math.floor(3000 / chars.length)) : 40;
 
     intervalRef.current = setInterval(() => {
       i++;
@@ -46,12 +48,12 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
       if (i >= chars.length) {
         clearInterval(intervalRef.current!);
       }
-    }, 40);
+    }, charDuration);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [text]);
+  }, [text, isPlaying]);
 
   useLayoutEffect(() => {
     const el = textRef.current;
