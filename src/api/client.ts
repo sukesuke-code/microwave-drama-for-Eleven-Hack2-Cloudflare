@@ -3,6 +3,21 @@ const DEFAULT_TTS_TIMEOUT_MS = 30000;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
+let stopRequested = false;
+
+function stopTtsPlayback(): void {
+  stopRequested = true;
+  if (activeTtsAudio) {
+    activeTtsAudio.pause();
+    activeTtsAudio.src = "";
+    activeTtsAudio.load();
+    activeTtsAudio = null;
+  }
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl);
+    activeObjectUrl = null;
+  }
+}
 
 export interface Session {
   foodName: string;
@@ -120,6 +135,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
 }
 
 async function playTts(text: string): Promise<void> {
+  stopRequested = false;
   const res = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: {
@@ -215,6 +231,12 @@ async function playTts(text: string): Promise<void> {
 
       audio.onpause = () => {
         if (audio.ended || completed) return;
+        if (stopRequested) {
+          completed = true;
+          cleanup();
+          reject(new Error("Audio playback stopped"));
+          return;
+        }
         console.warn("audio unexpectedly paused before completion; retrying play()");
         void audio.play().catch((err) => {
           if (completed) return;
@@ -261,5 +283,6 @@ export const api = {
   tickSession,
   saveNarration,
   playTts,
+  stopTtsPlayback,
   API_BASE,
 };
