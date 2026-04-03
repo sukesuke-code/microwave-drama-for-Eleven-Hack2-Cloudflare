@@ -510,7 +510,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
 }
 
 /* =========================
-   ElevenLabs Agent APIs
+   ElevenLabs APIs
 ========================= */
 
 async function getSignedUrl(): Promise<string> {
@@ -535,6 +535,24 @@ async function getSignedUrl(): Promise<string> {
   }
 
   return data.signedUrl;
+}
+
+async function playTts(text: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/elevenlabs-tts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || "TTS generation failed");
+  }
+
+  const blob = await parseAudioBlob(res);
+  await playAudioBlob(blob, false, 1);
 }
 
 function buildNarrationCue(input: BuildNarrationCueInput): string {
@@ -604,11 +622,11 @@ async function requestAgentNarration(
 }
 
 /* =========================
-   SFX / Music APIs
+   ElevenLabs SFX / Music APIs
 ========================= */
 
 async function playSfx(prompt: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
+  const res = await fetch(`${API_BASE}/api/elevenlabs-sfx`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -644,7 +662,7 @@ async function playSfx(prompt: string): Promise<void> {
 async function playMusic(prompt: string): Promise<void> {
   stopMusic();
 
-  const res = await fetch(`${API_BASE}/api/generate-music`, {
+  const res = await fetch(`${API_BASE}/api/elevenlabs-music`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -694,6 +712,7 @@ export {
   getSignedUrl,
   buildNarrationCue,
   requestAgentNarration,
+  playTts,
   playSfx,
   playMusic,
   stopMusic,
@@ -716,6 +735,7 @@ export const api = {
   getSignedUrl,
   buildNarrationCue,
   requestAgentNarration,
+  playTts,
   playSfx,
   playMusic,
   stopMusic,
