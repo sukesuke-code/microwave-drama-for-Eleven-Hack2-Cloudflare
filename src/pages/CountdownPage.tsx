@@ -37,10 +37,13 @@ export default function CountdownPage({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
+  const [ttsLevel, setTtsLevel] = useState(0);
+  const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastQueuedNarrationRef = useRef('');
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -94,6 +97,10 @@ export default function CountdownPage({
   useEffect(() => {
     if (!narrationText || isPaused) return;
     const line = narrationText;
+    if (line === lastQueuedNarrationRef.current) {
+      return;
+    }
+    lastQueuedNarrationRef.current = line;
     sessionIdRef.current = sessionStorage.getItem('sessionId');
 
     ttsQueueRef.current = ttsQueueRef.current
@@ -107,6 +114,17 @@ export default function CountdownPage({
         console.error('Failed to process narration event:', err);
       });
   }, [narrationText, isPaused]);
+
+  useEffect(() => {
+    const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
+      setTtsLevel(level);
+      setTtsSpectrum(spectrum);
+    });
+    return () => {
+      unsubscribe();
+      api.stopTtsPlayback();
+    };
+  }, []);
 
   useEffect(() => {
     if (isPaused || isFinished) return;
@@ -265,6 +283,8 @@ export default function CountdownPage({
               barCount={16}
               intensity={waveIntensity}
               syncSeed={waveSeed}
+              audioLevel={ttsLevel}
+              audioSpectrum={ttsSpectrum}
             />
           </div>
 
