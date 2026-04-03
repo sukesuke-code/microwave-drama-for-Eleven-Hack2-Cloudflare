@@ -172,10 +172,24 @@ export default function CountdownPage({
         await narration.play();
         await handlePhaseEffects(phase);
       })
-      .catch((err) => {
-        console.error('Failed to process phase narration event:', err);
+      .catch(async (err) => {
+        console.error('Failed to process phase narration event (fallback to local TTS):', err);
         prevNarrationRef.current = fallbackLine;
         setNarrationText(fallbackLine);
+
+        if (sessionIdRef.current) {
+          await api.saveNarration(sessionIdRef.current, fallbackLine).catch((saveError) => {
+            console.error('Failed to save fallback narration:', saveError);
+          });
+        }
+
+        await api.playTts(fallbackLine).catch((ttsError) => {
+          console.error('Failed to play fallback TTS:', ttsError);
+        });
+
+        await handlePhaseEffects(phase).catch((effectError) => {
+          console.error('Failed to run fallback phase effects:', effectError);
+        });
       });
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
 
