@@ -4,7 +4,7 @@ const API_BASE = "https://microwave-show-api.lolololololol.workers.dev";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://aaqahuauovsykozowifh.supabase.co";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhcWFodWF1b3ZzeWtvem93aWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTQzNTQsImV4cCI6MjA5MDczMDM1NH0.sjTM-7oGtRoRWv1pXPtQroeAR9ro1PxPMDJ6esW_3wk";
 const ELEVENLABS_TTS_ENDPOINT = `${SUPABASE_URL}/functions/v1/elevenlabs-tts`;
-const AGENT_NARRATION_ENDPOINT = `${SUPABASE_URL}/functions/v1/agent-narration`;
+const ELEVENLABS_NARRATION_ENDPOINT = `${SUPABASE_URL}/functions/v1/elevenlabs-narration`;
 const DEFAULT_TTS_TIMEOUT_MS = 30000;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -437,7 +437,7 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
     locale: request.locale,
   };
 
-  const res = await fetch(AGENT_NARRATION_ENDPOINT, {
+  const res = await fetch(ELEVENLABS_NARRATION_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -448,14 +448,6 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
 
   if (!res.ok) {
     const errText = await res.text();
-    try {
-      const errJson = JSON.parse(errText);
-      if (errJson.error === "AGENT_NARRATION_UNAVAILABLE") {
-        throw new Error("AGENT_NARRATION_UNAVAILABLE");
-      }
-    } catch {
-      // not JSON, continue
-    }
     throw new Error(errText || "Narration generation failed");
   }
 
@@ -465,10 +457,6 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
     audio_base64?: string;
     error?: string;
   };
-
-  if (data.error === "AGENT_NARRATION_UNAVAILABLE") {
-    throw new Error("AGENT_NARRATION_UNAVAILABLE");
-  }
 
   const text = String(data.text || "").trim();
   if (!data.ok || !text) {
