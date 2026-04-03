@@ -56,12 +56,12 @@ async function generateAgentNarrationWithAudio(
   const timePercent = Math.round((remainingTime / totalTime) * 100);
 
   const voiceIds: Record<string, string> = {
-    sports: "SOZ5d8W2v3U34Z7isYXr",
-    horror: "EXAVITQu4vr4xnSDxMaL",
-    documentary: "21m00Tcm4TlvDq8ikWAM",
-    anime: "nPczCjzI2devNBz1zQrb",
-    movie: "N2lVSFnlFdCoeSqpIHcl",
-    nature: "zcAOhNBS3c14rBihQnS1",
+    sports: "cgSgspJ2msLzdYWZ5kZo",
+    horror: "cgSgspJ2msLzdYWZ5kZo",
+    documentary: "cgSgspJ2msLzdYWZ5kZo",
+    anime: "cgSgspJ2msLzdYWZ5kZo",
+    movie: "cgSgspJ2msLzdYWZ5kZo",
+    nature: "cgSgspJ2msLzdYWZ5kZo",
   };
 
   const styleDescriptions: Record<string, string> = {
@@ -100,9 +100,11 @@ async function generateAgentNarrationWithAudio(
     narrationText = `Narrating the cooking of "${dishName}" in ${styleDescriptions[style] || styleDescriptions.sports}. Currently ${phaseDescriptions[phase] || phaseDescriptions.done}.`;
   }
 
-  const voiceId = voiceIds[style] || voiceIds.documentary;
+  const voiceId = voiceIds[style] || "cgSgspJ2msLzdYWZ5kZo";
 
-  const ttsResponse = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
+  console.log("ElevenLabs TTS Request:", { voiceId, textLength: narrationText.length, language: isJapanese ? "ja" : "en" });
+
+  const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -118,13 +120,18 @@ async function generateAgentNarrationWithAudio(
     }),
   });
 
+  console.log("ElevenLabs Response Status:", ttsResponse.status);
+
   if (!ttsResponse.ok) {
     const errorData = await ttsResponse.text();
+    console.error("ElevenLabs Error Response:", errorData);
     logSafeError("elevenlabs_tts_error", { status: ttsResponse.status, error: errorData });
     throw new Error("Failed to generate narration audio");
   }
 
   const audioBuffer = await ttsResponse.arrayBuffer();
+  console.log("Audio Buffer Size:", audioBuffer.byteLength);
+
   const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
   return {
