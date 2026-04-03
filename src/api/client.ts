@@ -128,26 +128,56 @@ async function playTts(text: string): Promise<void> {
     }),
   });
 
+  console.log("playTts status", res.status);
+  console.log("playTts content-type", res.headers.get("content-type"));
+
   if (!res.ok) {
-    let err: { error?: string } = {};
-    try {
-      err = (await res.json()) as { error?: string };
-    } catch {
-      // Ignore invalid/non-JSON error body.
-    }
-    throw new Error(err?.error || "TTS failed");
+    const errText = await res.text();
+    console.error("playTts error response", errText);
+    throw new Error("TTS failed");
   }
 
   const blob = await res.blob();
+  console.log("playTts blob", {
+    type: blob.type,
+    size: blob.size,
+  });
+
   const url = URL.createObjectURL(blob);
+  console.log("playTts object url", url);
 
   try {
-    const audio = new Audio(url);
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.src = url;
     audio.muted = false;
     audio.volume = 1;
+
+    audio.onloadedmetadata = () => {
+      console.log("audio loadedmetadata");
+    };
+
+    audio.oncanplay = () => {
+      console.log("audio canplay");
+    };
+
+    audio.oncanplaythrough = () => {
+      console.log("audio canplaythrough");
+    };
+
+    audio.onerror = () => {
+      console.error("audio element error", audio.error);
+    };
+
     await audio.play();
-    audio.onended = () => URL.revokeObjectURL(url);
+    console.log("audio playback success");
+
+    audio.onended = () => {
+      console.log("audio playback ended");
+      URL.revokeObjectURL(url);
+    };
   } catch (error) {
+    console.error("audio playback failed", error);
     URL.revokeObjectURL(url);
     throw error;
   }
