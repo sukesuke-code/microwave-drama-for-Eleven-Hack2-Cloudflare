@@ -1,6 +1,11 @@
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  "https://microwave-show-api-v2.lolololololol.workers.dev";
+function normalizeBaseUrl(value: string | undefined): string {
+  if (!value) return "";
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+const API_BASE = normalizeBaseUrl(import.meta.env.VITE_API_BASE);
+const SESSION_START_PATH =
+  import.meta.env.VITE_API_SESSION_START_PATH || "/api/session/start";
 
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
 
@@ -415,7 +420,7 @@ async function startSession(
     style,
   };
 
-  const res = await fetch(`${API_BASE}/api/session/start`, {
+  const res = await fetch(`${API_BASE}${SESSION_START_PATH}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
