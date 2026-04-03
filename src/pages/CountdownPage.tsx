@@ -37,9 +37,14 @@ export default function CountdownPage({
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
   const hasSpokenInitialNarrationRef = useRef(false);
-  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const speechAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechRequestAbortRef = useRef<AbortController | null>(null);
+  const speechCacheRef = useRef<Map<string, string>>(new Map());
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aiTtsEndpoint = import.meta.env.VITE_AI_TTS_ENDPOINT as string | undefined;
+  const aiTtsApiKey = import.meta.env.VITE_AI_TTS_API_KEY as string | undefined;
+  const aiVoiceSupported = Boolean(aiTtsEndpoint);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -91,32 +96,97 @@ export default function CountdownPage({
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
-    if (!speechSupported || !narrationText || isPaused) return;
+    if (!aiVoiceSupported || !narrationText || isPaused) return;
 
-    const synth = window.speechSynthesis;
-    if (synth.speaking) synth.cancel();
+    let disposed = false;
+    const cacheKey = `${locale}:${style}:${narrationText}`;
+    const currentAudio = speechAudioRef.current ?? new Audio();
+    speechAudioRef.current = currentAudio;
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
 
-    const utterance = new SpeechSynthesisUtterance(narrationText);
-    utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
-    utterance.rate = 1;
-    utterance.pitch = style === 'horror' ? 0.85 : style === 'sports' ? 1.1 : 1;
-    utterance.volume = 1;
+    speechRequestAbortRef.current?.abort();
+    const controller = new AbortController();
+    speechRequestAbortRef.current = controller;
 
-    const voices = synth.getVoices();
-    const localePrefix = locale === 'ja' ? 'ja' : 'en';
-    const preferredVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix));
-    if (preferredVoice) utterance.voice = preferredVoice;
+    const startPlayback = async (audioSrc: string) => {
+      if (disposed) return;
+      currentAudio.src = audioSrc;
+      try {
+        await currentAudio.play();
+      } catch {
+        // no-op: browser autoplay restrictions or user gesture requirements can block play()
+      }
+    };
 
+    const synthesizeAndPlay = async () => {
+      const cachedAudioUrl = speechCacheRef.current.get(cacheKey);
+      if (cachedAudioUrl) {
+        await startPlayback(cachedAudioUrl);
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (aiTtsApiKey) {
+        headers.Authorization = `Bearer ${aiTtsApiKey}`;
+        headers['x-api-key'] = aiTtsApiKey;
+      }
+
+      const response = await fetch(aiTtsEndpoint!, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          text: narrationText,
+          locale,
+          style,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+
+      const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+      let audioUrl: string | null = null;
+
+      if (contentType.includes('application/json')) {
+        const payload = await response.json() as { audioBase64?: string; mimeType?: string };
+        if (!payload.audioBase64) return;
+        const mimeType = payload.mimeType || 'audio/mpeg';
+        audioUrl = `data:${mimeType};base64,${payload.audioBase64}`;
+      } else {
+        const blob = await response.blob();
+        if (!blob.size) return;
+        audioUrl = URL.createObjectURL(blob);
+      }
+
+      speechCacheRef.current.set(cacheKey, audioUrl);
+      await startPlayback(audioUrl);
+    };
+
+    void synthesizeAndPlay();
     if (!hasSpokenInitialNarrationRef.current) {
       hasSpokenInitialNarrationRef.current = true;
     }
 
-    synth.speak(utterance);
-
     return () => {
-      synth.cancel();
+      disposed = true;
+      controller.abort();
+      currentAudio.pause();
     };
-  }, [narrationText, locale, style, isPaused, speechSupported]);
+  }, [narrationText, locale, style, isPaused, aiVoiceSupported, aiTtsEndpoint, aiTtsApiKey]);
+
+  useEffect(() => () => {
+    speechRequestAbortRef.current?.abort();
+    if (speechAudioRef.current) {
+      speechAudioRef.current.pause();
+      speechAudioRef.current.src = '';
+    }
+    speechCacheRef.current.forEach((audioUrl) => {
+      if (audioUrl.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+    });
+    speechCacheRef.current.clear();
+  }, []);
 
   useEffect(() => {
     if (isPaused || isFinished) return;
