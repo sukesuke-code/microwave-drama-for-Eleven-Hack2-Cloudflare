@@ -126,14 +126,17 @@ export default function CountdownPage({
     }
   }, [style]);
 
-  const updateNarration = useCallback((tl: number, tt: number) => {
-    if (tl <= 0) return;
-    const text = getCurrentNarration(tl, tt, style, dishName, locale);
-    if (text !== prevNarrationRef.current) {
-      prevNarrationRef.current = text;
-      setNarrationText(text);
-    }
-  }, [style, dishName, locale]);
+  const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+    return {
+      sessionId: sessionIdRef.current ?? undefined,
+      style,
+      dishName,
+      totalTime: totalSeconds,
+      remainingTime: tl,
+      phase,
+      locale,
+    };
+  }, [style, dishName, totalSeconds, locale]);
 
   useEffect(() => {
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
@@ -150,27 +153,31 @@ export default function CountdownPage({
     }
     phaseRef.current = phase;
 
-    const line = buildNarrationLine(timeLeft, totalSeconds);
-    if (line === lastQueuedNarrationRef.current) {
+    const fallbackLine = buildNarrationLine(timeLeft, totalSeconds);
+    if (fallbackLine === lastQueuedNarrationRef.current) {
       return;
     }
-    lastQueuedNarrationRef.current = line;
-    prevNarrationRef.current = line;
-    setNarrationText(line);
+    lastQueuedNarrationRef.current = fallbackLine;
     sessionIdRef.current = sessionStorage.getItem('sessionId');
+    const context = buildAgentNarrationContext(timeLeft, phase);
 
     ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
+        const narration = await api.requestAgentNarration(context);
+        prevNarrationRef.current = narration.text;
+        setNarrationText(narration.text);
         if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, line);
+          await api.saveNarration(sessionIdRef.current, narration.text);
         }
-        await api.playTts(line);
+        await narration.play();
         await handlePhaseEffects(phase);
       })
       .catch((err) => {
         console.error('Failed to process phase narration event:', err);
+        prevNarrationRef.current = fallbackLine;
+        setNarrationText(fallbackLine);
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -210,8 +217,6 @@ export default function CountdownPage({
           setTimeout(() => onFinish(), 4000);
           return 0;
         }
-        updateNarration(next, totalSeconds);
-
         if (sessionIdRef.current) {
           api.tickSession(sessionIdRef.current, next).catch((err) => {
             console.error('Failed to tick session:', err);
@@ -225,7 +230,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 

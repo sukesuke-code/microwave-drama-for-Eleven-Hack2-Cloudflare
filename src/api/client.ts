@@ -1,3 +1,5 @@
+import type { NarrationStyle } from "../types";
+
 const API_BASE = "https://microwave-show-api.lolololololol.workers.dev";
 const DEFAULT_TTS_TIMEOUT_MS = 30000;
 
@@ -13,6 +15,21 @@ type TtsMeterSnapshot = {
   level: number;
   spectrum: number[];
 };
+
+export interface AgentNarrationRequest {
+  sessionId?: string;
+  style: NarrationStyle;
+  dishName: string;
+  totalTime: number;
+  remainingTime: number;
+  phase: "opening" | "quarter" | "middle" | "final" | "done";
+  locale: string;
+}
+
+export interface AgentNarrationResponse {
+  text: string;
+  play: () => Promise<void>;
+}
 const ttsLevelListeners = new Set<TtsLevelListener>();
 const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
 
@@ -428,6 +445,162 @@ async function playTts(text: string): Promise<void> {
   }
 }
 
+async function requestAgentNarration(request: AgentNarrationRequest): Promise<AgentNarrationResponse> {
+  const payload = {
+    sessionId: request.sessionId,
+    send_user_message: true,
+    user_message: JSON.stringify({
+      event: "countdown_tick",
+      style: request.style,
+      dishName: request.dishName,
+      totalTime: request.totalTime,
+      remainingTime: request.remainingTime,
+      phase: request.phase,
+      locale: request.locale,
+    }),
+    dynamic_variables: {
+      style: request.style,
+      dish_name: request.dishName,
+      total_time: request.totalTime,
+      remaining_time: request.remainingTime,
+      phase: request.phase,
+      locale: request.locale,
+    },
+  };
+
+  const res = await fetch(`${API_BASE}/api/agent/narrate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || "Agent narration failed");
+  }
+
+  const data = (await res.json()) as {
+    ok?: boolean;
+    agent_response?: string;
+    text?: string;
+    audioBase64?: string;
+    audio?: string;
+    error?: string;
+  };
+
+  const text = String(data.agent_response || data.text || "").trim();
+  if (!data.ok || !text) {
+    throw new Error(data.error || "Agent response is missing");
+  }
+
+  const base64Audio = data.audioBase64 || data.audio;
+
+  return {
+    text,
+    play: async () => {
+      stopRequested = false;
+
+      if (!base64Audio) {
+        throw new Error("Agent audio payload is missing");
+      }
+
+      const rawBase64 = base64Audio.includes(",") ? base64Audio.split(",").pop() ?? "" : base64Audio;
+      const binary = atob(rawBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+
+      if (activeObjectUrl) {
+        URL.revokeObjectURL(activeObjectUrl);
+        activeObjectUrl = null;
+      }
+
+      try {
+        const audio = new Audio();
+        audio.preload = "auto";
+        audio.src = url;
+        audio.muted = false;
+        audio.volume = 1;
+        audio.setAttribute("playsinline", "true");
+        activeTtsAudio = audio;
+        activeObjectUrl = url;
+        activeMeterCleanup = attachAudioMeter(audio);
+
+        await audio.play();
+
+        await new Promise<void>((resolve, reject) => {
+          let completed = false;
+          let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+            if (completed) return;
+            completed = true;
+            cleanup();
+            reject(new Error("Audio playback timed out"));
+          }, DEFAULT_TTS_TIMEOUT_MS);
+
+          const cleanup = () => {
+            audio.onended = null;
+            audio.onerror = null;
+            audio.onpause = null;
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+          };
+
+          audio.onpause = () => {
+            if (audio.ended || completed) return;
+            if (stopRequested) {
+              completed = true;
+              cleanup();
+              reject(new Error("Audio playback stopped"));
+              return;
+            }
+            void audio.play().catch((err) => {
+              if (completed) return;
+              completed = true;
+              cleanup();
+              reject(err);
+            });
+          };
+
+          audio.onended = () => {
+            if (completed) return;
+            completed = true;
+            cleanup();
+            resolve();
+          };
+
+          audio.onerror = () => {
+            if (completed) return;
+            completed = true;
+            cleanup();
+            reject(audio.error ?? new Error("Unknown audio playback error"));
+          };
+        });
+      } finally {
+        if (activeObjectUrl === url) {
+          URL.revokeObjectURL(url);
+          activeObjectUrl = null;
+        }
+        if (activeTtsAudio) {
+          activeTtsAudio.src = "";
+          activeTtsAudio.load();
+          activeTtsAudio = null;
+        }
+        if (activeMeterCleanup) {
+          activeMeterCleanup();
+          activeMeterCleanup = null;
+        }
+      }
+    },
+  };
+}
+
 async function playSfx(prompt: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/generate-sfx`, {
     method: "POST",
@@ -495,6 +668,7 @@ export const api = {
   tickSession,
   saveNarration,
   playTts,
+  requestAgentNarration,
   playSfx,
   playMusic,
   stopMusic,
