@@ -1,4 +1,6 @@
-const API_BASE = "https://microwave-show-api.lolololololol.workers.dev";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ??
+  "https://microwave-show-api.lolololololol.workers.dev";
 
 export interface Session {
   foodName: string;
@@ -25,7 +27,7 @@ export type SignedUrlResponse = {
   error?: string;
 };
 
-async function startSession(
+export async function startSession(
   foodName: string,
   totalTime: number,
   style: "sports" | "horror" | "documentary" | "anime"
@@ -44,7 +46,12 @@ async function startSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as { ok?: boolean; session?: Session; error?: string };
+  const data = (await res.json()) as {
+    ok?: boolean;
+    session?: Session;
+    error?: string;
+  };
+
   console.log("startSession response", res.status, data);
 
   if (!res.ok || !data.ok || !data.session?.sessionId) {
@@ -54,7 +61,7 @@ async function startSession(
   return data.session;
 }
 
-async function getSession(sessionId: string): Promise<Session> {
+export async function getSession(sessionId: string): Promise<Session> {
   const res = await fetch(
     `${API_BASE}/api/session?sessionId=${encodeURIComponent(sessionId)}`,
     {
@@ -65,7 +72,12 @@ async function getSession(sessionId: string): Promise<Session> {
     }
   );
 
-  const data = (await res.json()) as { ok?: boolean; session?: Session; error?: string };
+  const data = (await res.json()) as {
+    ok?: boolean;
+    session?: Session;
+    error?: string;
+  };
+
   console.log("getSession response", res.status, data);
 
   if (!res.ok || !data.ok || !data.session) {
@@ -75,7 +87,7 @@ async function getSession(sessionId: string): Promise<Session> {
   return data.session;
 }
 
-async function tickSession(
+export async function tickSession(
   sessionId: string,
   remainingTime: number
 ): Promise<void> {
@@ -92,7 +104,11 @@ async function tickSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as { ok?: boolean; error?: string };
+  const data = (await res.json()) as {
+    ok?: boolean;
+    error?: string;
+  };
+
   console.log("tickSession response", res.status, data);
 
   if (!res.ok || !data.ok) {
@@ -100,7 +116,10 @@ async function tickSession(
   }
 }
 
-async function saveNarration(sessionId: string, text: string): Promise<void> {
+export async function saveNarration(
+  sessionId: string,
+  text: string
+): Promise<void> {
   const payload = {
     sessionId,
     text: String(text || "").trim(),
@@ -114,7 +133,11 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as { ok?: boolean; error?: string };
+  const data = (await res.json()) as {
+    ok?: boolean;
+    error?: string;
+  };
+
   console.log("saveNarration response", res.status, data);
 
   if (!res.ok || !data.ok) {
@@ -122,7 +145,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   }
 }
 
-async function getSignedUrl(): Promise<string> {
+export async function getSignedUrl(): Promise<string> {
   const res = await fetch(`${API_BASE}/api/elevenlabs/signed-url`, {
     method: "POST",
   });
@@ -137,7 +160,7 @@ async function getSignedUrl(): Promise<string> {
   return data.signedUrl;
 }
 
-function buildNarrationCue(params: {
+export function buildNarrationCue(params: {
   foodName: string;
   style: string;
   phase: string;
@@ -172,16 +195,6 @@ Rules:
 }
 
 export const api = {
-  startSession,
-  getSession,
-  tickSession,
-  saveNarration,
-  getSignedUrl,
-  buildNarrationCue,
-  API_BASE,
-};
-
-export {
   startSession,
   getSession,
   tickSession,
