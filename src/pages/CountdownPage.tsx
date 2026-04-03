@@ -36,6 +36,8 @@ export default function CountdownPage({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
+  const hasSpokenInitialNarrationRef = useRef(false);
+  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -85,7 +87,36 @@ export default function CountdownPage({
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
+    hasSpokenInitialNarrationRef.current = false;
   }, [totalSeconds, style, dishName, locale]);
+
+  useEffect(() => {
+    if (!speechSupported || !narrationText || isPaused) return;
+
+    const synth = window.speechSynthesis;
+    if (synth.speaking) synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(narrationText);
+    utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
+    utterance.rate = 1;
+    utterance.pitch = style === 'horror' ? 0.85 : style === 'sports' ? 1.1 : 1;
+    utterance.volume = 1;
+
+    const voices = synth.getVoices();
+    const localePrefix = locale === 'ja' ? 'ja' : 'en';
+    const preferredVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix));
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    if (!hasSpokenInitialNarrationRef.current) {
+      hasSpokenInitialNarrationRef.current = true;
+    }
+
+    synth.speak(utterance);
+
+    return () => {
+      synth.cancel();
+    };
+  }, [narrationText, locale, style, isPaused, speechSupported]);
 
   useEffect(() => {
     if (isPaused || isFinished) return;
