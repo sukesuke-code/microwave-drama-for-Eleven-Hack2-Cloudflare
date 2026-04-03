@@ -225,7 +225,6 @@ async function startSession(
   });
 
   const data = (await res.json()) as { ok?: boolean; session?: Session; error?: string };
-  console.log("startSession response", res.status, data);
 
   if (!res.ok || !data.ok || !data.session?.sessionId) {
     throw new Error(data?.error || "Failed to start session");
@@ -246,7 +245,6 @@ async function getSession(sessionId: string): Promise<Session> {
   );
 
   const data = (await res.json()) as { ok?: boolean; session?: Session; error?: string };
-  console.log("getSession response", res.status, data);
 
   if (!res.ok || !data.ok || !data.session) {
     throw new Error(data?.error || "Failed to get session");
@@ -273,7 +271,6 @@ async function tickSession(
   });
 
   const data = (await res.json()) as { ok?: boolean; error?: string };
-  console.log("tickSession response", res.status, data);
 
   if (!res.ok || !data.ok) {
     throw new Error(data?.error || "Failed to tick session");
@@ -295,7 +292,6 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   });
 
   const data = (await res.json()) as { ok?: boolean; error?: string };
-  console.log("saveNarration response", res.status, data);
 
   if (!res.ok || !data.ok) {
     throw new Error(data?.error || "Failed to save narration");
@@ -317,12 +313,9 @@ async function playTts(text: string): Promise<void> {
     }),
   });
 
-  console.log("playTts status", res.status);
-  console.log("playTts content-type", res.headers.get("content-type"));
-
   if (!res.ok) {
     const errText = await res.text();
-    console.error("playTts error response", errText);
+    console.error("TTS failed:", errText);
     throw new Error("TTS failed");
   }
 
@@ -338,13 +331,8 @@ async function playTts(text: string): Promise<void> {
     bytes[i] = binary.charCodeAt(i);
   }
   const blob = new Blob([bytes], { type: "audio/mpeg" });
-  console.log("playTts blob", {
-    type: blob.type,
-    size: blob.size,
-  });
 
   const url = URL.createObjectURL(blob);
-  console.log("playTts object url", url);
 
   if (activeObjectUrl) {
     URL.revokeObjectURL(activeObjectUrl);
@@ -362,24 +350,11 @@ async function playTts(text: string): Promise<void> {
     activeObjectUrl = url;
     activeMeterCleanup = attachAudioMeter(audio);
 
-    audio.onloadedmetadata = () => {
-      console.log("audio loadedmetadata");
-    };
-
-    audio.oncanplay = () => {
-      console.log("audio canplay");
-    };
-
-    audio.oncanplaythrough = () => {
-      console.log("audio canplaythrough");
-    };
-
     audio.onerror = () => {
       console.error("audio element error", audio.error);
     };
 
     await audio.play();
-    console.log("audio playback success");
 
     await new Promise<void>((resolve, reject) => {
       let completed = false;
@@ -402,14 +377,6 @@ async function playTts(text: string): Promise<void> {
         }
       };
 
-      audio.onstalled = () => {
-        console.warn("audio playback stalled");
-      };
-
-      audio.onwaiting = () => {
-        console.warn("audio playback waiting for data");
-      };
-
       audio.onpause = () => {
         if (audio.ended || completed) return;
         if (stopRequested) {
@@ -418,7 +385,6 @@ async function playTts(text: string): Promise<void> {
           reject(new Error("Audio playback stopped"));
           return;
         }
-        console.warn("audio unexpectedly paused before completion; retrying play()");
         void audio.play().catch((err) => {
           if (completed) return;
           completed = true;
@@ -431,7 +397,6 @@ async function playTts(text: string): Promise<void> {
         if (completed) return;
         completed = true;
         cleanup();
-        console.log("audio playback ended");
         resolve();
       };
 
@@ -443,7 +408,6 @@ async function playTts(text: string): Promise<void> {
       };
     });
   } catch (error) {
-    console.error("audio playback failed", error);
     throw error;
   } finally {
     if (activeObjectUrl === url) {
