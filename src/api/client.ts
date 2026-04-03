@@ -62,16 +62,28 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
     const rms = Math.sqrt(sumSquares / waveformData.length);
     const level = Math.min(1, rms * 3.8);
     const spectrumBins = 16;
-    const chunkSize = Math.max(1, Math.floor(frequencyData.length / spectrumBins));
+    const nyquist = audioContext.sampleRate / 2;
+    const minHz = 90;
+    const maxHz = Math.min(9000, nyquist);
+    const logMin = Math.log10(minHz);
+    const logMax = Math.log10(maxHz);
     const spectrum = Array.from({ length: spectrumBins }, (_, index) => {
-      const start = index * chunkSize;
-      const end = Math.min(frequencyData.length, start + chunkSize);
+      const startRatio = index / spectrumBins;
+      const endRatio = (index + 1) / spectrumBins;
+      const startHz = Math.pow(10, logMin + (logMax - logMin) * startRatio);
+      const endHz = Math.pow(10, logMin + (logMax - logMin) * endRatio);
+      const startBin = Math.max(0, Math.floor((startHz / nyquist) * frequencyData.length));
+      const endBin = Math.min(
+        frequencyData.length,
+        Math.max(startBin + 1, Math.ceil((endHz / nyquist) * frequencyData.length))
+      );
+
       let sum = 0;
-      for (let i = start; i < end; i += 1) {
+      for (let i = startBin; i < endBin; i += 1) {
         sum += frequencyData[i];
       }
-      const avg = end > start ? sum / (end - start) : 0;
-      return Math.min(1, (avg / 255) * 1.85);
+      const avg = sum / Math.max(1, endBin - startBin);
+      return Math.min(1, (avg / 255) * 2.2);
     });
 
     emitTtsLevel(level);
