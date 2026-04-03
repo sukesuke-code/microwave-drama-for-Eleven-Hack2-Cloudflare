@@ -1,6 +1,6 @@
 import type { NarrationStyle } from "../types";
 
-const API_BASE = "https://microwave-show-api.lolololololol.workers.dev";
+const API_BASE = "https://microwave-show-api-v2.lolololololol.workers.dev";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://aaqahuauovsykozowifh.supabase.co";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhcWFodWF1b3ZzeWtvem93aWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTQzNTQsImV4cCI6MjA5MDczMDM1NH0.sjTM-7oGtRoRWv1pXPtQroeAR9ro1PxPMDJ6esW_3wk";
 const ELEVENLABS_TTS_ENDPOINT = `${SUPABASE_URL}/functions/v1/elevenlabs-tts`;
