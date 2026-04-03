@@ -12,11 +12,6 @@ interface TTSRequest {
   model_id?: string;
 }
 
-interface ElevenLabsResponse {
-  audio_base64?: string;
-  error?: string;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {

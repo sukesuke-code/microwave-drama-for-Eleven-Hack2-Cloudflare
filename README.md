@@ -114,6 +114,42 @@ If browser binaries are not installed, run:
 npx playwright install chromium
 ```
 
+### 11) Narration Function Contract (Production)
+- **Canonical function name:** `agent-narration`
+- **Endpoint:** `POST /functions/v1/agent-narration`
+- **Compatibility alias:** `elevenlabs-narration` is kept as a proxy wrapper and forwards to `agent-narration`.
+
+**Request JSON**
+```json
+{
+  "sessionId": "optional-string",
+  "style": "sports | horror | documentary | anime | movie | nature",
+  "dishName": "string",
+  "totalTime": 120,
+  "remainingTime": 90,
+  "phase": "opening | quarter | middle | final | done",
+  "locale": "ja-JP or en-US"
+}
+```
+
+**Response JSON**
+```json
+{
+  "ok": true,
+  "text": "Narration text",
+  "audio_base64": "optional base64-encoded mp3"
+}
+```
+
+Error response:
+```json
+{
+  "ok": false,
+  "text": "",
+  "error": "error-code-or-message"
+}
+```
+
 ---
 
 ## 日本語
@@ -179,6 +215,42 @@ npx playwright install chromium
   - 機密ロジックはサーバー側へ移管、
   - クライアントに秘密情報を埋め込まない、
   が必須です。
+
+### 11) ナレーション関数の運用仕様（本番）
+- **実運用の関数名:** `agent-narration`
+- **エンドポイント:** `POST /functions/v1/agent-narration`
+- **互換エイリアス:** `elevenlabs-narration` は互換プロキシとして残し、内部で `agent-narration` に転送します。
+
+**入力(JSON)**
+```json
+{
+  "sessionId": "任意の文字列",
+  "style": "sports | horror | documentary | anime | movie | nature",
+  "dishName": "文字列",
+  "totalTime": 120,
+  "remainingTime": 90,
+  "phase": "opening | quarter | middle | final | done",
+  "locale": "ja-JP または en-US"
+}
+```
+
+**出力(JSON)**
+```json
+{
+  "ok": true,
+  "text": "ナレーション文字列",
+  "audio_base64": "任意: base64エンコード済みmp3"
+}
+```
+
+エラー時:
+```json
+{
+  "ok": false,
+  "text": "",
+  "error": "エラーコードまたはメッセージ"
+}
+```
 
 ### 9) 技術スタック
 - React + TypeScript + Vite

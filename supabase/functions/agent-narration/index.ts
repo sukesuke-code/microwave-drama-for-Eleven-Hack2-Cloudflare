@@ -16,13 +16,6 @@ interface NarrationRequest {
   locale: string;
 }
 
-interface NarrationResponse {
-  ok: boolean;
-  text: string;
-  audio_base64?: string;
-  error?: string;
-}
-
 const STYLE_PROMPTS: Record<string, { system: string; personality: string }> = {
   sports: {
     system: "You are an enthusiastic sports commentator providing live play-by-play narration for a microwave cooking timer.",
@@ -249,7 +242,7 @@ Deno.serve(async (req: Request) => {
           "Content-Type": "application/json",
         },
       });
-    } catch (_audioError) {
+    } catch {
       return new Response(JSON.stringify({
         ok: true,
         text: narrationText,
