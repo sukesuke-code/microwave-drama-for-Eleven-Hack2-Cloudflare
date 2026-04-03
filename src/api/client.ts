@@ -420,7 +420,8 @@ async function startSession(
     style,
   };
 
-  const res = await fetch(`${API_BASE}${SESSION_START_PATH}`, {
+  const requestUrl = `${API_BASE}${SESSION_START_PATH}`;
+  const res = await fetch(requestUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -428,16 +429,49 @@ async function startSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    session?: Session;
-    error?: string;
-  };
+  const contentType = res.headers.get("content-type") ?? "";
+  let data:
+    | {
+        ok?: boolean;
+        session?: Session;
+        error?: string;
+      }
+    | null = null;
+  let responseText = "";
 
-  console.log("startSession response", res.status, data);
+  if (contentType.includes("application/json")) {
+    data = (await res.json()) as {
+      ok?: boolean;
+      session?: Session;
+      error?: string;
+    };
+  } else {
+    responseText = await res.text();
+  }
 
-  if (!res.ok || !data.ok || !data.session?.sessionId) {
-    throw new Error(data?.error || "Failed to start session");
+  console.log("startSession response", {
+    status: res.status,
+    url: requestUrl,
+    data,
+    text: responseText,
+  });
+
+  if (!res.ok) {
+    const safeBody = (data?.error || responseText || "No response body")
+      .replace(/\s+/g, " ")
+      .slice(0, 300);
+    throw new Error(
+      `Failed to start session (HTTP ${res.status}) [${requestUrl}] ${safeBody}`
+    );
+  }
+
+  if (!data?.ok || !data.session?.sessionId) {
+    const safeBody = (data?.error || responseText || "Invalid API response")
+      .replace(/\s+/g, " ")
+      .slice(0, 300);
+    throw new Error(
+      `Failed to start session (invalid response) [${requestUrl}] ${safeBody}`
+    );
   }
 
   return data.session;

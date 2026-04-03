@@ -151,9 +151,17 @@ export default function SettingsPage({
       sessionStorage.setItem('sessionId', session.sessionId);
       onStart(settings);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to start session';
-      setError(message);
-      console.error('Failed to start session:', err);
+      const userMessage = locale === 'ja'
+        ? 'サーバーに接続できませんでした。通信環境をご確認のうえ、もう一度お試しください。'
+        : 'Could not connect to the server. Please check your connection and try again.';
+      setError(userMessage);
+
+      const developerMessage = err instanceof Error ? err.message : String(err);
+      console.error('Failed to start session (developer detail):', {
+        error: developerMessage,
+        duration,
+        style,
+      });
     } finally {
       setIsLoading(false);
     }
