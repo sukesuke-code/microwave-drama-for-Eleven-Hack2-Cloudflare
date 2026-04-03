@@ -45,6 +45,7 @@ export default function CountdownPage({
   const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastQueuedNarrationRef = useRef('');
   const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
+  const hasLoggedAgentFallbackRef = useRef(false);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -173,7 +174,15 @@ export default function CountdownPage({
         await handlePhaseEffects(phase);
       })
       .catch(async (err) => {
-        console.error('Failed to process phase narration event (fallback to local TTS):', err);
+        const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
+        if (isAgentUnavailable) {
+          if (!hasLoggedAgentFallbackRef.current) {
+            console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
+            hasLoggedAgentFallbackRef.current = true;
+          }
+        } else {
+          console.error('Failed to process phase narration event (fallback to local TTS):', err);
+        }
         prevNarrationRef.current = fallbackLine;
         setNarrationText(fallbackLine);
 

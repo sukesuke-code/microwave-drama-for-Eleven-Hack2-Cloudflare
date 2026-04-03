@@ -9,6 +9,7 @@ let stopRequested = false;
 let activeMeterCleanup: (() => void) | null = null;
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+let agentNarrationEndpointMissing = false;
 
 type TtsLevelListener = (level: number) => void;
 type TtsMeterSnapshot = {
@@ -29,6 +30,13 @@ export interface AgentNarrationRequest {
 export interface AgentNarrationResponse {
   text: string;
   play: () => Promise<void>;
+}
+
+class AgentNarrationUnavailableError extends Error {
+  constructor() {
+    super("AGENT_NARRATION_UNAVAILABLE");
+    this.name = "AgentNarrationUnavailableError";
+  }
 }
 const ttsLevelListeners = new Set<TtsLevelListener>();
 const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
@@ -446,6 +454,10 @@ async function playTts(text: string): Promise<void> {
 }
 
 async function requestAgentNarration(request: AgentNarrationRequest): Promise<AgentNarrationResponse> {
+  if (agentNarrationEndpointMissing) {
+    throw new AgentNarrationUnavailableError();
+  }
+
   const payload = {
     sessionId: request.sessionId,
     send_user_message: true,
@@ -477,6 +489,10 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
   });
 
   if (!res.ok) {
+    if (res.status === 404) {
+      agentNarrationEndpointMissing = true;
+      throw new AgentNarrationUnavailableError();
+    }
     const errText = await res.text();
     throw new Error(errText || "Agent narration failed");
   }
