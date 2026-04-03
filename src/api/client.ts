@@ -5,6 +5,8 @@ let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 let stopRequested = false;
 let activeMeterCleanup: (() => void) | null = null;
+let activeMusicAudio: HTMLAudioElement | null = null;
+let activeMusicObjectUrl: string | null = null;
 
 type TtsLevelListener = (level: number) => void;
 type TtsMeterSnapshot = {
@@ -128,6 +130,39 @@ function stopTtsPlayback(): void {
     URL.revokeObjectURL(activeObjectUrl);
     activeObjectUrl = null;
   }
+}
+
+function stopMusic(): void {
+  if (activeMusicAudio) {
+    activeMusicAudio.pause();
+    activeMusicAudio.src = "";
+    activeMusicAudio.load();
+    activeMusicAudio = null;
+  }
+  if (activeMusicObjectUrl) {
+    URL.revokeObjectURL(activeMusicObjectUrl);
+    activeMusicObjectUrl = null;
+  }
+}
+
+async function parseAudioBlob(res: Response): Promise<Blob> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const json = (await res.json()) as { audioBase64?: string; audio?: string; error?: string };
+    const base64Audio = json.audioBase64 || json.audio;
+    if (!base64Audio) {
+      throw new Error(json.error || "Audio payload is missing");
+    }
+    const base64 = base64Audio.includes(",") ? base64Audio.split(",").pop() ?? "" : base64Audio;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: "audio/mpeg" });
+  }
+
+  return res.blob();
 }
 
 export interface Session {
@@ -393,12 +428,76 @@ async function playTts(text: string): Promise<void> {
   }
 }
 
+async function playSfx(prompt: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || "SFX generation failed");
+  }
+
+  const blob = await parseAudioBlob(res);
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.preload = "auto";
+  audio.volume = 0.55;
+  audio.setAttribute("playsinline", "true");
+  audio.onended = () => {
+    URL.revokeObjectURL(url);
+  };
+
+  try {
+    await audio.play();
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+async function playMusic(prompt: string): Promise<void> {
+  stopMusic();
+
+  const res = await fetch(`${API_BASE}/api/generate-music`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || "Music generation failed");
+  }
+
+  const blob = await parseAudioBlob(res);
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.preload = "auto";
+  audio.loop = true;
+  audio.volume = 0.3;
+  audio.setAttribute("playsinline", "true");
+
+  activeMusicAudio = audio;
+  activeMusicObjectUrl = url;
+  await audio.play();
+}
+
 export const api = {
   startSession,
   getSession,
   tickSession,
   saveNarration,
   playTts,
+  playSfx,
+  playMusic,
+  stopMusic,
   stopTtsPlayback,
   subscribeTtsLevel,
   subscribeTtsMeter,
