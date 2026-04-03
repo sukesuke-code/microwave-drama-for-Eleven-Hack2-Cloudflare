@@ -9,6 +9,9 @@ import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
+import { api } from '../api/client';
+import { ElevenLabsAgent } from '../api/elevenlab-agent';
+import { AudioPlayer } from '../api/audio-player';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -40,6 +43,10 @@ export default function CountdownPage({
   const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const agentRef = useRef<ElevenLabsAgent | null>(null);
+  const audioPlayerRef = useRef<AudioPlayer | null>(null);
+  const unsubscribeRef = useRef<Array<() => void>>([]);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -88,34 +95,96 @@ export default function CountdownPage({
     prevNarrationRef.current = initial;
     setNarrationText(initial);
     hasSpokenInitialNarrationRef.current = false;
+
+    sessionIdRef.current = sessionStorage.getItem('sessionId');
+
+    const initializeAgent = async () => {
+      try {
+        if (!sessionIdRef.current) {
+          console.warn('No session ID found');
+          return;
+        }
+
+        const signedUrlResponse = await api.getSignedUrl();
+        console.log('Got signed URL:', signedUrlResponse.signedUrl);
+
+        agentRef.current = new ElevenLabsAgent(signedUrlResponse.signedUrl);
+        await agentRef.current.connect();
+
+        audioPlayerRef.current = new AudioPlayer();
+        await audioPlayerRef.current.initialize();
+
+        const unsubAudio = agentRef.current.on('audio', (event) => {
+          if ('data' in event && audioPlayerRef.current) {
+            audioPlayerRef.current.queueAudio(event.data);
+          }
+        });
+
+        const unsubAgentTranscript = agentRef.current.on('agent_transcript', (event) => {
+          if ('data' in event) {
+            console.log('Agent transcript:', event.data);
+          }
+        });
+
+        const unsubError = agentRef.current.on('error', (event) => {
+          if ('error' in event) {
+            console.error('Agent error:', event.error);
+          }
+        });
+
+        unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError];
+
+        agentRef.current.send(initial);
+      } catch (error) {
+        console.error('Failed to initialize agent:', error);
+      }
+    };
+
+    initializeAgent();
+
+    return () => {
+      unsubscribeRef.current.forEach((unsub) => unsub());
+      if (agentRef.current) {
+        agentRef.current.disconnect();
+        agentRef.current = null;
+      }
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.destroy();
+        audioPlayerRef.current = null;
+      }
+    };
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
-    if (!speechSupported || !narrationText || isPaused) return;
+    if (!narrationText || isPaused) return;
 
-    const synth = window.speechSynthesis;
-    if (synth.speaking) synth.cancel();
+    if (agentRef.current && agentRef.current.isConnected()) {
+      agentRef.current.send(narrationText);
+    } else if (speechSupported) {
+      const synth = window.speechSynthesis;
+      if (synth.speaking) synth.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(narrationText);
-    utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
-    utterance.rate = 1;
-    utterance.pitch = style === 'horror' ? 0.85 : style === 'sports' ? 1.1 : 1;
-    utterance.volume = 1;
+      const utterance = new SpeechSynthesisUtterance(narrationText);
+      utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
+      utterance.rate = 1;
+      utterance.pitch = style === 'horror' ? 0.85 : style === 'sports' ? 1.1 : 1;
+      utterance.volume = 1;
 
-    const voices = synth.getVoices();
-    const localePrefix = locale === 'ja' ? 'ja' : 'en';
-    const preferredVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix));
-    if (preferredVoice) utterance.voice = preferredVoice;
+      const voices = synth.getVoices();
+      const localePrefix = locale === 'ja' ? 'ja' : 'en';
+      const preferredVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix));
+      if (preferredVoice) utterance.voice = preferredVoice;
 
-    if (!hasSpokenInitialNarrationRef.current) {
-      hasSpokenInitialNarrationRef.current = true;
+      if (!hasSpokenInitialNarrationRef.current) {
+        hasSpokenInitialNarrationRef.current = true;
+      }
+
+      synth.speak(utterance);
+
+      return () => {
+        synth.cancel();
+      };
     }
-
-    synth.speak(utterance);
-
-    return () => {
-      synth.cancel();
-    };
   }, [narrationText, locale, style, isPaused, speechSupported]);
 
   useEffect(() => {
@@ -133,11 +202,25 @@ export default function CountdownPage({
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
+
+          if (sessionIdRef.current) {
+            api.tickSession(sessionIdRef.current, 0).catch((err) => {
+              console.error('Failed to tick session on finish:', err);
+            });
+          }
+
           setTimeout(() => setIsFlashing(false), 600);
           setTimeout(() => onFinish(), 4000);
           return 0;
         }
         updateNarration(next, totalSeconds);
+
+        if (sessionIdRef.current) {
+          api.tickSession(sessionIdRef.current, next).catch((err) => {
+            console.error('Failed to tick session:', err);
+          });
+        }
+
         return next;
       });
     }, 1000);

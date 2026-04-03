@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed } from 'lucide-react';
 import { Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
+import { api } from '../api/client';
 
 interface SettingsPageProps {
   locale: Locale;
@@ -102,6 +103,8 @@ export default function SettingsPage({
   const [duration, setDuration] = useState(draft.duration);
   const [dishName, setDishName] = useState(draft.dishName);
   const [style, setStyle] = useState<NarrationStyle>(draft.style);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const t = UI_TEXT[locale];
   const isLight = themeMode === 'light';
@@ -122,12 +125,38 @@ export default function SettingsPage({
     setDuration(clampDuration(minutes * 60 + nextSeconds));
   };
 
-  const handleStart = () => {
-    onStart({
-      totalSeconds: duration,
-      dishName: dishName.trim() || t.mysteryDish,
-      style,
-    });
+  const handleStart = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const mappedStyle = style === 'sports' ? 'sports'
+        : style === 'movie' ? 'documentary'
+        : style === 'horror' ? 'horror'
+        : 'anime';
+
+      const session = await api.startSession(
+        dishName.trim() || t.mysteryDish,
+        duration,
+        mappedStyle as "sports" | "horror" | "documentary" | "anime"
+      );
+
+      const settings: Settings = {
+        totalSeconds: duration,
+        dishName: dishName.trim() || t.mysteryDish,
+        style,
+      };
+
+      sessionStorage.setItem('sessionId', session.sessionId);
+      onStart(settings);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start session';
+      setError(message);
+      console.error('Failed to start session:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -279,19 +308,26 @@ export default function SettingsPage({
             </div>
           </section>
 
-          <button
-            type="button"
-            onClick={handleStart}
-            disabled={duration < 1}
-            className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #ea580c, #dc2626)',
-              boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
-            }}
-          >
-            <PlayCircle size={14} />
-            {t.startNarration}
-          </button>
+          <div className="space-y-2">
+            {error && (
+              <div className="rounded-lg bg-red-500/20 border border-red-500/40 p-2 text-xs text-red-300">
+                {error}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={duration < 1 || isLoading}
+              className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0"
+              style={{
+                background: 'linear-gradient(135deg, #ea580c, #dc2626)',
+                boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
+              }}
+            >
+              <PlayCircle size={14} />
+              {isLoading ? t.loading : t.startNarration}
+            </button>
+          </div>
         </div>
       </div>
     </div>
