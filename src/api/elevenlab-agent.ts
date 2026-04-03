@@ -57,13 +57,14 @@ export class ElevenLabsAgent {
         this.ws = new WebSocket(this.signedUrl);
 
         this.ws.onopen = () => {
-          console.log('ElevenLabs agent connected');
+          console.log('ElevenLabs agent connected, starting ping interval');
           this.startPingInterval();
           this.emit({ type: 'connected' });
           resolve();
         };
 
         this.ws.onmessage = (event) => {
+          console.log('raw websocket message', event.data);
           this.handleMessage(event.data);
         };
 
@@ -73,8 +74,12 @@ export class ElevenLabsAgent {
           reject(new Error('Failed to connect to ElevenLabs agent'));
         };
 
-        this.ws.onclose = () => {
-          console.log('ElevenLabs agent disconnected');
+        this.ws.onclose = (event) => {
+          console.log('agent disconnect event', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+          });
           this.stopPingInterval();
           this.emit({ type: 'disconnected' });
         };
@@ -86,17 +91,20 @@ export class ElevenLabsAgent {
 
   private handleMessage(data: string | ArrayBuffer) {
     try {
+      let message: AgentMessage;
+
       if (typeof data === 'string') {
-        const message: AgentMessage = JSON.parse(data);
-        this.processMessage(message);
+        message = JSON.parse(data);
       } else {
         const view = new Uint8Array(data as ArrayBuffer);
         const text = new TextDecoder().decode(view);
-        const message: AgentMessage = JSON.parse(text);
-        this.processMessage(message);
+        message = JSON.parse(text);
       }
+
+      console.log('parsed websocket message', message);
+      this.processMessage(message);
     } catch (error) {
-      console.error('Error parsing message:', error);
+      console.error('Error parsing message:', error, 'raw data:', data);
     }
   }
 
@@ -104,9 +112,18 @@ export class ElevenLabsAgent {
     const type = message.type as string;
 
     switch (type) {
+      case 'conversation_initiation_metadata': {
+        console.log('conversation_initiation_metadata received', message);
+        break;
+      }
+      case 'agent_response': {
+        console.log('agent_response received', message);
+        break;
+      }
       case 'audio': {
         const audioMsg = message as unknown as AudioMessage;
         if (audioMsg.audio?.chunk) {
+          console.log('audio event received', { chunk_length: audioMsg.audio.chunk.length });
           this.emit({ type: 'audio', data: audioMsg.audio.chunk });
         }
         break;
@@ -114,6 +131,7 @@ export class ElevenLabsAgent {
       case 'user_transcript': {
         const userMsg = message as unknown as UserTranscriptMessage;
         if (userMsg.user_transcript) {
+          console.log('user_transcript received', userMsg.user_transcript);
           this.emit({ type: 'user_transcript', data: userMsg.user_transcript });
         }
         break;
@@ -121,32 +139,60 @@ export class ElevenLabsAgent {
       case 'agent_transcript': {
         const agentMsg = message as unknown as AgentTranscriptMessage;
         if (agentMsg.agent_transcript) {
+          console.log('agent_transcript received', agentMsg.agent_transcript);
           this.emit({ type: 'agent_transcript', data: agentMsg.agent_transcript });
         }
         break;
       }
       case 'interruption': {
+        console.log('interruption received');
         this.emit({ type: 'interruption' });
         break;
       }
-      case 'pong': {
+      case 'ping': {
+        console.log('ping received', (message as unknown as { ping_event?: { event_id?: string } }).ping_event);
+        this.sendPong(message);
         break;
+      }
+      case 'pong': {
+        console.log('pong received');
+        break;
+      }
+      default: {
+        console.log('unknown message type received', type, message);
       }
     }
   }
 
-  send(text: string): void {
+  private sendPong(pingMessage: AgentMessage): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected');
+      console.warn('WebSocket not open, cannot send pong');
       return;
     }
 
-    const message = {
+    const pingEvent = (pingMessage as unknown as { ping_event?: { event_id?: string } }).ping_event;
+    const pongPayload = {
+      type: 'pong',
+      event_id: pingEvent?.event_id,
+    };
+
+    console.log('pong sent', { eventId: pingEvent?.event_id });
+    this.ws.send(JSON.stringify(pongPayload));
+  }
+
+  send(text: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('WebSocket not connected, cannot send user_input');
+      return;
+    }
+
+    const payload = {
       type: 'user_input',
       user_input: text,
     };
 
-    this.ws.send(JSON.stringify(message));
+    console.log('socket outgoing payload', payload);
+    this.ws.send(JSON.stringify(payload));
   }
 
   disconnect(): void {
@@ -186,6 +232,7 @@ export class ElevenLabsAgent {
     this.pingInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const ping: PingMessage = { type: 'ping' };
+        console.log('ping sent');
         this.ws.send(JSON.stringify(ping));
       }
     }, 30000);
