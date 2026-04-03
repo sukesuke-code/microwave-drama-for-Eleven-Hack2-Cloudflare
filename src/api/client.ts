@@ -43,6 +43,8 @@ export interface AgentNarrationRequest {
 
 export interface AgentNarrationResponse {
   text: string;
+  audioAvailable: boolean;
+  fallbackReason: string | null;
   play: () => Promise<void>;
 }
 
@@ -506,6 +508,8 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
     ok?: boolean;
     text?: string;
     audio_base64?: string;
+    audio_available?: boolean;
+    fallback_reason?: string | null;
     error?: string;
   };
 
@@ -515,13 +519,29 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
   }
 
   const base64Audio = data.audio_base64;
+  const audioAvailable = Boolean(data.audio_available && base64Audio);
+  const fallbackReason = data.fallback_reason ?? null;
+
+  if (!audioAvailable) {
+    const warningContext = {
+      component: "requestAgentNarration",
+      event: "subtitle_only_mode",
+      reason: fallbackReason ?? "AUDIO_MISSING",
+      sessionId: request.sessionId ?? "unknown",
+      phase: request.phase,
+      style: request.style,
+    };
+    console.warn(`[narration-warning] ${JSON.stringify(warningContext)}`);
+  }
 
   return {
     text,
+    audioAvailable,
+    fallbackReason,
     play: async () => {
       stopRequested = false;
 
-      if (!base64Audio) {
+      if (!audioAvailable || !base64Audio) {
         return;
       }
 

@@ -61,6 +61,7 @@ export default function CountdownPage({
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+  const [subtitleModeDebug, setSubtitleModeDebug] = useState<string | null>(null);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -217,6 +218,13 @@ export default function CountdownPage({
         const narration = await api.requestAgentNarration(context);
         prevNarrationRef.current = narration.text;
         setNarrationText(narration.text);
+        if (!narration.audioAvailable) {
+          const debugInfo = `subtitle-only mode (reason=${narration.fallbackReason ?? 'AUDIO_MISSING'}, phase=${phase}, t=${timeLeft}s)`;
+          setSubtitleModeDebug(debugInfo);
+          console.debug(`[narration-debug] ${debugInfo}`);
+        } else {
+          setSubtitleModeDebug(null);
+        }
         if (sessionIdRef.current) {
           await api.saveNarration(sessionIdRef.current, narration.text);
         }
@@ -227,6 +235,7 @@ export default function CountdownPage({
       })
       .catch(async (err) => {
         const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
+        setSubtitleModeDebug(`subtitle-only fallback(local TTS) reason=${isAgentUnavailable ? 'AGENT_NARRATION_UNAVAILABLE' : 'PHASE_NARRATION_ERROR'}`);
         if (isAgentUnavailable) {
           if (!hasLoggedAgentFallbackRef.current) {
             console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
@@ -247,6 +256,7 @@ export default function CountdownPage({
         await Promise.allSettled([
           api.playTts(fallbackLine).catch((ttsError) => {
             console.error('Failed to play fallback TTS:', ttsError);
+            setSubtitleModeDebug('subtitle-only fallback(local TTS failed)');
           }),
           handlePhaseEffects(phase).catch((effectError) => {
             console.error('Failed to run fallback phase effects:', effectError);
@@ -431,6 +441,11 @@ export default function CountdownPage({
           <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
             <NarrationText text={narrationText} style={style} themeMode={themeMode} />
           </div>
+          {subtitleModeDebug && (
+            <p className={`mt-1 text-center text-[10px] tracking-wide ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>
+              DEBUG: {subtitleModeDebug}
+            </p>
+          )}
 
           {isDanger && !isFinished && (
             <div

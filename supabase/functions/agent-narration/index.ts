@@ -197,7 +197,7 @@ async function generateSpeechFromElevenLabs(
 ): Promise<string> {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
   if (!apiKey) {
-    throw new Error("ElevenLabs API key is not configured");
+    throw new Error("ELEVENLABS_API_KEY_MISSING");
   }
 
   const elevenLabsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
@@ -220,7 +220,7 @@ async function generateSpeechFromElevenLabs(
 
   if (!response.ok) {
     logSafeError("elevenlabs_tts_error", { status: response.status });
-    throw new Error("Failed to generate speech");
+    throw new Error("ELEVENLABS_TTS_FAILED");
   }
 
   const audioBuffer = await response.arrayBuffer();
@@ -272,6 +272,8 @@ Deno.serve(async (req: Request) => {
         ok: true,
         text: narrationText,
         audio_base64: audioBase64,
+        audio_available: true,
+        fallback_reason: null,
       }), {
         status: 200,
         headers: {
@@ -279,10 +281,29 @@ Deno.serve(async (req: Request) => {
           "Content-Type": "application/json",
         },
       });
-    } catch {
+    } catch (audioError) {
+      const reason = audioError instanceof Error ? audioError.message : "AUDIO_GENERATION_FAILED";
+      if (reason === "ELEVENLABS_API_KEY_MISSING") {
+        return new Response(JSON.stringify({
+          ok: false,
+          text: narrationText,
+          audio_available: false,
+          fallback_reason: "ELEVENLABS_API_KEY_MISSING",
+          error: "ELEVENLABS_API_KEY_MISSING",
+        }), {
+          status: 503,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        });
+      }
+
       return new Response(JSON.stringify({
         ok: true,
         text: narrationText,
+        audio_available: false,
+        fallback_reason: "AUDIO_GENERATION_FAILED",
       }), {
         status: 200,
         headers: {
@@ -300,6 +321,8 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({
         ok: false,
         text: "",
+        audio_available: false,
+        fallback_reason: "AGENT_NARRATION_UNAVAILABLE",
         error: "AGENT_NARRATION_UNAVAILABLE",
       }), {
         status: 503,
@@ -313,6 +336,8 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({
       ok: false,
       text: "",
+      audio_available: false,
+      fallback_reason: "INTERNAL_ERROR",
       error: error instanceof Error ? error.message : "Unknown error",
     }), {
       status: 500,
