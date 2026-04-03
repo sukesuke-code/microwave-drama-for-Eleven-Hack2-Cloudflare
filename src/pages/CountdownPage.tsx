@@ -195,10 +195,6 @@ export default function CountdownPage({
           });
         }
 
-        await api.playTts(fallbackLine).catch((ttsError) => {
-          console.error('Failed to play fallback TTS:', ttsError);
-        });
-
         await handlePhaseEffects(phase).catch((effectError) => {
           console.error('Failed to run fallback phase effects:', effectError);
         });
