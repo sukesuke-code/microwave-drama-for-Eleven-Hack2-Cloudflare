@@ -38,6 +38,7 @@ export default function CountdownPage({
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
+  const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -115,8 +116,9 @@ export default function CountdownPage({
   }, [narrationText, isPaused]);
 
   useEffect(() => {
-    const unsubscribe = api.subscribeTtsLevel((level) => {
+    const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
       setTtsLevel(level);
+      setTtsSpectrum(spectrum);
     });
     return () => {
       unsubscribe();
@@ -282,6 +284,7 @@ export default function CountdownPage({
               intensity={waveIntensity}
               syncSeed={waveSeed}
               audioLevel={ttsLevel}
+              audioSpectrum={ttsSpectrum}
             />
           </div>
 

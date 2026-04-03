@@ -7,7 +7,12 @@ let stopRequested = false;
 let activeMeterCleanup: (() => void) | null = null;
 
 type TtsLevelListener = (level: number) => void;
+type TtsMeterSnapshot = {
+  level: number;
+  spectrum: number[];
+};
 const ttsLevelListeners = new Set<TtsLevelListener>();
+const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
 
 function emitTtsLevel(level: number): void {
   ttsLevelListeners.forEach((listener) => {
@@ -22,6 +27,13 @@ function subscribeTtsLevel(listener: TtsLevelListener): () => void {
   };
 }
 
+function subscribeTtsMeter(listener: (snapshot: TtsMeterSnapshot) => void): () => void {
+  ttsMeterListeners.add(listener);
+  return () => {
+    ttsMeterListeners.delete(listener);
+  };
+}
+
 function attachAudioMeter(audio: HTMLAudioElement): () => void {
   const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextImpl) {
@@ -30,23 +42,45 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
 
   const audioContext = new AudioContextImpl();
   const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
-  const data = new Uint8Array(analyser.fftSize);
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.8;
+  const waveformData = new Uint8Array(analyser.fftSize);
+  const frequencyData = new Uint8Array(analyser.frequencyBinCount);
   const source = audioContext.createMediaElementSource(audio);
   source.connect(analyser);
   analyser.connect(audioContext.destination);
 
   let frameId = 0;
   const tick = () => {
-    analyser.getByteTimeDomainData(data);
+    analyser.getByteTimeDomainData(waveformData);
+    analyser.getByteFrequencyData(frequencyData);
     let sumSquares = 0;
-    for (let i = 0; i < data.length; i += 1) {
-      const normalized = (data[i] - 128) / 128;
+    for (let i = 0; i < waveformData.length; i += 1) {
+      const normalized = (waveformData[i] - 128) / 128;
       sumSquares += normalized * normalized;
     }
-    const rms = Math.sqrt(sumSquares / data.length);
+    const rms = Math.sqrt(sumSquares / waveformData.length);
     const level = Math.min(1, rms * 3.8);
+    const spectrumBins = 16;
+    const chunkSize = Math.max(1, Math.floor(frequencyData.length / spectrumBins));
+    const spectrum = Array.from({ length: spectrumBins }, (_, index) => {
+      const start = index * chunkSize;
+      const end = Math.min(frequencyData.length, start + chunkSize);
+      let sum = 0;
+      for (let i = start; i < end; i += 1) {
+        sum += frequencyData[i];
+      }
+      const avg = end > start ? sum / (end - start) : 0;
+      return Math.min(1, (avg / 255) * 1.85);
+    });
+
     emitTtsLevel(level);
+    ttsMeterListeners.forEach((listener) => {
+      listener({
+        level,
+        spectrum,
+      });
+    });
     frameId = window.requestAnimationFrame(tick);
   };
 
@@ -59,6 +93,9 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
     source.disconnect();
     analyser.disconnect();
     emitTtsLevel(0);
+    ttsMeterListeners.forEach((listener) => {
+      listener({ level: 0, spectrum: [] });
+    });
     void audioContext.close();
   };
 }
@@ -352,5 +389,6 @@ export const api = {
   playTts,
   stopTtsPlayback,
   subscribeTtsLevel,
+  subscribeTtsMeter,
   API_BASE,
 };
