@@ -226,7 +226,9 @@ export default function CountdownPage({
           setSubtitleModeDebug(null);
         }
         if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, narration.text);
+          await api.saveNarration(sessionIdRef.current, narration.text).catch((saveError) => {
+            console.error('Failed to save narration:', saveError);
+          });
         }
         await Promise.allSettled([
           narration.play(),
@@ -235,7 +237,10 @@ export default function CountdownPage({
       })
       .catch(async (err) => {
         const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
-        setSubtitleModeDebug(`subtitle-only fallback(local TTS) reason=${isAgentUnavailable ? 'AGENT_NARRATION_UNAVAILABLE' : 'PHASE_NARRATION_ERROR'}`);
+        const requestErrorReason = err instanceof Error
+          ? (err.message || 'REQUEST_FAILED')
+          : 'REQUEST_FAILED';
+        setSubtitleModeDebug(`subtitle-only fallback(local TTS) reason=${isAgentUnavailable ? 'AGENT_NARRATION_UNAVAILABLE' : requestErrorReason}`);
         if (isAgentUnavailable) {
           if (!hasLoggedAgentFallbackRef.current) {
             console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
