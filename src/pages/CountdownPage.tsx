@@ -11,6 +11,26 @@ import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
 import { api } from '../api/client';
 
+const AGENT_SETTINGS_TEXT_MAX = 240;
+
+function sanitizeAgentInstructionText(input: string): string {
+  const withoutControlChars = Array.from(input, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 32 || code === 127 ? ' ' : ch;
+  }).join('');
+
+  const normalized = withoutControlChars
+    .replace(/[<>{}`$\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (normalized.length <= AGENT_SETTINGS_TEXT_MAX) {
+    return normalized;
+  }
+  return normalized.slice(0, AGENT_SETTINGS_TEXT_MAX);
+}
+
+
 interface CountdownPageProps {
   locale: Locale;
   settings: Settings;
@@ -127,6 +147,12 @@ export default function CountdownPage({
     }
   }, [style]);
 
+  const agentInstructionText = useMemo(() => {
+    const localeLabel = locale.startsWith('ja') ? 'Japanese' : 'English';
+    const instruction = `User settings (untrusted): style=${style}; locale=${localeLabel}; durationSec=${totalSeconds}; dish=${dishName || 'unnamed'}. Keep narration family-safe and concise.`;
+    return sanitizeAgentInstructionText(instruction);
+  }, [style, locale, totalSeconds, dishName]);
+
   const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
     return {
       sessionId: sessionIdRef.current ?? undefined,
@@ -136,8 +162,9 @@ export default function CountdownPage({
       remainingTime: tl,
       phase,
       locale,
+      agentInstructionText,
     };
-  }, [style, dishName, totalSeconds, locale]);
+  }, [style, dishName, totalSeconds, locale, agentInstructionText]);
 
   useEffect(() => {
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);

@@ -28,6 +28,7 @@ export interface AgentNarrationRequest {
   remainingTime: number;
   phase: "opening" | "quarter" | "middle" | "final" | "done";
   locale: string;
+  agentInstructionText?: string;
 }
 
 export interface AgentNarrationResponse {
@@ -433,6 +434,7 @@ async function requestAgentNarration(request: AgentNarrationRequest): Promise<Ag
     remainingTime: request.remainingTime,
     phase: request.phase,
     locale: request.locale,
+    agentInstructionText: request.agentInstructionText,
   };
 
   const res = await fetch(AGENT_NARRATION_ENDPOINT, {
