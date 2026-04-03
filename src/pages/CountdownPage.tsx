@@ -142,7 +142,21 @@ export default function CountdownPage({
           }
         });
 
-        unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError];
+        const unsubConnected = agentRef.current.on('connected', () => {
+          console.log('Agent connected event received, flushing pending narrations');
+          while (pendingNarrationsRef.current.length > 0) {
+            const nextNarration = pendingNarrationsRef.current.shift();
+            if (!nextNarration) break;
+            if (agentRef.current && agentRef.current.isConnected()) {
+              console.log('Flushing pending narration:', nextNarration);
+              agentRef.current.send(nextNarration);
+            }
+          }
+        });
+
+        unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError, unsubConnected];
+
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         while (pendingNarrationsRef.current.length > 0) {
           const nextNarration = pendingNarrationsRef.current.shift();
@@ -152,6 +166,7 @@ export default function CountdownPage({
         }
       } catch (error) {
         console.error('Failed to initialize agent:', error);
+        setTimeout(() => initializeAgent(), 2000);
       }
     };
 
@@ -173,13 +188,18 @@ export default function CountdownPage({
   useEffect(() => {
     if (!narrationText || isPaused) return;
 
-    if (agentRef.current && agentRef.current.isConnected()) {
-      agentRef.current.send(narrationText);
-      return;
-    }
+    const sendNarration = () => {
+      if (agentRef.current && agentRef.current.isConnected()) {
+        console.log('Sending narration to agent:', narrationText);
+        agentRef.current.send(narrationText);
+      } else {
+        console.warn('AI narration agent is not connected yet. Narration queued for AI TTS playback.');
+        pendingNarrationsRef.current.push(narrationText);
+      }
+    };
 
-    pendingNarrationsRef.current.push(narrationText);
-    console.warn('AI narration agent is not connected yet. Narration queued for AI TTS playback.');
+    const timer = setTimeout(sendNarration, 100);
+    return () => clearTimeout(timer);
   }, [narrationText, isPaused]);
 
   useEffect(() => {
