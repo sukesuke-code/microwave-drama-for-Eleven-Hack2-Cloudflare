@@ -1,168 +1,183 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { AppScreen, Locale, Settings, ThemeMode } from './types';
-import TopPage from './pages/TopPage';
+import { useEffect, useMemo, useRef, useState } from "react";
+import CountdownPage from "./pages/CountdownPage";
+import { startSession, tickSession } from "./lib/client";
 
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
-const CountdownPage = lazy(() => import('./pages/CountdownPage'));
-const ResultPage = lazy(() => import('./pages/ResultPage'));
+type Session = {
+  foodName: string;
+  totalTime: number;
+  remainingTime: number;
+  style: "sports" | "horror" | "documentary" | "anime";
+  phase: "opening" | "quarter" | "middle" | "final" | "done";
+  isRunning: boolean;
+  sessionId: string;
+  createdAt: number;
+  updatedAt: number;
+};
 
-const DEFAULT_LOCALE: Locale = 'en';
-const SUPPORTED_LOCALES: Locale[] = ['en', 'ja'];
+function getPhaseFromRemainingTime(
+  remainingTime: number,
+  totalTime: number
+): "opening" | "quarter" | "middle" | "final" | "done" {
+  if (remainingTime <= 0) return "done";
 
-function readStorage(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
+  const ratio = remainingTime / totalTime;
 
-function writeStorage(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // no-op: storage might be unavailable in private mode or restricted contexts
-  }
-}
-
-function normalizeLocale(locale: string): Locale | null {
-  const base = locale.toLowerCase().split('-')[0] as Locale;
-  return SUPPORTED_LOCALES.includes(base) ? base : null;
-}
-
-function detectDeviceLocale(): Locale {
-  if (typeof navigator === 'undefined') return DEFAULT_LOCALE;
-
-  const candidates = [...(navigator.languages ?? []), navigator.language]
-    .filter((lang): lang is string => Boolean(lang));
-
-  for (const candidate of candidates) {
-    const normalized = normalizeLocale(candidate);
-    if (normalized) return normalized;
-  }
-
-  return DEFAULT_LOCALE;
-}
-
-function readLocale(): Locale {
-  const saved = readStorage('ching-drama-locale');
-  if (saved) {
-    const normalizedSaved = normalizeLocale(saved);
-    if (normalizedSaved) return normalizedSaved;
-  }
-
-  return detectDeviceLocale();
-}
-
-
-function readSettings(): Settings | null {
-  const raw = readStorage('ching-drama-settings');
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<Settings>;
-    if (
-      typeof parsed.totalSeconds === 'number' &&
-      typeof parsed.dishName === 'string' &&
-      (parsed.style === 'sports' || parsed.style === 'movie' || parsed.style === 'horror' || parsed.style === 'nature')
-    ) {
-      return {
-        totalSeconds: parsed.totalSeconds,
-        dishName: parsed.dishName,
-        style: parsed.style,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  if (ratio > 0.75) return "opening";
+  if (ratio > 0.5) return "quarter";
+  if (ratio > 0.25) return "middle";
+  return "final";
 }
 
 export default function App() {
-  const [settings, setSettings] = useState<Settings | null>(() => readSettings());
-  const [screen, setScreen] = useState<AppScreen>('top');
-  const [locale, setLocale] = useState<Locale>(() => readLocale());
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-    const saved = readStorage('ching-drama-theme');
-    return saved === 'light' || saved === 'dark' ? saved : 'dark';
-  });
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const intervalRef = useRef<number | null>(null);
+  const startedRef = useRef(false);
+  const lastTickSentRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    writeStorage('ching-drama-locale', locale);
-    document.documentElement.lang = locale;
-  }, [locale]);
-
-  useEffect(() => {
-    writeStorage('ching-drama-theme', themeMode);
-  }, [themeMode]);
-
-  useEffect(() => {
-    writeStorage('ching-drama-screen', screen);
-  }, [screen]);
-
-  useEffect(() => {
-    if (!settings) return;
-    writeStorage('ching-drama-settings', JSON.stringify(settings));
-  }, [settings]);
-
-  const handleStartSettings = () => setScreen('settings');
-
-  const handleStartCountdown = (s: Settings) => {
-    setSettings(s);
-    setScreen('countdown');
-  };
-
-  const handleFinish = () => setScreen('result');
-
-  const handleReplay = () => {
-    if (settings) setScreen('countdown');
-  };
-
-  const handleHome = () => setScreen('settings');
-  const handleTop = () => setScreen('top');
-
-  return (
-    <div className="font-sans">
-      {screen === 'top' && (
-        <TopPage
-          onStart={handleStartSettings}
-          locale={locale}
-          themeMode={themeMode}
-          onLocaleChange={setLocale}
-          onThemeModeChange={setThemeMode}
-        />
-      )}
-      <Suspense fallback={<div className="min-h-screen bg-[#00031a]" />}>
-        {screen === 'settings' && (
-          <SettingsPage
-            locale={locale}
-            themeMode={themeMode}
-            onThemeModeChange={setThemeMode}
-            onBack={() => setScreen('top')}
-            onStart={handleStartCountdown}
-          />
-        )}
-        {screen === 'countdown' && settings && (
-          <CountdownPage
-            locale={locale}
-            settings={settings}
-            themeMode={themeMode}
-            onThemeModeChange={setThemeMode}
-            onBack={() => setScreen('settings')}
-            onFinish={handleFinish}
-          />
-        )}
-        {screen === 'result' && settings && (
-          <ResultPage
-            locale={locale}
-            settings={settings}
-            themeMode={themeMode}
-            onThemeModeChange={setThemeMode}
-            onReplay={handleReplay}
-            onHome={handleHome}
-            onTop={handleTop}
-          />
-        )}
-      </Suspense>
-    </div>
+  const sessionConfig = useMemo(
+    () => ({
+      foodName: "冷凍チャーハン",
+      totalTime: 60,
+      style: "sports" as const,
+    }),
+    []
   );
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    async function boot() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const startedSession = await startSession(
+          sessionConfig.foodName,
+          sessionConfig.totalTime,
+          sessionConfig.style
+        );
+
+        setSession(startedSession);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unknown error occurred";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void boot();
+  }, [sessionConfig]);
+
+  useEffect(() => {
+    if (!session?.sessionId) return;
+    if (!session.isRunning) return;
+    if (session.phase === "done") return;
+    if (intervalRef.current !== null) return;
+
+    intervalRef.current = window.setInterval(() => {
+      setSession((current) => {
+        if (!current) return current;
+        if (!current.isRunning) return current;
+        if (current.remainingTime <= 0) return current;
+
+        const nextRemainingTime = Math.max(0, current.remainingTime - 1);
+        const nextPhase = getPhaseFromRemainingTime(
+          nextRemainingTime,
+          current.totalTime
+        );
+
+        return {
+          ...current,
+          remainingTime: nextRemainingTime,
+          phase: nextPhase,
+          isRunning: nextRemainingTime > 0,
+          updatedAt: Date.now(),
+        };
+      });
+    }, 1000);
+
+    return () => {
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [session?.sessionId, session?.isRunning, session?.phase]);
+
+  useEffect(() => {
+    if (!session?.sessionId) return;
+
+    const currentRemaining = session.remainingTime;
+    if (lastTickSentRef.current === currentRemaining) return;
+    lastTickSentRef.current = currentRemaining;
+
+    void tickSession(session.sessionId, currentRemaining).catch((err) => {
+      console.error("tickSession failed", err);
+    });
+
+    if (currentRemaining <= 0 && intervalRef.current !== null) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, [session?.sessionId, session?.remainingTime]);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#111",
+          color: "white",
+          display: "grid",
+          placeItems: "center",
+          fontFamily:
+            "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        }}
+      >
+        Starting microwave session...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#111",
+          color: "white",
+          display: "grid",
+          placeItems: "center",
+          padding: 24,
+          fontFamily:
+            "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>
+            Failed to start session
+          </div>
+          <div style={{ opacity: 0.8 }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) return null;
+
+  return <CountdownPage session={session} />;
 }
