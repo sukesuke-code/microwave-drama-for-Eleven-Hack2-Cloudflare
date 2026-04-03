@@ -39,14 +39,14 @@ export default function CountdownPage({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
-  const hasSpokenInitialNarrationRef = useRef(false);
-  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const pendingNarrationsRef = useRef<string[]>([]);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const agentRef = useRef<ElevenLabsAgent | null>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const unsubscribeRef = useRef<Array<() => void>>([]);
+  const audioContextResumedRef = useRef(false);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -54,6 +54,13 @@ export default function CountdownPage({
   const lightBgGradient = style === 'sports'
     ? 'from-sky-50 via-blue-50/80 to-slate-100'
     : 'from-slate-50 via-orange-50/80 to-slate-100';
+
+  const resumeAudioContext = useCallback(() => {
+    if (audioPlayerRef.current && !audioContextResumedRef.current) {
+      audioContextResumedRef.current = true;
+      console.log('AudioContext resumed by user interaction');
+    }
+  }, []);
 
   const playAlarmTone = useCallback(() => {
     const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -94,7 +101,7 @@ export default function CountdownPage({
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
-    hasSpokenInitialNarrationRef.current = false;
+    pendingNarrationsRef.current = [];
 
     sessionIdRef.current = sessionStorage.getItem('sessionId');
 
@@ -110,12 +117,15 @@ export default function CountdownPage({
 
         agentRef.current = new ElevenLabsAgent(signedUrlResponse.signedUrl);
         await agentRef.current.connect();
+        console.log('ElevenLabs agent connected successfully');
 
         audioPlayerRef.current = new AudioPlayer();
         await audioPlayerRef.current.initialize();
+        console.log('AudioPlayer initialized');
 
         const unsubAudio = agentRef.current.on('audio', (event) => {
           if ('data' in event && audioPlayerRef.current) {
+            console.log('Received audio chunk from agent');
             audioPlayerRef.current.queueAudio(event.data);
           }
         });
@@ -132,11 +142,31 @@ export default function CountdownPage({
           }
         });
 
-        unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError];
+        const unsubConnected = agentRef.current.on('connected', () => {
+          console.log('Agent connected event received, flushing pending narrations');
+          while (pendingNarrationsRef.current.length > 0) {
+            const nextNarration = pendingNarrationsRef.current.shift();
+            if (!nextNarration) break;
+            if (agentRef.current && agentRef.current.isConnected()) {
+              console.log('Flushing pending narration:', nextNarration);
+              agentRef.current.send(nextNarration);
+            }
+          }
+        });
 
-        agentRef.current.send(initial);
+        unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError, unsubConnected];
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        while (pendingNarrationsRef.current.length > 0) {
+          const nextNarration = pendingNarrationsRef.current.shift();
+          if (!nextNarration) break;
+          console.log('Sending pending narration:', nextNarration);
+          agentRef.current.send(nextNarration);
+        }
       } catch (error) {
         console.error('Failed to initialize agent:', error);
+        setTimeout(() => initializeAgent(), 2000);
       }
     };
 
@@ -158,34 +188,19 @@ export default function CountdownPage({
   useEffect(() => {
     if (!narrationText || isPaused) return;
 
-    if (agentRef.current && agentRef.current.isConnected()) {
-      agentRef.current.send(narrationText);
-    } else if (speechSupported) {
-      const synth = window.speechSynthesis;
-      if (synth.speaking) synth.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(narrationText);
-      utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
-      utterance.rate = 1;
-      utterance.pitch = style === 'horror' ? 0.85 : style === 'sports' ? 1.1 : 1;
-      utterance.volume = 1;
-
-      const voices = synth.getVoices();
-      const localePrefix = locale === 'ja' ? 'ja' : 'en';
-      const preferredVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix));
-      if (preferredVoice) utterance.voice = preferredVoice;
-
-      if (!hasSpokenInitialNarrationRef.current) {
-        hasSpokenInitialNarrationRef.current = true;
+    const sendNarration = () => {
+      if (agentRef.current && agentRef.current.isConnected()) {
+        console.log('Sending narration to agent:', narrationText);
+        agentRef.current.send(narrationText);
+      } else {
+        console.warn('AI narration agent is not connected yet. Narration queued for AI TTS playback.');
+        pendingNarrationsRef.current.push(narrationText);
       }
+    };
 
-      synth.speak(utterance);
-
-      return () => {
-        synth.cancel();
-      };
-    }
-  }, [narrationText, locale, style, isPaused, speechSupported]);
+    const timer = setTimeout(sendNarration, 100);
+    return () => clearTimeout(timer);
+  }, [narrationText, isPaused]);
 
   useEffect(() => {
     if (isPaused || isFinished) return;
@@ -263,6 +278,8 @@ export default function CountdownPage({
   return (
       <div
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
+      onClick={resumeAudioContext}
+      onTouchStart={resumeAudioContext}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />
