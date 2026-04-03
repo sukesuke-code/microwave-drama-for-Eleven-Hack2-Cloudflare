@@ -6,7 +6,11 @@ export class AudioPlayer {
 
   async initialize(): Promise<void> {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextImpl = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextImpl) {
+        throw new Error('Web Audio API is not supported in this browser.');
+      }
+      this.audioContext = new AudioContextImpl();
     }
   }
 

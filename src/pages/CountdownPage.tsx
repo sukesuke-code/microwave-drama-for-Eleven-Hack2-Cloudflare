@@ -39,8 +39,7 @@ export default function CountdownPage({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
-  const hasSpokenInitialNarrationRef = useRef(false);
-  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const pendingNarrationsRef = useRef<string[]>([]);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -94,7 +93,7 @@ export default function CountdownPage({
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
-    hasSpokenInitialNarrationRef.current = false;
+    pendingNarrationsRef.current = [];
 
     sessionIdRef.current = sessionStorage.getItem('sessionId');
 
@@ -134,7 +133,11 @@ export default function CountdownPage({
 
         unsubscribeRef.current = [unsubAudio, unsubAgentTranscript, unsubError];
 
-        agentRef.current.send(initial);
+        while (pendingNarrationsRef.current.length > 0) {
+          const nextNarration = pendingNarrationsRef.current.shift();
+          if (!nextNarration) break;
+          agentRef.current.send(nextNarration);
+        }
       } catch (error) {
         console.error('Failed to initialize agent:', error);
       }
@@ -160,32 +163,12 @@ export default function CountdownPage({
 
     if (agentRef.current && agentRef.current.isConnected()) {
       agentRef.current.send(narrationText);
-    } else if (speechSupported) {
-      const synth = window.speechSynthesis;
-      if (synth.speaking) synth.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(narrationText);
-      utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
-      utterance.rate = 1;
-      utterance.pitch = style === 'horror' ? 0.85 : style === 'sports' ? 1.1 : 1;
-      utterance.volume = 1;
-
-      const voices = synth.getVoices();
-      const localePrefix = locale === 'ja' ? 'ja' : 'en';
-      const preferredVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix));
-      if (preferredVoice) utterance.voice = preferredVoice;
-
-      if (!hasSpokenInitialNarrationRef.current) {
-        hasSpokenInitialNarrationRef.current = true;
-      }
-
-      synth.speak(utterance);
-
-      return () => {
-        synth.cancel();
-      };
+      return;
     }
-  }, [narrationText, locale, style, isPaused, speechSupported]);
+
+    pendingNarrationsRef.current.push(narrationText);
+    console.warn('AI narration agent is not connected yet. Narration queued for AI TTS playback.');
+  }, [narrationText, isPaused]);
 
   useEffect(() => {
     if (isPaused || isFinished) return;
