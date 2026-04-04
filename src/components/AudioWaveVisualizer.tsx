@@ -1,4 +1,4 @@
-import { CSSProperties, useMemo } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 
 interface AudioWaveVisualizerProps {
   color?: string;
@@ -8,6 +8,7 @@ interface AudioWaveVisualizerProps {
   audioLevel?: number;
   audioSpectrum?: number[];
   inverted?: boolean;
+  mode?: 'bars' | 'morph';
 }
 
 type WavePattern = {
@@ -72,8 +73,10 @@ export default function AudioWaveVisualizer({
   audioLevel,
   audioSpectrum,
   inverted = false,
+  mode = 'bars',
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
+  const [motionTick, setMotionTick] = useState(0);
   const delayMultiplier = intensity === 'high' ? 0.06 : intensity === 'low' ? 0.12 : 0.08;
   const pattern = useMemo(() => {
     if (typeof syncSeed === 'number') {
@@ -84,6 +87,84 @@ export default function AudioWaveVisualizer({
   const hasSpectrum = Array.isArray(audioSpectrum) && audioSpectrum.length > 0;
   const level = typeof audioLevel === 'number' ? Math.max(0, Math.min(1, audioLevel)) : 0;
   const isAudioReactive = typeof audioLevel === 'number' || hasSpectrum;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setMotionTick((prev) => prev + 1);
+    }, 90);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const waveformPath = useMemo(() => {
+    if (mode !== 'morph') return '';
+
+    const points = 36;
+    const width = 100;
+    const centerY = 50;
+    const phase = (syncSeed ?? 0) * 0.17 + motionTick * 0.52;
+    const baseAmplitude = 8 + level * 12;
+    const smoothing = 0.65 + level * 0.2;
+    const yPoints: number[] = [];
+
+    for (let i = 0; i <= points; i += 1) {
+      const xRatio = i / points;
+      const spectrumIndex = xRatio * Math.max(0, (audioSpectrum?.length ?? 1) - 1);
+      const leftIndex = Math.floor(spectrumIndex);
+      const rightIndex = Math.min((audioSpectrum?.length ?? 1) - 1, leftIndex + 1);
+      const blend = spectrumIndex - leftIndex;
+      const leftEnergy = hasSpectrum ? (audioSpectrum?.[leftIndex] ?? 0) : 0;
+      const rightEnergy = hasSpectrum ? (audioSpectrum?.[rightIndex] ?? 0) : 0;
+      const bandEnergy = hasSpectrum ? leftEnergy + (rightEnergy - leftEnergy) * blend : 0;
+      const envelope = 0.72 + Math.sin((xRatio - 0.5) * Math.PI) * 0.38;
+      const wobbleA = Math.sin(phase + i * 0.43) * (baseAmplitude * 0.35);
+      const wobbleB = Math.sin(phase * 0.68 + i * 0.21) * (baseAmplitude * 0.22);
+      const spectrumLift = bandEnergy * (16 + level * 12);
+      const y = centerY - (wobbleA + wobbleB + spectrumLift) * envelope * smoothing;
+      yPoints.push(Math.max(7, Math.min(93, y)));
+    }
+
+    return yPoints.reduce((path, y, i) => {
+      const x = (i / points) * width;
+      if (i === 0) return `M ${x.toFixed(2)} ${y.toFixed(2)}`;
+      return `${path} L ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }, '');
+  }, [mode, level, syncSeed, motionTick, audioSpectrum, hasSpectrum]);
+
+  if (mode === 'morph') {
+    const glowOpacity = Math.min(0.92, 0.35 + level * 0.7);
+    return (
+      <div className="w-full max-w-sm px-2">
+        <svg viewBox="0 0 100 100" className="h-16 w-full overflow-visible">
+          <defs>
+            <filter id="waveGlow">
+              <feGaussianBlur stdDeviation="1.8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path
+            d={waveformPath}
+            stroke={color}
+            strokeWidth={5}
+            strokeLinecap="round"
+            fill="none"
+            opacity={glowOpacity}
+            filter="url(#waveGlow)"
+          />
+          <path
+            d={waveformPath}
+            stroke={color}
+            strokeWidth={2}
+            strokeLinecap="round"
+            fill="none"
+            opacity={0.95}
+          />
+        </svg>
+      </div>
+    );
+  }
 
   return (
     <div

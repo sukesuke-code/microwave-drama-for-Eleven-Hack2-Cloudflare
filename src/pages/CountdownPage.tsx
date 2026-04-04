@@ -400,6 +400,7 @@ export default function CountdownPage({
               syncSeed={waveSeed}
               audioLevel={ttsLevel}
               audioSpectrum={ttsSpectrum}
+              mode="morph"
             />
           </div>
 
