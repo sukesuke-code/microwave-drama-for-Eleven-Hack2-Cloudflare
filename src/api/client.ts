@@ -752,11 +752,6 @@ async function requestAgentNarration(
     play: async () => {
       if (!narrationText) return;
 
-            headers: {
-              "Content-Type": "application/json",
-              "xi-api-key": ELEVENLABS_API_KEY,
-            },
-            body: JSON.stringify({
               text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
               model_id: "eleven_multilingual_v2",
               voice_settings: { stability: 0.5, similarity_boost: 0.75 },
