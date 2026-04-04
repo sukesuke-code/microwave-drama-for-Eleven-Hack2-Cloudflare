@@ -389,7 +389,7 @@ export default function CountdownPage({
           </div>
         </div>
 
-        <div className="absolute left-4 top-4 z-30">
+        <div className="absolute left-16 top-4 z-30">
           {sessionMode === 'remote' ? (
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'

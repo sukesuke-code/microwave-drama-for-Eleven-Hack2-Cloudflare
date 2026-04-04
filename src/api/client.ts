@@ -783,6 +783,7 @@ async function requestAgentNarration(
       }
 
       // Fallback: browser speech synthesis
+      if (stopRequested) return;
       if (onReady) onReady();
       await playLocalNarration(narrationText, sanitizedRequest.locale || "ja");
     },
