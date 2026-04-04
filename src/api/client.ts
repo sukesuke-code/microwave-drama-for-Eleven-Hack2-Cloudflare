@@ -8,6 +8,9 @@ const DEFAULT_RETRY_COUNT = 1;
 const AUDIO_METER_FPS = 30;
 const IS_DEV = import.meta.env.DEV;
 const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_TEXT_PAYLOAD_LENGTH = 280;
+const MAX_DISH_NAME_LENGTH = 100;
+const EFFECT_RATE_LIMIT_MS = 1500;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
@@ -16,6 +19,34 @@ let activeMeterCleanup: (() => void) | null = null;
 
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+const lastEffectRequestAt = new Map<string, number>();
+
+function normalizeTextInput(input: string, maxLen: number): string {
+  let output = "";
+  for (const char of input) {
+    const code = char.charCodeAt(0);
+    const isControl = code < 32 || code === 127;
+    output += isControl ? " " : char;
+  }
+  return output.replace(/\s+/g, " ").trim().slice(0, maxLen);
+}
+
+function ensureSafeApiBase(): void {
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(API_BASE);
+  const isHttps = API_BASE.startsWith("https://");
+  if (!isHttps && !isLocalhost) {
+    throw new Error("VITE_API_BASE must use HTTPS outside localhost.");
+  }
+}
+
+function enforceEffectRateLimit(effectKey: "sfx" | "music"): void {
+  const now = Date.now();
+  const lastAt = lastEffectRequestAt.get(effectKey) ?? 0;
+  if (now - lastAt < EFFECT_RATE_LIMIT_MS) {
+    throw new Error("EFFECT_RATE_LIMITED");
+  }
+  lastEffectRequestAt.set(effectKey, now);
+}
 
 function logDebug(...args: unknown[]): void {
   if (IS_DEV) {
@@ -32,6 +63,7 @@ function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  ensureSafeApiBase();
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
@@ -477,9 +509,11 @@ async function startSession(
   totalTime: number,
   style: NarrationStyle
 ): Promise<Session> {
+  const sanitizedFoodName = normalizeTextInput(String(foodName || ""), MAX_DISH_NAME_LENGTH);
+  const normalizedTotalTime = Number.isFinite(totalTime) ? Math.max(1, Math.min(600, Math.floor(totalTime))) : 60;
   const payload: StartSessionPayload = {
-    foodName: String(foodName || "").trim(),
-    totalTime: Number(totalTime),
+    foodName: sanitizedFoodName,
+    totalTime: normalizedTotalTime,
     style,
   };
 
@@ -530,8 +564,10 @@ async function tickSession(
   remainingTime: number
 ): Promise<void> {
   const payload = {
-    sessionId,
-    remainingTime: Number(remainingTime),
+    sessionId: normalizeTextInput(sessionId, 120),
+    remainingTime: Number.isFinite(remainingTime)
+      ? Math.max(0, Math.min(600, Math.floor(remainingTime)))
+      : 0,
   };
 
   const data = await requestJson<{
@@ -554,8 +590,8 @@ async function tickSession(
 
 async function saveNarration(sessionId: string, text: string): Promise<void> {
   const payload = {
-    sessionId,
-    text: String(text || "").trim(),
+    sessionId: normalizeTextInput(sessionId, 120),
+    text: normalizeTextInput(String(text || ""), MAX_TEXT_PAYLOAD_LENGTH),
   };
 
   const data = await requestJson<{
@@ -635,6 +671,14 @@ Sound direction:
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
+  const sanitizedRequest: AgentNarrationRequest = {
+    ...request,
+    sessionId: request.sessionId ? normalizeTextInput(request.sessionId, 120) : undefined,
+    dishName: normalizeTextInput(request.dishName, MAX_DISH_NAME_LENGTH),
+    totalTime: Math.max(1, Math.min(600, Math.floor(request.totalTime))),
+    remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
+  };
+
   const data = await requestJson<{
     ok?: boolean;
     text?: string;
@@ -644,7 +688,7 @@ async function requestAgentNarration(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify(sanitizedRequest),
   });
 
   logDebug("requestAgentNarration response", data);
@@ -662,12 +706,14 @@ async function requestAgentNarration(
 }
 
 async function playSfx(prompt: string): Promise<void> {
+  ensureSafeApiBase();
+  enforceEffectRateLimit("sfx");
   const res = await fetch(`${API_BASE}/api/generate-sfx`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
     signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
   });
 
@@ -681,12 +727,14 @@ async function playSfx(prompt: string): Promise<void> {
 }
 
 async function playMusic(prompt: string): Promise<void> {
+  ensureSafeApiBase();
+  enforceEffectRateLimit("music");
   const res = await fetch(`${API_BASE}/api/generate-music`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
     signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
   });
 
