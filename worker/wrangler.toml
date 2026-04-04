@@ -14,7 +14,7 @@ class_name = "MicrowaveSession"
 # Durable Object Migrations
 [[migrations]]
 tag = "v1"
-new_classes = ["MicrowaveSession"]
+new_sqlite_classes = ["MicrowaveSession"]
 
 # ElevenLabs API Key should be set via `npx wrangler secret put ELEVENLABS_API_KEY`
 # Agent ID should be set via `npx wrangler secret put ELEVENLABS_AGENT_ID`
