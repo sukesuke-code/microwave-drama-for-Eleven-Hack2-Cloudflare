@@ -10,6 +10,7 @@ export default defineConfig({
         target: 'https://microwave-show-backend.lolololololol.workers.dev',
         changeOrigin: true,
         secure: true,
+        ws: true,
       },
     },
   },
