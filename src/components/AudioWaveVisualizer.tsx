@@ -237,7 +237,7 @@ export default function AudioWaveVisualizer({
           '--eq-max-height': `${pattern.maxHeight}px`,
           '--eq-opacity-min': pattern.opacityMin,
           '--eq-opacity-max': pattern.opacityMax,
-          ...(isAudioReactive
+          ...(isAudioReactive && (isDynamicProfile || !addBaseMotion)
             ? {
               transform: isDynamicProfile
                 ? `translateX(${jitterX.toFixed(2)}px) rotate(${rotate.toFixed(2)}deg) scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})`
