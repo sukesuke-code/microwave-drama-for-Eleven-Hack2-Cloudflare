@@ -752,11 +752,6 @@ async function requestAgentNarration(
     play: async () => {
       if (!narrationText) return;
 
-      // 2. Play Audio via ElevenLabs (if key exists)
-      if (ELEVENLABS_API_KEY) {
-        try {
-          const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
-            method: "POST",
             headers: {
               "Content-Type": "application/json",
               "xi-api-key": ELEVENLABS_API_KEY,
