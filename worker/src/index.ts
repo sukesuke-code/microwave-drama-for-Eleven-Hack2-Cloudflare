@@ -35,13 +35,17 @@ export default {
         return await handleSessionWebSocket(request, env);
       }
 
-      return new Response(JSON.stringify({ error: "Not Found" }), {
+      return new Response(JSON.stringify({ error: "Not Found", path: url.pathname }), {
         status: 404,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+      return new Response(JSON.stringify({ 
+        error: "Internal Server Error", 
+        message: err.message,
+        stack: err.stack 
+      }), {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
