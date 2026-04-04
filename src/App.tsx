@@ -104,6 +104,27 @@ export default function App() {
     writeStorage('ching-drama-settings', JSON.stringify(settings));
   }, [settings]);
 
+  useEffect(() => {
+    const preload = () => {
+      void import('./pages/SettingsPage');
+      void import('./pages/CountdownPage');
+      void import('./pages/ResultPage');
+    };
+
+    const maybeWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof maybeWindow.requestIdleCallback === 'function') {
+      const idleId = maybeWindow.requestIdleCallback(preload);
+      return () => maybeWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = window.setTimeout(preload, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
   const handleStartSettings = () => setScreen('settings');
 
   const handleStartCountdown = (s: Settings) => {

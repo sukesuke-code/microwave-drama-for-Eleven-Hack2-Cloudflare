@@ -3,6 +3,8 @@ const API_BASE =
   "https://microwave-show-api-v2.lolololololol.workers.dev";
 
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
+const IS_DEV = import.meta.env.DEV;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
@@ -11,6 +13,34 @@ let activeMeterCleanup: (() => void) | null = null;
 
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+
+function logDebug(...args: unknown[]): void {
+  if (IS_DEV) {
+    console.debug(...args);
+  }
+}
+
+function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+
+  return undefined;
+}
+
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    signal:
+      init?.signal ??
+      withTimeoutSignal(
+        init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000
+      ),
+  });
+
+  const data = (await res.json()) as T;
+  return data;
+}
 
 type TtsLevelListener = (level: number) => void;
 
@@ -415,7 +445,11 @@ async function startSession(
     style,
   };
 
-  const res = await fetch(`${API_BASE}/api/session/start`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    session?: Session;
+    error?: string;
+  }>("/api/session/start", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -423,15 +457,9 @@ async function startSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    session?: Session;
-    error?: string;
-  };
+  logDebug("startSession response", data);
 
-  console.log("startSession response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.session?.sessionId) {
+  if (!data.ok || !data.session?.sessionId) {
     throw new Error(data?.error || "Failed to start session");
   }
 
@@ -439,25 +467,20 @@ async function startSession(
 }
 
 async function getSession(sessionId: string): Promise<Session> {
-  const res = await fetch(
-    `${API_BASE}/api/session?sessionId=${encodeURIComponent(sessionId)}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const data = (await res.json()) as {
+  const data = await requestJson<{
     ok?: boolean;
     session?: Session;
     error?: string;
-  };
+  }>(`/api/session?sessionId=${encodeURIComponent(sessionId)}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
-  console.log("getSession response", res.status, data);
+  logDebug("getSession response", data);
 
-  if (!res.ok || !data.ok || !data.session) {
+  if (!data.ok || !data.session) {
     throw new Error(data?.error || "Failed to get session");
   }
 
@@ -473,7 +496,10 @@ async function tickSession(
     remainingTime: Number(remainingTime),
   };
 
-  const res = await fetch(`${API_BASE}/api/session/tick`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    error?: string;
+  }>("/api/session/tick", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -481,14 +507,9 @@ async function tickSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    error?: string;
-  };
+  logDebug("tickSession response", data);
 
-  console.log("tickSession response", res.status, data);
-
-  if (!res.ok || !data.ok) {
+  if (!data.ok) {
     throw new Error(data?.error || "Failed to tick session");
   }
 }
@@ -499,7 +520,10 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
     text: String(text || "").trim(),
   };
 
-  const res = await fetch(`${API_BASE}/api/session/narration`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    error?: string;
+  }>("/api/session/narration", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -507,36 +531,29 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    error?: string;
-  };
+  logDebug("saveNarration response", data);
 
-  console.log("saveNarration response", res.status, data);
-
-  if (!res.ok || !data.ok) {
+  if (!data.ok) {
     throw new Error(data?.error || "Failed to save narration");
   }
 }
 
 async function getSignedUrl(): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/get-signed-url`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    signedUrl?: string;
+    agentId?: string;
+    error?: string;
+  }>("/api/get-signed-url", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
     },
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    signedUrl?: string;
-    agentId?: string;
-    error?: string;
-  };
+  logDebug("getSignedUrl response", data);
 
-  console.log("getSignedUrl response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.signedUrl) {
+  if (!data.ok || !data.signedUrl) {
     throw new Error(data?.error || "Failed to get signed URL");
   }
 
@@ -580,7 +597,11 @@ Sound direction:
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
-  const res = await fetch(`${API_BASE}/api/agent/narration`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    text?: string;
+    error?: string;
+  }>("/api/agent/narration", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -588,15 +609,9 @@ async function requestAgentNarration(
     body: JSON.stringify(request),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    text?: string;
-    error?: string;
-  };
+  logDebug("requestAgentNarration response", data);
 
-  console.log("requestAgentNarration response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.text) {
+  if (!data.ok || !data.text) {
     throw new Error(data.error || "Agent narration failed");
   }
 
@@ -615,6 +630,7 @@ async function playSfx(prompt: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ prompt }),
+    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
   });
 
   if (!res.ok) {
@@ -633,6 +649,7 @@ async function playMusic(prompt: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ prompt }),
+    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
   });
 
   if (!res.ok) {
