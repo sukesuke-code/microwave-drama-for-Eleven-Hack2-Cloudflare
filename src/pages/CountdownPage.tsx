@@ -400,6 +400,8 @@ export default function CountdownPage({
               syncSeed={waveSeed}
               audioLevel={ttsLevel}
               audioSpectrum={ttsSpectrum}
+              mode="bars"
+              motionProfile="classic"
             />
           </div>
 

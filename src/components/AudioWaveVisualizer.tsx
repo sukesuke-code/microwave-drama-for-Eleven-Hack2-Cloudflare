@@ -1,4 +1,4 @@
-import { CSSProperties, useMemo } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 
 interface AudioWaveVisualizerProps {
   color?: string;
@@ -8,6 +8,8 @@ interface AudioWaveVisualizerProps {
   audioLevel?: number;
   audioSpectrum?: number[];
   inverted?: boolean;
+  mode?: 'bars' | 'morph';
+  motionProfile?: 'classic' | 'dynamic';
 }
 
 type WavePattern = {
@@ -72,8 +74,11 @@ export default function AudioWaveVisualizer({
   audioLevel,
   audioSpectrum,
   inverted = false,
+  mode = 'bars',
+  motionProfile = 'dynamic',
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
+  const [motionTick, setMotionTick] = useState(0);
   const delayMultiplier = intensity === 'high' ? 0.06 : intensity === 'low' ? 0.12 : 0.08;
   const pattern = useMemo(() => {
     if (typeof syncSeed === 'number') {
@@ -84,10 +89,107 @@ export default function AudioWaveVisualizer({
   const hasSpectrum = Array.isArray(audioSpectrum) && audioSpectrum.length > 0;
   const level = typeof audioLevel === 'number' ? Math.max(0, Math.min(1, audioLevel)) : 0;
   const isAudioReactive = typeof audioLevel === 'number' || hasSpectrum;
+  const spectrumAverage = useMemo(() => {
+    if (!hasSpectrum || !audioSpectrum?.length) return 0;
+    const total = audioSpectrum.reduce((sum, current) => sum + Math.max(0, current), 0);
+    return Math.min(1, total / audioSpectrum.length);
+  }, [hasSpectrum, audioSpectrum]);
+  const motionIntensity = Math.min(1, Math.max(level, spectrumAverage));
+  const isDynamicProfile = motionProfile === 'dynamic';
+  const swayX = Math.sin((syncSeed ?? 0) * 0.09 + motionTick * 0.85) * (2 + motionIntensity * 6);
+  const swayY = Math.cos((syncSeed ?? 0) * 0.06 + motionTick * 0.9) * (0.6 + motionIntensity * 2.4);
+  const tilt = Math.sin((syncSeed ?? 0) * 0.03 + motionTick * 0.65) * (1.8 + motionIntensity * 4.2);
+  const shellScaleY = 0.95 + motionIntensity * 0.35 + Math.abs(Math.sin((syncSeed ?? 0) * 0.08 + motionTick * 0.58)) * 0.16;
+
+  useEffect(() => {
+    const cadenceMs = isDynamicProfile
+      ? Math.max(38, Math.floor((intensity === 'high' ? 52 : intensity === 'medium' ? 66 : 78) - motionIntensity * 22))
+      : 90;
+    const timer = window.setInterval(() => {
+      setMotionTick((prev) => prev + 1);
+    }, cadenceMs);
+    return () => window.clearInterval(timer);
+  }, [intensity, motionIntensity, isDynamicProfile]);
+
+  const waveformPath = useMemo(() => {
+    if (mode !== 'morph') return '';
+
+    const points = 36;
+    const width = 100;
+    const centerY = 50;
+    const phase = (syncSeed ?? 0) * 0.17 + motionTick * 0.52;
+    const baseAmplitude = 8 + level * 12;
+    const smoothing = 0.65 + level * 0.2;
+    const yPoints: number[] = [];
+
+    for (let i = 0; i <= points; i += 1) {
+      const xRatio = i / points;
+      const spectrumIndex = xRatio * Math.max(0, (audioSpectrum?.length ?? 1) - 1);
+      const leftIndex = Math.floor(spectrumIndex);
+      const rightIndex = Math.min((audioSpectrum?.length ?? 1) - 1, leftIndex + 1);
+      const blend = spectrumIndex - leftIndex;
+      const leftEnergy = hasSpectrum ? (audioSpectrum?.[leftIndex] ?? 0) : 0;
+      const rightEnergy = hasSpectrum ? (audioSpectrum?.[rightIndex] ?? 0) : 0;
+      const bandEnergy = hasSpectrum ? leftEnergy + (rightEnergy - leftEnergy) * blend : 0;
+      const envelope = 0.72 + Math.sin((xRatio - 0.5) * Math.PI) * 0.38;
+      const wobbleA = Math.sin(phase + i * 0.43) * (baseAmplitude * 0.35);
+      const wobbleB = Math.sin(phase * 0.68 + i * 0.21) * (baseAmplitude * 0.22);
+      const spectrumLift = bandEnergy * (16 + level * 12);
+      const y = centerY - (wobbleA + wobbleB + spectrumLift) * envelope * smoothing;
+      yPoints.push(Math.max(7, Math.min(93, y)));
+    }
+
+    return yPoints.reduce((path, y, i) => {
+      const x = (i / points) * width;
+      if (i === 0) return `M ${x.toFixed(2)} ${y.toFixed(2)}`;
+      return `${path} L ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }, '');
+  }, [mode, level, syncSeed, motionTick, audioSpectrum, hasSpectrum]);
+
+  if (mode === 'morph') {
+    const glowOpacity = Math.min(0.92, 0.35 + level * 0.7);
+    return (
+      <div className="w-full max-w-sm px-2">
+        <svg viewBox="0 0 100 100" className="h-16 w-full overflow-visible">
+          <defs>
+            <filter id="waveGlow">
+              <feGaussianBlur stdDeviation="1.8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path
+            d={waveformPath}
+            stroke={color}
+            strokeWidth={5}
+            strokeLinecap="round"
+            fill="none"
+            opacity={glowOpacity}
+            filter="url(#waveGlow)"
+          />
+          <path
+            d={waveformPath}
+            stroke={color}
+            strokeWidth={2}
+            strokeLinecap="round"
+            fill="none"
+            opacity={0.95}
+          />
+        </svg>
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`flex justify-center gap-1 h-12 px-2 ${inverted ? 'items-start' : 'items-end'}`}
+      className={`flex justify-center gap-1 h-12 px-2 ${isDynamicProfile ? 'transition-transform duration-75' : ''} ${inverted ? 'items-start' : 'items-end'}`}
+      style={isDynamicProfile
+        ? {
+          transform: `translate3d(${swayX.toFixed(2)}px, ${swayY.toFixed(2)}px, 0) skewX(${tilt.toFixed(2)}deg) scaleY(${shellScaleY.toFixed(3)})`,
+        }
+        : undefined}
     >
       {bars.map((_, i) => {
         const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();
@@ -109,11 +211,17 @@ export default function AudioWaveVisualizer({
           : level;
         const floorLevel = 0.14 + level * 0.42;
         const activeLevel = Math.max(floorLevel, mixedLevel);
-        const dynamicScale = 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95) * 0.18;
+        const dynamicScale = isDynamicProfile
+          ? 0.34
+            + activeLevel * 2.25
+            + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.33) * 0.28
+          : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95) * 0.18;
+        const jitterX = Math.sin((syncSeed ?? 0) * 0.07 + i * 1.17 + motionTick * 0.52) * (0.08 + activeLevel * 0.32);
+        const rotate = Math.sin((syncSeed ?? 0) * 0.05 + i * 0.41 + motionTick * 0.4) * (2 + activeLevel * 5.5);
         const barStyle: CSSProperties & Record<string, string | number> = {
           backgroundColor: color,
           animationDelay: `${i * delayMultiplier}s`,
-          boxShadow: `0 0 4px ${color}40`,
+          boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
           animationName: pattern.keyframe,
           animationDuration: `${randomDuration}s`,
           animationTimingFunction: 'ease-in-out',
@@ -125,9 +233,13 @@ export default function AudioWaveVisualizer({
           '--eq-opacity-max': pattern.opacityMax,
           ...(isAudioReactive
             ? {
-              transform: `scaleY(${Math.max(0.2, dynamicScale)})`,
+              transform: isDynamicProfile
+                ? `translateX(${jitterX.toFixed(2)}px) rotate(${rotate.toFixed(2)}deg) scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})`
+                : `scaleY(${Math.max(0.2, dynamicScale).toFixed(3)})`,
               willChange: 'transform, opacity',
-              opacity: Math.min(1, 0.35 + activeLevel * 0.95),
+              opacity: isDynamicProfile
+                ? Math.min(1, 0.42 + activeLevel * 1.08)
+                : Math.min(1, 0.35 + activeLevel * 0.95),
             }
             : {}),
         };
