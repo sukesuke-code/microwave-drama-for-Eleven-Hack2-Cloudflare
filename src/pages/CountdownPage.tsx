@@ -122,33 +122,55 @@ export default function CountdownPage({
 
   const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
     if (isPausedRef.current || isUnmountedRef.current) return;
-    if (style === 'movie') {
-      if (phase === 'done') {
-        api.stopMusic();
-        await api.playSfx('cinematic ending impact, short trailer hit');
-        return;
+    
+    const styleEffects: Record<string, { music?: string, sfxMiddle?: string, sfxDone?: string }> = {
+      movie: {
+        music: 'cinematic trailer underscore, tense and dramatic',
+        sfxMiddle: 'cinematic whoosh rise, short transition',
+        sfxDone: 'cinematic ending impact, short trailer hit',
+      },
+      nature: {
+        music: 'calm nature ambience, soft wind and birds',
+        sfxMiddle: 'light natural rustle and airy swell',
+        sfxDone: 'soft forest chime, gentle resolution',
+      },
+      sports: {
+        music: 'upbeat energetic sports game atmosphere in a stadium',
+        sfxMiddle: 'sports crowd cheering briefly',
+        sfxDone: 'sports buzzer and loud crowd cheer',
+      },
+      horror: {
+        music: 'eerie ambient horror drone, very spooky, dark',
+        sfxMiddle: 'horror jump scare sting short',
+        sfxDone: 'creepy horror sting ending sound',
+      },
+      documentary: {
+        music: 'calm documentary informative background music, subtle',
+        sfxMiddle: 'subtle documentary transition swish',
+        sfxDone: 'calm documentary piano outtro chord',
+      },
+      anime: {
+        music: 'high energy anime battle background music',
+        sfxMiddle: 'anime laser or fast slash sound effect',
+        sfxDone: 'anime victory chime jingle',
       }
-      if (phase === 'opening') {
-        await api.playMusic('cinematic trailer underscore, tense and dramatic');
-      }
-      if (phase === 'middle' || phase === 'final') {
-        await api.playSfx('cinematic whoosh rise, short transition');
-      }
+    };
+
+    const effects = styleEffects[style];
+    if (!effects) return;
+
+    if (phase === 'done') {
+      api.stopMusic();
+      if (effects.sfxDone) await api.playSfx(effects.sfxDone);
       return;
     }
-
-    if (style === 'nature') {
-      if (phase === 'done') {
-        api.stopMusic();
-        await api.playSfx('soft forest chime, gentle resolution');
-        return;
-      }
-      if (phase === 'opening') {
-        await api.playMusic('calm nature ambience, soft wind and birds');
-      }
-      if (phase === 'middle' || phase === 'final') {
-        await api.playSfx('light natural rustle and airy swell');
-      }
+    
+    if (phase === 'opening') {
+      if (effects.music) await api.playMusic(effects.music);
+    }
+    
+    if (phase === 'middle' || phase === 'final') {
+      if (effects.sfxMiddle) await api.playSfx(effects.sfxMiddle);
     }
   }, [style]);
 
