@@ -7,6 +7,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
 const DEFAULT_RETRY_COUNT = 1;
 const AUDIO_METER_FPS = 30;
 const IS_DEV = import.meta.env.DEV;
+const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
@@ -44,14 +45,21 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
           ),
       });
 
-      const data = (await res.json()) as T;
       if (!res.ok) {
-        throw new Error(`HTTP_${res.status}`);
+        const shouldRetry = RETRYABLE_HTTP_STATUS.has(res.status);
+        throw new Error(`HTTP_${res.status}:${shouldRetry ? "RETRYABLE" : "FINAL"}`);
       }
+
+      const data = (await res.json()) as T;
       return data;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt >= DEFAULT_RETRY_COUNT) {
+      const isRetryableHttp = /HTTP_\d+:RETRYABLE/.test(lastError.message);
+      const isAbortError = lastError.name === "AbortError";
+      const isNetworkLike = /Failed to fetch|NetworkError|Load failed/i.test(lastError.message);
+      const canRetry = isRetryableHttp || isAbortError || isNetworkLike;
+
+      if (attempt >= DEFAULT_RETRY_COUNT || !canRetry) {
         break;
       }
 
