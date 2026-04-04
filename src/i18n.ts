@@ -44,6 +44,8 @@ export const UI_TEXT = {
     backTop: '設定に戻る',
     shareCopied: 'テキストをコピーしました！',
     mysteryDish: '謎の料理',
+    aiConnectionError: 'AIに接続できませんでした',
+    localSessionFallback: 'ローカルセッションにフォールバック中',
     styleShort: ['🏟️ スポーツ', '🎬 映画', '😱 ホラー', '🌍 自然'],
   },
   en: {
@@ -74,6 +76,8 @@ export const UI_TEXT = {
     backTop: 'Back to settings',
     shareCopied: 'Text copied!',
     mysteryDish: 'Mystery Dish',
+    aiConnectionError: 'Could not connect with AI',
+    localSessionFallback: 'Falling back to local session',
     styleShort: ['🏟️ Sports', '🎬 Movie', '😱 Horror', '🌍 Nature'],
   },
 } as const;

@@ -92,6 +92,17 @@ This README is not legal advice.
 npm install
 ```
 
+#### Environment variables
+```bash
+cp .env.example .env
+```
+
+- `VITE_API_BASE`: API base URL.  
+  - Leave empty when API is served from the same origin (recommended default).
+  - Set this when API is hosted on a different domain (e.g. Cloudflare Workers URL).
+- `VITE_API_SESSION_START_PATH`: Session start endpoint path (default: `/api/session/start`).
+  - If your backend uses a different path (e.g. `/session/start`), change this value to match backend routing.
+
 #### Run development server
 ```bash
 npm run dev
@@ -194,6 +205,17 @@ npx playwright install chromium
 ```bash
 npm install
 ```
+
+#### 環境変数
+```bash
+cp .env.example .env
+```
+
+- `VITE_API_BASE`: API のベースURL。  
+  - API が同一オリジン配信の場合は空欄のまま（推奨デフォルト）。
+  - API を別ドメインで運用している場合（例: Cloudflare Workers URL）は値を設定。
+- `VITE_API_SESSION_START_PATH`: セッション開始APIのパス（デフォルト: `/api/session/start`）。
+  - バックエンドの実装が `/session/start` など別パスの場合、この値を合わせて変更。
 
 #### 開発起動
 ```bash
