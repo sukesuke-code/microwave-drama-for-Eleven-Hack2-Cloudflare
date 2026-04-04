@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
-import { Locale, Settings, ThemeMode } from '../types';
+import { Locale, Settings, ThemeMode, NarrationStyle } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
@@ -10,6 +10,8 @@ import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
 import { api } from '../api/client';
+
+type SessionPhase = 'opening' | 'quarter' | 'middle' | 'final' | 'done';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -40,6 +42,7 @@ export default function CountdownPage({
   const [ttsLevel, setTtsLevel] = useState(0);
   const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback' | 'connecting'>('connecting');
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,7 +50,7 @@ export default function CountdownPage({
   const sessionIdRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastQueuedNarrationRef = useRef('');
-  const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
+  const phaseRef = useRef<SessionPhase | null>(null);
   const isPausedRef = useRef(isPaused);
   const isFinishedRef = useRef(isFinished);
   const isUnmountedRef = useRef(false);
@@ -97,14 +100,12 @@ export default function CountdownPage({
       osc.stop(ctx.currentTime + offset + duration + 0.02);
     };
 
-    // Microwave-like "ding-dong" chime.
     scheduleTone(0, 1320, 0.22, 0.22);
     scheduleTone(0.25, 980, 0.28, 0.18);
-
     window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
-  const getPhase = useCallback((tl: number, tt: number): 'opening' | 'quarter' | 'middle' | 'final' | 'done' => {
+  const getPhase = useCallback((tl: number, tt: number): SessionPhase => {
     if (tl <= 0) return 'done';
     const percent = tt > 0 ? (tl / tt) * 100 : 0;
     if (percent > 75) return 'opening';
@@ -120,7 +121,7 @@ export default function CountdownPage({
     return getCurrentNarration(tl, tt, style, dishName, locale);
   }, [style, dishName, locale]);
 
-  const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+  const handlePhaseEffects = useCallback(async (phase: SessionPhase) => {
     if (isPausedRef.current || isUnmountedRef.current) return;
     
     const styleEffects: Record<string, { music?: string, sfxMiddle?: string, sfxDone?: string }> = {
@@ -174,7 +175,7 @@ export default function CountdownPage({
     }
   }, [style]);
 
-  const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+  const buildAgentNarrationContext = useCallback((tl: number, phase: SessionPhase) => {
     return {
       sessionId: sessionIdRef.current ?? undefined,
       style,
@@ -186,24 +187,22 @@ export default function CountdownPage({
     };
   }, [style, dishName, totalSeconds, locale]);
 
-
-
   useEffect(() => {
     async function initSession() {
       const existingSessionId = sessionStorage.getItem('sessionId');
       const existingMode = sessionStorage.getItem('sessionMode') as 'remote' | 'local-fallback' | 'connecting' | null;
 
       if (existingSessionId && sessionIdRef.current !== existingSessionId) {
-        console.log("[CountdownPage] Resuming existing AI session:", existingSessionId);
+        console.log(\"[CountdownPage] Resuming existing AI session:\", existingSessionId);
         sessionIdRef.current = existingSessionId;
         if (existingMode) setSessionMode(existingMode);
         return;
       }
 
-      console.log("[CountdownPage] Initializing NEW AI session...");
+      console.log(\"[CountdownPage] Initializing NEW AI session...\");
       try {
         const session = await api.startSession(dishName, totalSeconds, style);
-        console.log("[CountdownPage] AI session started:", session.sessionId);
+        console.log(\"[CountdownPage] AI session started:\", session.sessionId);
         sessionIdRef.current = session.sessionId;
         sessionStorage.setItem('sessionId', session.sessionId);
         const mode = session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote';
@@ -220,7 +219,7 @@ export default function CountdownPage({
 
     const timer = setTimeout(() => {
       initSession();
-    }, 50); // Small delay to allow session storage to settle if just came from another page
+    }, 50);
 
     const text = buildNarrationLine(totalSeconds, totalSeconds);
     setNarrationText(text);
@@ -274,13 +273,13 @@ export default function CountdownPage({
 
         try {
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("NARRATION_TASK_TIMEOUT")), 35000)
+            setTimeout(() => reject(new Error(\"NARRATION_TASK_TIMEOUT\")), 35000)
           );
 
           const taskPromise = (async () => {
              console.log(`[CountdownPage] Calling requestAgentNarration for ${phase}...`);
              const narration = await api.requestAgentNarration(context);
-             console.log(`[CountdownPage] Received narration for ${phase}: "${narration.text}"`);
+             console.log(`[CountdownPage] Received narration for ${phase}: \"${narration.text}\"`);
              
              let textSet = false;
              const triggerTextSync = () => {
@@ -309,7 +308,6 @@ export default function CountdownPage({
           console.error(`[CountdownPage] Narration task failed for phase ${phase}:`, err);
           if (isUnmountedRef.current || isPausedRef.current) return;
 
-          // Local Fallback
           prevNarrationRef.current = fallbackLine;
           setNarrationText(fallbackLine);
           if (sessionIdRef.current) api.saveNarration(sessionIdRef.current, fallbackLine).catch(() => {});
@@ -317,8 +315,8 @@ export default function CountdownPage({
           await handlePhaseEffects(phase).catch(() => {});
           
           if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-            console.log(`[CountdownPage] Playing local fallback narration: "${fallbackLine}"`);
-            await api.playLocalNarration(fallbackLine, locale).catch(e => console.error("Local fallback failed:", e));
+            console.log(`[CountdownPage] Playing local fallback narration: \"${fallbackLine}\"`);
+            await api.playLocalNarration(fallbackLine, locale).catch(e => console.error(\"Local fallback failed:\", e));
           }
         }
       })
@@ -328,16 +326,21 @@ export default function CountdownPage({
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale]);
 
   useEffect(() => {
-    const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
+    const unsub = api.subscribeTtsMeter(({ level, spectrum }) => {
       setTtsLevel(level);
       setTtsSpectrum(spectrum);
     });
     return () => {
-      unsubscribe();
+      unsub();
       api.stopTtsPlayback();
       api.stopMusic();
     };
   }, []);
+
+  const handleTogglePause = () => {
+    if (isFinished) return;
+    setIsPaused((p) => !p);
+  };
 
   useEffect(() => {
     if (isPaused || isFinished) return;
@@ -345,30 +348,23 @@ export default function CountdownPage({
     intervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         const next = prev - 1;
+
         if (next <= 0) {
           clearInterval(intervalRef.current!);
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
           playAlarmTone();
+
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
 
-          if (sessionIdRef.current) {
-            api.tickSession(sessionIdRef.current, 0).catch((err) => {
-              console.error('Failed to tick session on finish:', err);
-            });
-          }
-
           flashTimeoutRef.current = setTimeout(() => setIsFlashing(false), 600);
-          finishTimeoutRef.current = setTimeout(() => onFinish(), 4000);
+          finishTimeoutRef.current = setTimeout(() => {
+            onFinish();
+          }, 4000);
           return 0;
-        }
-        if (sessionIdRef.current) {
-          api.tickSession(sessionIdRef.current, next).catch((err) => {
-            console.error('Failed to tick session:', err);
-          });
         }
 
         return next;
@@ -381,12 +377,8 @@ export default function CountdownPage({
   }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
 
   useEffect(() => () => {
-    if (flashTimeoutRef.current) {
-      clearTimeout(flashTimeoutRef.current);
-    }
-    if (finishTimeoutRef.current) {
-      clearTimeout(finishTimeoutRef.current);
-    }
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
   }, []);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
@@ -431,7 +423,7 @@ export default function CountdownPage({
 
       {isDanger && !isFinished && (
         <div
-          className="absolute inset-0 pointer-events-none z-10"
+          className=\"absolute inset-0 pointer-events-none z-10\"
           style={{
             background: `radial-gradient(ellipse at center, transparent 40%, ${styleConfig.accentColor}15 100%)`,
             animation: 'vignettePulse 0.5s ease-in-out infinite',
@@ -439,21 +431,21 @@ export default function CountdownPage({
         />
       )}
 
-      <div className="relative z-20 flex h-full flex-col">
+      <div className=\"relative z-20 flex h-full flex-col\">
         <div className={`relative flex items-center justify-center px-4 pt-safe pt-3 pb-2 border-b ${isLight ? 'border-slate-200/80 bg-white/75' : 'border-white/5'}`}>
           <button
             onClick={onBack}
             className={`absolute left-4 top-4 rounded-lg p-1 transition-colors ${isLight ? 'text-slate-700 hover:bg-slate-200' : 'text-slate-300 hover:bg-white/10'}`}
-            aria-label="Back to settings"
+            aria-label=\"Back to settings\"
           >
             <ChevronLeft size={24} />
           </button>
-          <div className="flex flex-col items-center text-center">
+          <div className=\"flex flex-col items-center text-center\">
             <span className={`text-xs uppercase tracking-widest font-bold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               {styleConfig.emoji} {styleConfig.label}
             </span>
             <span
-              className="text-sm font-bold mt-0.5"
+              className=\"text-sm font-bold mt-0.5\"
               style={{ color: styleConfig.accentColor }}
             >
               {dishName}
@@ -461,12 +453,12 @@ export default function CountdownPage({
           </div>
         </div>
 
-        <div className="absolute left-16 top-4 z-30">
+        <div className=\"absolute left-16 top-4 z-30\">
           {sessionMode === 'remote' && (
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
             }`}>
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]"></div>
+              <div className=\"h-2 w-2 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]\"></div>
               <span>AI Connected</span>
             </div>
           )}
@@ -474,7 +466,7 @@ export default function CountdownPage({
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-sky-500/30 bg-sky-500/10 text-sky-400'
             }`}>
-              <div className="h-2 w-2 rounded-full bg-sky-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+              <div className=\"h-2 w-2 rounded-full bg-sky-500 animate-[pulse_1s_ease-in-out_infinite]\"></div>
               <span>Connecting AI...</span>
             </div>
           )}
@@ -482,13 +474,13 @@ export default function CountdownPage({
              <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
             }`}>
-              <div className="h-2 w-2 rounded-full bg-amber-500"></div>
+              <div className=\"h-2 w-2 rounded-full bg-amber-500\"></div>
               <span>Local Session</span>
             </div>
           )}
         </div>
 
-        <div className="absolute right-4 top-4 z-30">
+        <div className=\"absolute right-4 top-4 z-30\">
           <button
             onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
             className={`flex items-center justify-center rounded-xl p-2 transition-colors ${
@@ -496,14 +488,14 @@ export default function CountdownPage({
                 ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                 : 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
             }`}
-            aria-label="Dark mode switcher"
+            aria-label=\"Dark mode switcher\"
           >
             {isLight ? <Moon size={14} /> : <Sun size={14} />}
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center px-4 py-3">
-          <div className="flex h-[250px] w-full flex-col items-center justify-start gap-1 sm:h-[280px] md:h-[320px]">
+        <div className=\"flex-1 flex flex-col items-center px-4 py-3\">
+          <div className=\"flex h-[250px] w-full flex-col items-center justify-start gap-1 sm:h-[280px] md:h-[320px]\">
             <CircularTimer
               remaining={timeLeft}
               total={totalSeconds}
@@ -512,10 +504,10 @@ export default function CountdownPage({
               locale={locale}
             />
 
-            <div className="w-full max-w-xs mt-3">
+            <div className=\"w-full max-w-xs mt-3\">
               <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
                 <div
-                  className="h-full rounded-full transition-all duration-1000"
+                  className=\"h-full rounded-full transition-all duration-1000\"
                   style={{
                     width: `${progressPercent}%`,
                     background: `linear-gradient(90deg, ${styleConfig.accentColor}80, ${styleConfig.accentColor})`,
@@ -526,7 +518,7 @@ export default function CountdownPage({
             </div>
           </div>
 
-          <div className="mt-1">
+          <div className=\"mt-1\">
             <AudioWaveVisualizer
               color={styleConfig.accentColor}
               barCount={16}
@@ -534,13 +526,13 @@ export default function CountdownPage({
               syncSeed={waveSeed}
               audioLevel={ttsLevel}
               audioSpectrum={ttsSpectrum}
-              mode="bars"
-              motionProfile="classic"
+              mode=\"bars\"
+              motionProfile=\"classic\"
               addBaseMotion
             />
           </div>
 
-          <div className="mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]">
+          <div className=\"mt-3 h-[120px] w-full max-w-sm sm:h-[140px] md:h-[170px]\">
             <NarrationText text={narrationText} style={style} themeMode={themeMode} />
           </div>
 
@@ -557,9 +549,9 @@ export default function CountdownPage({
           )}
         </div>
 
-        <div className="px-4 pb-3 text-center">
+        <div className=\"px-4 pb-3 text-center\">
           <button
-            onClick={() => setIsPaused((p) => !p)}
+            onClick={handleTogglePause}
             className={`mb-2 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
               isLight
                 ? 'bg-slate-200/90 text-slate-700 hover:bg-slate-300'
