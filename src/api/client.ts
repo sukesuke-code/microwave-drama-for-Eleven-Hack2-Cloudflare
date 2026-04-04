@@ -4,6 +4,8 @@ const API_BASE =
 
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
+const DEFAULT_RETRY_COUNT = 1;
+const AUDIO_METER_FPS = 30;
 const IS_DEV = import.meta.env.DEV;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -29,17 +31,36 @@ function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    signal:
-      init?.signal ??
-      withTimeoutSignal(
-        init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000
-      ),
-  });
+  let lastError: Error | null = null;
 
-  const data = (await res.json()) as T;
-  return data;
+  for (let attempt = 0; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        signal:
+          init?.signal ??
+          withTimeoutSignal(
+            init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000
+          ),
+      });
+
+      const data = (await res.json()) as T;
+      if (!res.ok) {
+        throw new Error(`HTTP_${res.status}`);
+      }
+      return data;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt >= DEFAULT_RETRY_COUNT) {
+        break;
+      }
+
+      const backoffMs = 250 * (attempt + 1);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  throw lastError ?? new Error("REQUEST_FAILED");
 }
 
 type TtsLevelListener = (level: number) => void;
@@ -155,8 +176,16 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
   analyser.connect(audioContext.destination);
 
   let frameId = 0;
+  const minFrameIntervalMs = 1000 / AUDIO_METER_FPS;
+  let lastFrameAt = 0;
 
-  const tick = () => {
+  const tick = (now: number) => {
+    if (now - lastFrameAt < minFrameIntervalMs) {
+      frameId = window.requestAnimationFrame(tick);
+      return;
+    }
+    lastFrameAt = now;
+
     analyser.getByteTimeDomainData(waveformData);
     analyser.getByteFrequencyData(frequencyData);
 
@@ -176,7 +205,8 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
     const logMin = Math.log10(minHz);
     const logMax = Math.log10(maxHz);
 
-    const spectrum = Array.from({ length: spectrumBins }, (_, index) => {
+    const spectrum = new Array<number>(spectrumBins);
+    for (let index = 0; index < spectrumBins; index += 1) {
       const startRatio = index / spectrumBins;
       const endRatio = (index + 1) / spectrumBins;
 
@@ -208,8 +238,8 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
       }
 
       const avg = sum / Math.max(1, endBin - startBin);
-      return Math.min(1, (avg / 255) * 2.2);
-    });
+      spectrum[index] = Math.min(1, (avg / 255) * 2.2);
+    }
 
     emitTtsLevel(level);
 

@@ -267,12 +267,14 @@ export default function CountdownPage({
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
-  const waveSeed = useMemo(() => {
-    const textSeed = narrationText
-      .split('')
-      .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
-    return textSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13;
-  }, [narrationText, totalSeconds, timeLeft, waveBeat]);
+  const narrationSeed = useMemo(() => narrationText
+    .split('')
+    .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0), [narrationText]);
+
+  const waveSeed = useMemo(
+    () => narrationSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13,
+    [narrationSeed, totalSeconds, timeLeft, waveBeat]
+  );
 
   const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
     if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
