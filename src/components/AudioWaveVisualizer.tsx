@@ -9,6 +9,7 @@ interface AudioWaveVisualizerProps {
   audioSpectrum?: number[];
   inverted?: boolean;
   mode?: 'bars' | 'morph';
+  motionProfile?: 'classic' | 'dynamic';
 }
 
 type WavePattern = {
@@ -74,6 +75,7 @@ export default function AudioWaveVisualizer({
   audioSpectrum,
   inverted = false,
   mode = 'bars',
+  motionProfile = 'dynamic',
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
   const [motionTick, setMotionTick] = useState(0);
@@ -93,19 +95,21 @@ export default function AudioWaveVisualizer({
     return Math.min(1, total / audioSpectrum.length);
   }, [hasSpectrum, audioSpectrum]);
   const motionIntensity = Math.min(1, Math.max(level, spectrumAverage));
+  const isDynamicProfile = motionProfile === 'dynamic';
   const swayX = Math.sin((syncSeed ?? 0) * 0.09 + motionTick * 0.85) * (2 + motionIntensity * 6);
   const swayY = Math.cos((syncSeed ?? 0) * 0.06 + motionTick * 0.9) * (0.6 + motionIntensity * 2.4);
   const tilt = Math.sin((syncSeed ?? 0) * 0.03 + motionTick * 0.65) * (1.8 + motionIntensity * 4.2);
   const shellScaleY = 0.95 + motionIntensity * 0.35 + Math.abs(Math.sin((syncSeed ?? 0) * 0.08 + motionTick * 0.58)) * 0.16;
 
   useEffect(() => {
-    const baseCadence = intensity === 'high' ? 52 : intensity === 'medium' ? 66 : 78;
-    const cadenceMs = Math.max(38, Math.floor(baseCadence - motionIntensity * 22));
+    const cadenceMs = isDynamicProfile
+      ? Math.max(38, Math.floor((intensity === 'high' ? 52 : intensity === 'medium' ? 66 : 78) - motionIntensity * 22))
+      : 90;
     const timer = window.setInterval(() => {
       setMotionTick((prev) => prev + 1);
     }, cadenceMs);
     return () => window.clearInterval(timer);
-  }, [intensity, motionIntensity]);
+  }, [intensity, motionIntensity, isDynamicProfile]);
 
   const waveformPath = useMemo(() => {
     if (mode !== 'morph') return '';
@@ -180,10 +184,12 @@ export default function AudioWaveVisualizer({
 
   return (
     <div
-      className={`flex justify-center gap-1 h-12 px-2 transition-transform duration-75 ${inverted ? 'items-start' : 'items-end'}`}
-      style={{
-        transform: `translate3d(${swayX.toFixed(2)}px, ${swayY.toFixed(2)}px, 0) skewX(${tilt.toFixed(2)}deg) scaleY(${shellScaleY.toFixed(3)})`,
-      }}
+      className={`flex justify-center gap-1 h-12 px-2 ${isDynamicProfile ? 'transition-transform duration-75' : ''} ${inverted ? 'items-start' : 'items-end'}`}
+      style={isDynamicProfile
+        ? {
+          transform: `translate3d(${swayX.toFixed(2)}px, ${swayY.toFixed(2)}px, 0) skewX(${tilt.toFixed(2)}deg) scaleY(${shellScaleY.toFixed(3)})`,
+        }
+        : undefined}
     >
       {bars.map((_, i) => {
         const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();
@@ -205,16 +211,17 @@ export default function AudioWaveVisualizer({
           : level;
         const floorLevel = 0.14 + level * 0.42;
         const activeLevel = Math.max(floorLevel, mixedLevel);
-        const dynamicScale =
-          0.34
-          + activeLevel * 2.25
-          + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.33) * 0.28;
+        const dynamicScale = isDynamicProfile
+          ? 0.34
+            + activeLevel * 2.25
+            + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.33) * 0.28
+          : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95) * 0.18;
         const jitterX = Math.sin((syncSeed ?? 0) * 0.07 + i * 1.17 + motionTick * 0.52) * (0.08 + activeLevel * 0.32);
         const rotate = Math.sin((syncSeed ?? 0) * 0.05 + i * 0.41 + motionTick * 0.4) * (2 + activeLevel * 5.5);
         const barStyle: CSSProperties & Record<string, string | number> = {
           backgroundColor: color,
           animationDelay: `${i * delayMultiplier}s`,
-          boxShadow: `0 0 ${4 + activeLevel * 9}px ${color}66`,
+          boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
           animationName: pattern.keyframe,
           animationDuration: `${randomDuration}s`,
           animationTimingFunction: 'ease-in-out',
@@ -226,9 +233,13 @@ export default function AudioWaveVisualizer({
           '--eq-opacity-max': pattern.opacityMax,
           ...(isAudioReactive
             ? {
-              transform: `translateX(${jitterX.toFixed(2)}px) rotate(${rotate.toFixed(2)}deg) scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})`,
+              transform: isDynamicProfile
+                ? `translateX(${jitterX.toFixed(2)}px) rotate(${rotate.toFixed(2)}deg) scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})`
+                : `scaleY(${Math.max(0.2, dynamicScale).toFixed(3)})`,
               willChange: 'transform, opacity',
-              opacity: Math.min(1, 0.42 + activeLevel * 1.08),
+              opacity: isDynamicProfile
+                ? Math.min(1, 0.42 + activeLevel * 1.08)
+                : Math.min(1, 0.35 + activeLevel * 0.95),
             }
             : {}),
         };
