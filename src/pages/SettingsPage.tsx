@@ -136,24 +136,51 @@ export default function SettingsPage({
         : style === 'horror' ? 'horror'
         : 'anime';
 
-      const session = await api.startSession(
-        dishName.trim() || t.mysteryDish,
-        duration,
-        mappedStyle as "sports" | "horror" | "documentary" | "anime"
-      );
+      const nextDishName = dishName.trim() || t.mysteryDish;
+      let sessionId = '';
+      let usedLocalFallback = false;
+
+      try {
+        const session = await api.startSession(
+          nextDishName,
+          duration,
+          mappedStyle as "sports" | "horror" | "documentary" | "anime"
+        );
+        sessionId = session.sessionId;
+      } catch (startError) {
+        usedLocalFallback = true;
+        const localSessionIdFactory = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? () => crypto.randomUUID()
+          : () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        sessionId = `local-${localSessionIdFactory()}`;
+
+        console.warn('Session API unavailable. Falling back to local session mode.', {
+          error: startError instanceof Error ? startError.message : String(startError),
+          fallbackSessionId: sessionId,
+        });
+      }
 
       const settings: Settings = {
         totalSeconds: duration,
-        dishName: dishName.trim() || t.mysteryDish,
+        dishName: nextDishName,
         style,
       };
 
-      sessionStorage.setItem('sessionId', session.sessionId);
+      sessionStorage.setItem('sessionId', sessionId);
+      sessionStorage.setItem('sessionMode', usedLocalFallback ? 'local-fallback' : 'remote');
       onStart(settings);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to start session';
-      setError(message);
-      console.error('Failed to start session:', err);
+      const userMessage = locale === 'ja'
+        ? 'サーバーに接続できませんでした。通信環境をご確認のうえ、もう一度お試しください。'
+        : 'Could not connect to the server. Please check your connection and try again.';
+      setError(userMessage);
+
+      const developerMessage = err instanceof Error ? err.message : String(err);
+      console.error('Failed to start session (developer detail):', {
+        error: developerMessage,
+        duration,
+        style,
+      });
     } finally {
       setIsLoading(false);
     }

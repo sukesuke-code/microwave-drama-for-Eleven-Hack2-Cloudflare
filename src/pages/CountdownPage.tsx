@@ -39,11 +39,14 @@ export default function CountdownPage({
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>('remote');
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastQueuedNarrationRef = useRef('');
+  const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
+  const hasLoggedAgentFallbackRef = useRef(false);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -78,42 +81,125 @@ export default function CountdownPage({
     window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
-  const updateNarration = useCallback((tl: number, tt: number) => {
-    if (tl <= 0) return;
-    const text = getCurrentNarration(tl, tt, style, dishName, locale);
-    if (text !== prevNarrationRef.current) {
-      prevNarrationRef.current = text;
-      setNarrationText(text);
+  const getPhase = useCallback((tl: number, tt: number): 'opening' | 'quarter' | 'middle' | 'final' | 'done' => {
+    if (tl <= 0) return 'done';
+    const percent = tt > 0 ? (tl / tt) * 100 : 0;
+    if (percent > 75) return 'opening';
+    if (percent > 50) return 'quarter';
+    if (percent > 25) return 'middle';
+    return 'final';
+  }, []);
+
+  const buildNarrationLine = useCallback((tl: number, tt: number) => {
+    if (tl <= 0) {
+      return getFinishLine(style, dishName, locale);
     }
+    return getCurrentNarration(tl, tt, style, dishName, locale);
   }, [style, dishName, locale]);
+
+  const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+    if (style === 'movie') {
+      if (phase === 'done') {
+        api.stopMusic();
+        await api.playSfx('cinematic ending impact, short trailer hit');
+        return;
+      }
+      if (phase === 'opening') {
+        await api.playMusic('cinematic trailer underscore, tense and dramatic');
+      }
+      if (phase === 'middle' || phase === 'final') {
+        await api.playSfx('cinematic whoosh rise, short transition');
+      }
+      return;
+    }
+
+    if (style === 'nature') {
+      if (phase === 'done') {
+        api.stopMusic();
+        await api.playSfx('soft forest chime, gentle resolution');
+        return;
+      }
+      if (phase === 'opening') {
+        await api.playMusic('calm nature ambience, soft wind and birds');
+      }
+      if (phase === 'middle' || phase === 'final') {
+        await api.playSfx('light natural rustle and airy swell');
+      }
+    }
+  }, [style]);
+
+  const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+    return {
+      sessionId: sessionIdRef.current ?? undefined,
+      style,
+      dishName,
+      totalTime: totalSeconds,
+      remainingTime: tl,
+      phase,
+      locale,
+    };
+  }, [style, dishName, totalSeconds, locale]);
 
   useEffect(() => {
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
     sessionIdRef.current = sessionStorage.getItem('sessionId');
+    const mode = sessionStorage.getItem('sessionMode');
+    setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
-    if (!narrationText || isPaused) return;
-    const line = narrationText;
-    if (line === lastQueuedNarrationRef.current) {
+    if (isPaused) return;
+    const phase = getPhase(timeLeft, totalSeconds);
+    if (phaseRef.current === phase) {
       return;
     }
-    lastQueuedNarrationRef.current = line;
+    phaseRef.current = phase;
+
+    const fallbackLine = buildNarrationLine(timeLeft, totalSeconds);
+    if (fallbackLine === lastQueuedNarrationRef.current) {
+      return;
+    }
+    lastQueuedNarrationRef.current = fallbackLine;
     sessionIdRef.current = sessionStorage.getItem('sessionId');
+    const context = buildAgentNarrationContext(timeLeft, phase);
 
     ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
+        const narration = await api.requestAgentNarration(context);
+        prevNarrationRef.current = narration.text;
+        setNarrationText(narration.text);
         if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, line);
+          await api.saveNarration(sessionIdRef.current, narration.text);
         }
-        await api.playTts(line);
+        await narration.play();
+        await handlePhaseEffects(phase);
       })
-      .catch((err) => {
-        console.error('Failed to process narration event:', err);
+      .catch(async (err) => {
+        const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
+        if (isAgentUnavailable) {
+          if (!hasLoggedAgentFallbackRef.current) {
+            console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
+            hasLoggedAgentFallbackRef.current = true;
+          }
+        } else {
+          console.error('Failed to process phase narration event (fallback to local TTS):', err);
+        }
+        prevNarrationRef.current = fallbackLine;
+        setNarrationText(fallbackLine);
+
+        if (sessionIdRef.current) {
+          await api.saveNarration(sessionIdRef.current, fallbackLine).catch((saveError) => {
+            console.error('Failed to save fallback narration:', saveError);
+          });
+        }
+
+        await handlePhaseEffects(phase).catch((effectError) => {
+          console.error('Failed to run fallback phase effects:', effectError);
+        });
       });
-  }, [narrationText, isPaused]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -123,6 +209,7 @@ export default function CountdownPage({
     return () => {
       unsubscribe();
       api.stopTtsPlayback();
+      api.stopMusic();
     };
   }, []);
 
@@ -152,8 +239,6 @@ export default function CountdownPage({
           setTimeout(() => onFinish(), 4000);
           return 0;
         }
-        updateNarration(next, totalSeconds);
-
         if (sessionIdRef.current) {
           api.tickSession(sessionIdRef.current, next).catch((err) => {
             console.error('Failed to tick session:', err);
@@ -167,7 +252,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, updateNarration, onFinish, locale, playAlarmTone]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
@@ -238,6 +323,17 @@ export default function CountdownPage({
             </span>
           </div>
         </div>
+
+        {sessionMode === 'local-fallback' && (
+          <div className={`mx-4 mt-2 rounded-lg border px-3 py-2 text-center text-xs font-bold ${
+            isLight
+              ? 'border-amber-300 bg-amber-50 text-amber-800'
+              : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+          }`}>
+            <p>{t.aiConnectionError}</p>
+            <p>{t.localSessionFallback}</p>
+          </div>
+        )}
 
         <div className="absolute right-4 top-4 z-30">
           <button

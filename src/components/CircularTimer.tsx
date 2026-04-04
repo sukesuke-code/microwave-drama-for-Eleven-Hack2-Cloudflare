@@ -31,7 +31,7 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
   const minutes = Math.floor(Math.max(remaining, 0) / 60);
   const seconds = Math.max(remaining, 0) % 60;
   const minuteStr = String(minutes).padStart(2, '0');
-  const secondStr = String(seconds).padStart(2, '0');
+  const secondStr = seconds <= 10 ? String(seconds) : String(seconds).padStart(2, '0');
   const showMinutePrefix = remaining >= 60;
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
