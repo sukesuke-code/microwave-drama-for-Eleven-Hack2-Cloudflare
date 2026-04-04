@@ -10,6 +10,7 @@ interface AudioWaveVisualizerProps {
   inverted?: boolean;
   mode?: 'bars' | 'morph';
   motionProfile?: 'classic' | 'dynamic';
+  addBaseMotion?: boolean;
 }
 
 type WavePattern = {
@@ -76,6 +77,7 @@ export default function AudioWaveVisualizer({
   inverted = false,
   mode = 'bars',
   motionProfile = 'dynamic',
+  addBaseMotion = false,
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
   const [motionTick, setMotionTick] = useState(0);
@@ -209,8 +211,10 @@ export default function AudioWaveVisualizer({
         const mixedLevel = hasSpectrum
           ? Math.min(1, interpolatedEnergy * 0.9 + level * 0.65 + ripple * level)
           : level;
+        const baseWaveLane = 0.2 + Math.abs(Math.sin((syncSeed ?? 0) * 0.12 + i * 0.82 + motionTick * 0.46)) * 0.65;
+        const laneBoost = addBaseMotion ? baseWaveLane * (0.45 + motionIntensity * 0.55) : 0;
         const floorLevel = 0.14 + level * 0.42;
-        const activeLevel = Math.max(floorLevel, mixedLevel);
+        const activeLevel = Math.max(floorLevel, Math.min(1, mixedLevel + laneBoost));
         const dynamicScale = isDynamicProfile
           ? 0.34
             + activeLevel * 2.25
