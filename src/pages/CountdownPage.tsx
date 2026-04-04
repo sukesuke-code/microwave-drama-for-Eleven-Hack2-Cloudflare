@@ -50,6 +50,14 @@ export default function CountdownPage({
   const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
   const hasLoggedAgentFallbackRef = useRef(false);
   const isPausedRef = useRef(isPaused);
+  const isFinishedRef = useRef(isFinished);
+  const isUnmountedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      isUnmountedRef.current = true;
+    };
+  }, []);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -58,6 +66,10 @@ export default function CountdownPage({
       api.stopMusic();
     }
   }, [isPaused]);
+
+  useEffect(() => {
+    isFinishedRef.current = isFinished;
+  }, [isFinished]);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -109,7 +121,7 @@ export default function CountdownPage({
   }, [style, dishName, locale]);
 
   const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
-    if (isPausedRef.current) return;
+    if (isPausedRef.current || isUnmountedRef.current) return;
     if (style === 'movie') {
       if (phase === 'done') {
         api.stopMusic();
@@ -203,29 +215,29 @@ export default function CountdownPage({
 
     ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
-        if (isPausedRef.current) return;
+        if (isUnmountedRef.current || isPausedRef.current || (isFinishedRef.current && phase !== 'done')) return;
         const narration = await api.requestAgentNarration(context);
         
         let textSet = false;
         const triggerTextSync = () => {
-          if (textSet || isPausedRef.current) return;
+          if (textSet || isPausedRef.current || isUnmountedRef.current) return;
           textSet = true;
           prevNarrationRef.current = narration.text;
           setNarrationText(narration.text);
         };
 
-        if (sessionIdRef.current) {
+        if (sessionIdRef.current && !isUnmountedRef.current) {
           api.saveNarration(sessionIdRef.current, narration.text).catch(console.warn);
         }
 
-        if (!isPausedRef.current) {
+        if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
           await narration.play(triggerTextSync);
           triggerTextSync(); // Fallback if onReady was not completely fired
           await handlePhaseEffects(phase);
         }
       })
       .catch(async (err) => {
-        if (isPausedRef.current) return;
+        if (isUnmountedRef.current || isPausedRef.current || (isFinishedRef.current && phase !== 'done')) return;
         const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
         if (isAgentUnavailable) {
           if (!hasLoggedAgentFallbackRef.current) {
@@ -238,6 +250,7 @@ export default function CountdownPage({
           console.error('Failed to process phase narration event (fallback to local TTS):', err);
         }
         
+        if (isUnmountedRef.current) return;
         prevNarrationRef.current = fallbackLine;
         setNarrationText(fallbackLine);
 
@@ -247,7 +260,7 @@ export default function CountdownPage({
 
         handlePhaseEffects(phase).catch(() => {});
         
-        if (!isPausedRef.current) {
+        if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
           await api.playLocalNarration(fallbackLine, locale).catch((ttsError) => {
             console.error('Failed local fallback TTS playback:', ttsError);
           });
