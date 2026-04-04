@@ -178,7 +178,7 @@ export default function ResultPage({
     <div
       className={`h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b ${
         isLight ? 'from-slate-50 via-orange-50/70 to-slate-100' : `${styleConfig.bgGradient} bg-[#00031a]`
-      }`}
+      } page-container`}
     >
       <div className="absolute right-4 top-4 z-30">
         <button
