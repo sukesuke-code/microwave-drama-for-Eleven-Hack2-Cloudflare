@@ -105,8 +105,8 @@ export default function AudioWaveVisualizer({
 
   useEffect(() => {
     const cadenceMs = isDynamicProfile
-      ? Math.max(16, Math.floor((intensity === 'high' ? 20 : intensity === 'medium' ? 28 : 32) - motionIntensity * 10))
-      : 32;
+      ? Math.max(38, Math.floor((intensity === 'high' ? 52 : intensity === 'medium' ? 66 : 78) - motionIntensity * 22))
+      : 90;
     const timer = window.setInterval(() => {
       setMotionTick((prev) => prev + 1);
     }, cadenceMs);
@@ -186,11 +186,10 @@ export default function AudioWaveVisualizer({
 
   return (
     <div
-      className={`flex justify-center gap-1 h-12 px-2 ${inverted ? 'items-start' : 'items-end'}`}
+      className={`flex justify-center gap-1 h-12 px-2 ${isDynamicProfile ? 'transition-transform duration-75' : ''} ${inverted ? 'items-start' : 'items-end'}`}
       style={isDynamicProfile
         ? {
           transform: `translate3d(${swayX.toFixed(2)}px, ${swayY.toFixed(2)}px, 0) skewX(${tilt.toFixed(2)}deg) scaleY(${shellScaleY.toFixed(3)})`,
-          transition: 'transform 32ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         }
         : undefined}
     >
@@ -231,7 +230,7 @@ export default function AudioWaveVisualizer({
           boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
           animationName: pattern.keyframe,
           animationDuration: `${randomDuration}s`,
-          animationTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          animationTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1.0)',
           animationIterationCount: 'infinite',
           animationDirection: 'alternate',
           '--eq-min-height': `${pattern.minHeight}px`,

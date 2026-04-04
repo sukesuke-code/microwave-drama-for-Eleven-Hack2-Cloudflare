@@ -52,7 +52,7 @@ export default function WaveAnimation({ style, active, narrationText, beat }: Wa
             style={{
               backgroundColor: color,
               height: `${heightPercent}%`,
-              animation: `wave ${duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite`,
+              animation: `wave ${duration}s ease-in-out infinite`,
               animationDelay: `${(i % 6) * 0.08}s`,
               opacity: 0.85,
             }}
