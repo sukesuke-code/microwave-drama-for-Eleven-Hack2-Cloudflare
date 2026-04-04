@@ -38,8 +38,8 @@ export default function CountdownPage({
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
+  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback' | 'connecting'>('connecting');
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
-  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>('remote');
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,12 +48,12 @@ export default function CountdownPage({
   const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastQueuedNarrationRef = useRef('');
   const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
-  const hasLoggedAgentFallbackRef = useRef(false);
   const isPausedRef = useRef(isPaused);
   const isFinishedRef = useRef(isFinished);
   const isUnmountedRef = useRef(false);
 
   useEffect(() => {
+    isUnmountedRef.current = false;
     return () => {
       isUnmountedRef.current = true;
     };
@@ -164,16 +164,31 @@ export default function CountdownPage({
     };
   }, [style, dishName, totalSeconds, locale]);
 
+
+
   useEffect(() => {
     async function initSession() {
+      const existingSessionId = sessionStorage.getItem('sessionId');
+      const existingMode = sessionStorage.getItem('sessionMode') as 'remote' | 'local-fallback' | 'connecting' | null;
+
+      if (existingSessionId && sessionIdRef.current !== existingSessionId) {
+        console.log("[CountdownPage] Resuming existing AI session:", existingSessionId);
+        sessionIdRef.current = existingSessionId;
+        if (existingMode) setSessionMode(existingMode);
+        return;
+      }
+
+      console.log("[CountdownPage] Initializing NEW AI session...");
       try {
         const session = await api.startSession(dishName, totalSeconds, style);
+        console.log("[CountdownPage] AI session started:", session.sessionId);
         sessionIdRef.current = session.sessionId;
         sessionStorage.setItem('sessionId', session.sessionId);
-        setSessionMode(session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote');
-        sessionStorage.setItem('sessionMode', session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote');
+        const mode = session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote';
+        setSessionMode(mode);
+        sessionStorage.setItem('sessionMode', mode);
       } catch (err) {
-        console.warn('Failed to start remote session, using local defaults', err);
+        console.warn('[CountdownPage] Failed to start remote session, using local defaults', err);
         sessionIdRef.current = `local-${Date.now()}`;
         sessionStorage.setItem('sessionId', sessionIdRef.current);
         setSessionMode('local-fallback');
@@ -181,90 +196,112 @@ export default function CountdownPage({
       }
     }
 
-    initSession();
+    const timer = setTimeout(() => {
+      initSession();
+    }, 50); // Small delay to allow session storage to settle if just came from another page
 
     const text = buildNarrationLine(totalSeconds, totalSeconds);
-    prevNarrationRef.current = text;
     setNarrationText(text);
+
+    return () => clearTimeout(timer);
   }, [totalSeconds, style, dishName, locale, buildNarrationLine]);
 
   useEffect(() => {
     const sId = sessionStorage.getItem('sessionId');
-    if (sId) {
-      sessionIdRef.current = sId;
-    }
-    const mode = sessionStorage.getItem('sessionMode');
-    setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
-  }, [totalSeconds, style, dishName, locale]);
+    if (sId) sessionIdRef.current = sId;
+    const mode = sessionStorage.getItem('sessionMode') as 'remote' | 'local-fallback' | 'connecting' | null;
+    if (mode) setSessionMode(mode);
+  }, []);
 
   useEffect(() => {
     if (isPaused) return;
+
     const phase = getPhase(timeLeft, totalSeconds);
-    if (phaseRef.current === phase) {
-      return;
-    }
+    if (phaseRef.current === phase) return;
+    
+    console.log(`[CountdownPage] Phase transition detected: ${phaseRef.current} -> ${phase} (Time: ${timeLeft}s)`);
     phaseRef.current = phase;
 
     const fallbackLine = buildNarrationLine(timeLeft, totalSeconds);
-    if (fallbackLine === lastQueuedNarrationRef.current) {
-      return;
-    }
+    if (fallbackLine === lastQueuedNarrationRef.current) return;
     lastQueuedNarrationRef.current = fallbackLine;
-    sessionIdRef.current = sessionStorage.getItem('sessionId');
+
     const context = buildAgentNarrationContext(timeLeft, phase);
+    console.log(`[CountdownPage] Queueing narration for phase: ${phase}`);
 
     ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
-        if (isUnmountedRef.current || isPausedRef.current || (isFinishedRef.current && phase !== 'done')) return;
-        const narration = await api.requestAgentNarration(context);
+        const isUm = isUnmountedRef.current;
+        const isPs = isPausedRef.current;
+        const isFn = isFinishedRef.current;
         
-        let textSet = false;
-        const triggerTextSync = () => {
-          if (textSet || isPausedRef.current || isUnmountedRef.current) return;
-          textSet = true;
-          prevNarrationRef.current = narration.text;
-          setNarrationText(narration.text);
-        };
+        console.log(`[CountdownPage] Task starting for ${phase}. States: unmounted=${isUm}, paused=${isPs}, finished=${isFn}`);
 
-        if (sessionIdRef.current && !isUnmountedRef.current) {
-          api.saveNarration(sessionIdRef.current, narration.text).catch(console.warn);
+        if (isUm) {
+          console.log(`[CountdownPage] Skipping ${phase} - Component unmounted`);
+          return;
+        }
+        if (isPs) {
+          console.log(`[CountdownPage] Skipping ${phase} - Session paused`);
+          return;
+        }
+        if (isFn && phase !== 'done') {
+          console.log(`[CountdownPage] Skipping ${phase} - Session finished`);
+          return;
         }
 
-        if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-          await narration.play(triggerTextSync);
-          triggerTextSync(); // Fallback if onReady was not completely fired
-          await handlePhaseEffects(phase);
+        try {
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("NARRATION_TASK_TIMEOUT")), 35000)
+          );
+
+          const taskPromise = (async () => {
+             console.log(`[CountdownPage] Calling requestAgentNarration for ${phase}...`);
+             const narration = await api.requestAgentNarration(context);
+             console.log(`[CountdownPage] Received narration for ${phase}: "${narration.text}"`);
+             
+             let textSet = false;
+             const triggerTextSync = () => {
+               if (textSet || isPausedRef.current || isUnmountedRef.current) return;
+               textSet = true;
+               prevNarrationRef.current = narration.text;
+               setNarrationText(narration.text);
+             };
+
+             if (sessionIdRef.current && !isUnmountedRef.current) {
+               api.saveNarration(sessionIdRef.current, narration.text).catch(console.warn);
+             }
+
+             if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
+               console.log(`[CountdownPage] Playing narration and effects concurrently...`);
+               const effectPromise = handlePhaseEffects(phase).catch(console.error);
+               await narration.play(triggerTextSync);
+               triggerTextSync();
+               await effectPromise;
+               console.log(`[CountdownPage] Finished playing narration and effects.`);
+             }
+          })();
+
+          await Promise.race([taskPromise, timeoutPromise]);
+        } catch (err) {
+          console.error(`[CountdownPage] Narration task failed for phase ${phase}:`, err);
+          if (isUnmountedRef.current || isPausedRef.current) return;
+
+          // Local Fallback
+          prevNarrationRef.current = fallbackLine;
+          setNarrationText(fallbackLine);
+          if (sessionIdRef.current) api.saveNarration(sessionIdRef.current, fallbackLine).catch(() => {});
+          
+          await handlePhaseEffects(phase).catch(() => {});
+          
+          if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
+            console.log(`[CountdownPage] Playing local fallback narration: "${fallbackLine}"`);
+            await api.playLocalNarration(fallbackLine, locale).catch(e => console.error("Local fallback failed:", e));
+          }
         }
       })
-      .catch(async (err) => {
-        if (isUnmountedRef.current || isPausedRef.current || (isFinishedRef.current && phase !== 'done')) return;
-        const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
-        if (isAgentUnavailable) {
-          if (!hasLoggedAgentFallbackRef.current) {
-            console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
-            hasLoggedAgentFallbackRef.current = true;
-          }
-          sessionStorage.setItem('sessionMode', 'local-fallback');
-          setSessionMode('local-fallback');
-        } else {
-          console.error('Failed to process phase narration event (fallback to local TTS):', err);
-        }
-        
-        if (isUnmountedRef.current) return;
-        prevNarrationRef.current = fallbackLine;
-        setNarrationText(fallbackLine);
-
-        if (sessionIdRef.current) {
-          api.saveNarration(sessionIdRef.current, fallbackLine).catch(() => {});
-        }
-
-        handlePhaseEffects(phase).catch(() => {});
-        
-        if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-          await api.playLocalNarration(fallbackLine, locale).catch((ttsError) => {
-            console.error('Failed local fallback TTS playback:', ttsError);
-          });
-        }
+      .finally(() => {
+        console.log(`[CountdownPage] Task for phase ${phase} completed/exited.`);
       });
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale]);
 
@@ -403,14 +440,23 @@ export default function CountdownPage({
         </div>
 
         <div className="absolute left-16 top-4 z-30">
-          {sessionMode === 'remote' ? (
+          {sessionMode === 'remote' && (
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
             }`}>
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]"></div>
               <span>AI Connected</span>
             </div>
-          ) : (
+          )}
+          {sessionMode === 'connecting' && (
+            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
+              isLight ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-sky-500/30 bg-sky-500/10 text-sky-400'
+            }`}>
+              <div className="h-2 w-2 rounded-full bg-sky-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+              <span>Connecting AI...</span>
+            </div>
+          )}
+          {sessionMode === 'local-fallback' && (
              <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
             }`}>

@@ -53,7 +53,7 @@ function enforceEffectRateLimit(effectKey: "sfx" | "music"): void {
 
 function logDebug(...args: unknown[]): void {
   if (IS_DEV) {
-    console.debug(...args);
+    console.debug("[MicrowaveShow API]", ...args);
   }
 }
 
@@ -64,45 +64,59 @@ function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
   return undefined;
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  const url = `${API_BASE}${path}`;
   ensureSafeApiBase();
-  let lastError: Error | null = null;
+  logDebug(`Requesting ${url}`, init?.body);
+
+  let lastError: any = null;
 
   for (let attempt = 0; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutMs = init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000;
+    const timerId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await fetch(url, {
         ...init,
-        signal:
-          init?.signal ??
-          withTimeoutSignal(
-            init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000
-          ),
+        signal: init?.signal ?? controller.signal,
       });
 
       if (!res.ok) {
-        const shouldRetry = RETRYABLE_HTTP_STATUS.has(res.status);
-        throw new Error(`HTTP_${res.status}:${shouldRetry ? "RETRYABLE" : "FINAL"}`);
+        const errText = await res.text().catch(() => "Unknown error");
+        const isRetryable = RETRYABLE_HTTP_STATUS.has(res.status);
+        console.error(`API Error [${res.status}] (Attempt ${attempt}): ${errText}`);
+
+        if (isRetryable && attempt < DEFAULT_RETRY_COUNT) {
+          const backoff = 300 * (attempt + 1);
+          await new Promise(r => setTimeout(r, backoff));
+          continue;
+        }
+        throw new Error(`API error ${res.status}: ${errText}`);
       }
 
-      const data = (await res.json()) as T;
-      return data;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      const isRetryableHttp = /HTTP_\d+:RETRYABLE/.test(lastError.message);
-      const isAbortError = lastError.name === "AbortError";
-      const isNetworkLike = /Failed to fetch|NetworkError|Load failed/i.test(lastError.message);
-      const canRetry = isRetryableHttp || isAbortError || isNetworkLike;
-
-      if (attempt >= DEFAULT_RETRY_COUNT || !canRetry) {
-        break;
+      const data = await res.json();
+      logDebug(`Response from ${path}:`, data);
+      return data as T;
+    } catch (err: any) {
+      lastError = err;
+      const isAbort = err.name === "AbortError";
+      const isNetwork = err.message?.includes("fetch") || err.message?.includes("Network");
+      
+      if ((isAbort || isNetwork) && attempt < DEFAULT_RETRY_COUNT) {
+        await new Promise(r => setTimeout(r, 400));
+        continue;
       }
-
-      const backoffMs = 250 * (attempt + 1);
-      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      break;
+    } finally {
+      clearTimeout(timerId);
     }
   }
 
-  throw lastError ?? new Error("REQUEST_FAILED");
+  throw lastError || new Error("REQUEST_FAILED");
 }
 
 type TtsLevelListener = (level: number) => void;
@@ -443,7 +457,13 @@ async function playAudioBlob(
     activeMeterCleanup = attachAudioMeter(audio);
   }
 
-  await audio.play();
+  try {
+    await audio.play();
+  } catch (err) {
+    console.warn("Audio play failed or was interrupted:", err);
+    URL.revokeObjectURL(url);
+    throw err;
+  }
 
   if (loop) {
     return;
@@ -720,6 +740,7 @@ async function requestAgentNarration(
 
   // 1. Try to get AI-generated text from the backend
   try {
+    logDebug("Requesting narration for context:", sanitizedRequest);
     const data = await requestJson<{
       ok?: boolean;
       text?: string;
@@ -750,7 +771,8 @@ async function requestAgentNarration(
 
   return {
     text: narrationText,
-    play: async (onReady) => {
+    play: async (onReady?: () => void) => {
+      stopRequested = false;
       if (!narrationText) return;
 
       // Try TTS from the backend (ElevenLabs via secure proxy)
@@ -784,18 +806,19 @@ async function requestAgentNarration(
 
       // Fallback: browser speech synthesis
       if (stopRequested) return;
-      if (onReady) onReady();
-      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja");
+      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja", onReady);
     },
   };
 }
 
-async function playLocalNarration(text: string, locale = "ja"): Promise<void> {
+async function playLocalNarration(text: string, locale = "ja", onStart?: () => void): Promise<void> {
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    if (onStart) onStart();
     return;
   }
 
   stopTtsPlayback();
+  stopRequested = false; // Reset the flag so future checks don't block playback
   const sanitizedText = normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH);
   const utterance = new SpeechSynthesisUtterance(sanitizedText);
   utterance.rate = locale.startsWith("ja") ? 1.02 : 1.0;
@@ -819,6 +842,9 @@ async function playLocalNarration(text: string, locale = "ja"): Promise<void> {
   }, 70);
 
   await new Promise<void>((resolve, reject) => {
+    utterance.onstart = () => {
+      if (onStart) onStart();
+    };
     utterance.onend = () => resolve();
     utterance.onerror = () => reject(new Error("LOCAL_TTS_FAILED"));
     window.speechSynthesis.speak(utterance);
