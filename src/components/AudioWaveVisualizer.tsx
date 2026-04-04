@@ -10,6 +10,7 @@ interface AudioWaveVisualizerProps {
   inverted?: boolean;
   mode?: 'bars' | 'morph';
   motionProfile?: 'classic' | 'dynamic';
+  addBaseMotion?: boolean;
 }
 
 type WavePattern = {
@@ -25,8 +26,8 @@ type WavePattern = {
 const WAVE_PATTERNS: WavePattern[] = [
   {
     keyframe: 'eqBarClassic',
-    durationMin: 0.9,
-    durationMax: 0.9,
+    durationMin: 0.7,
+    durationMax: 0.7,
     minHeight: 8,
     maxHeight: 30,
     opacityMin: 0.45,
@@ -34,8 +35,8 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
   {
     keyframe: 'eqBar',
-    durationMin: 0.82,
-    durationMax: 1.02,
+    durationMin: 0.65,
+    durationMax: 0.8,
     minHeight: 6,
     maxHeight: 32,
     opacityMin: 0.4,
@@ -43,8 +44,8 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
   {
     keyframe: 'eqBarWide',
-    durationMin: 1.05,
-    durationMax: 1.35,
+    durationMin: 0.8,
+    durationMax: 1.0,
     minHeight: 10,
     maxHeight: 42,
     opacityMin: 0.36,
@@ -52,8 +53,8 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
   {
     keyframe: 'eqBarStaccato',
-    durationMin: 0.55,
-    durationMax: 0.84,
+    durationMin: 0.45,
+    durationMax: 0.65,
     minHeight: 4,
     maxHeight: 26,
     opacityMin: 0.45,
@@ -76,6 +77,7 @@ export default function AudioWaveVisualizer({
   inverted = false,
   mode = 'bars',
   motionProfile = 'dynamic',
+  addBaseMotion = false,
 }: AudioWaveVisualizerProps) {
   const bars = Array.from({ length: barCount });
   const [motionTick, setMotionTick] = useState(0);
@@ -209,29 +211,33 @@ export default function AudioWaveVisualizer({
         const mixedLevel = hasSpectrum
           ? Math.min(1, interpolatedEnergy * 0.9 + level * 0.65 + ripple * level)
           : level;
-        const floorLevel = 0.14 + level * 0.42;
-        const activeLevel = Math.max(floorLevel, mixedLevel);
+        const baseWaveLane = 0.2 + Math.abs(Math.sin((syncSeed ?? 0) * 0.12 + i * 0.82 + motionTick * 0.46)) * 0.65;
+        const laneBoost = addBaseMotion ? baseWaveLane * 0.65 : 0;
+        const floorLevel = addBaseMotion ? 0.3 : 0.14 + level * 0.42;
+        const activeLevel = addBaseMotion
+          ? Math.max(0.35, Math.min(1, baseWaveLane + mixedLevel * 0.5))
+          : Math.max(floorLevel, Math.min(1, mixedLevel + laneBoost));
         const dynamicScale = isDynamicProfile
           ? 0.34
             + activeLevel * 2.25
             + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.33) * 0.28
-          : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95) * 0.18;
+          : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.22) * 0.18;
         const jitterX = Math.sin((syncSeed ?? 0) * 0.07 + i * 1.17 + motionTick * 0.52) * (0.08 + activeLevel * 0.32);
         const rotate = Math.sin((syncSeed ?? 0) * 0.05 + i * 0.41 + motionTick * 0.4) * (2 + activeLevel * 5.5);
         const barStyle: CSSProperties & Record<string, string | number> = {
           backgroundColor: color,
-          animationDelay: `${i * delayMultiplier}s`,
+          animationDelay: addBaseMotion ? `-${(i * delayMultiplier).toFixed(3)}s` : `${i * delayMultiplier}s`,
           boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
           animationName: pattern.keyframe,
           animationDuration: `${randomDuration}s`,
-          animationTimingFunction: 'ease-in-out',
+          animationTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1.0)',
           animationIterationCount: 'infinite',
           animationDirection: 'alternate',
           '--eq-min-height': `${pattern.minHeight}px`,
           '--eq-max-height': `${pattern.maxHeight}px`,
           '--eq-opacity-min': pattern.opacityMin,
           '--eq-opacity-max': pattern.opacityMax,
-          ...(isAudioReactive
+          ...(isAudioReactive && (isDynamicProfile || !addBaseMotion)
             ? {
               transform: isDynamicProfile
                 ? `translateX(${jitterX.toFixed(2)}px) rotate(${rotate.toFixed(2)}deg) scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})`

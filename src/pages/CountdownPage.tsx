@@ -402,6 +402,7 @@ export default function CountdownPage({
               audioSpectrum={ttsSpectrum}
               mode="bars"
               motionProfile="classic"
+              addBaseMotion
             />
           </div>
 
