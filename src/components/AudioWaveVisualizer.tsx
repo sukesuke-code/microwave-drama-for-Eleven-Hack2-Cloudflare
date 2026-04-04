@@ -213,8 +213,10 @@ export default function AudioWaveVisualizer({
           : level;
         const baseWaveLane = 0.2 + Math.abs(Math.sin((syncSeed ?? 0) * 0.12 + i * 0.82 + motionTick * 0.46)) * 0.65;
         const laneBoost = addBaseMotion ? baseWaveLane * 0.65 : 0;
-        const floorLevel = 0.14 + level * 0.42;
-        const activeLevel = Math.max(floorLevel, Math.min(1, mixedLevel + laneBoost));
+        const floorLevel = addBaseMotion ? 0.3 : 0.14 + level * 0.42;
+        const activeLevel = addBaseMotion
+          ? Math.max(0.35, Math.min(1, baseWaveLane + mixedLevel * 0.5))
+          : Math.max(floorLevel, Math.min(1, mixedLevel + laneBoost));
         const dynamicScale = isDynamicProfile
           ? 0.34
             + activeLevel * 2.25
