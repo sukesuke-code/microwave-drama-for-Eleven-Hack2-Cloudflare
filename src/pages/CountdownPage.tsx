@@ -9,7 +9,17 @@ import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
+import {
+  connectAgent,
+  disconnectAgent,
+  sendUserMessage,
+  subscribeAgentMeter,
+  isAgentConnected,
+} from '../api/elevenlabs-agent';
+import type { AgentCallbacks, DynamicVars } from '../api/elevenlabs-agent';
 import { api } from '../api/client';
+
+type SessionPhase = 'opening' | 'quarter' | 'middle' | 'final' | 'done';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -39,16 +49,16 @@ export default function CountdownPage({
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
-  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>('remote');
+  const [agentStatus, setAgentStatus] = useState<string>('disconnected');
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
-  const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const lastQueuedNarrationRef = useRef('');
-  const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
-  const hasLoggedAgentFallbackRef = useRef(false);
+  const phaseRef = useRef<SessionPhase | null>(null);
+  const agentConnectedRef = useRef(false);
+  const narrationRequestInFlightRef = useRef(false);
+  const timeLeftRef = useRef(totalSeconds);
+  const syncClientRef = useRef<any>(null);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -76,14 +86,12 @@ export default function CountdownPage({
       osc.stop(ctx.currentTime + offset + duration + 0.02);
     };
 
-    // Microwave-like "ding-dong" chime.
     scheduleTone(0, 1320, 0.22, 0.22);
     scheduleTone(0.25, 980, 0.28, 0.18);
-
     window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
-  const getPhase = useCallback((tl: number, tt: number): 'opening' | 'quarter' | 'middle' | 'final' | 'done' => {
+  const getPhase = useCallback((tl: number, tt: number): SessionPhase => {
     if (tl <= 0) return 'done';
     const percent = tt > 0 ? (tl / tt) * 100 : 0;
     if (percent > 75) return 'opening';
@@ -92,165 +100,222 @@ export default function CountdownPage({
     return 'final';
   }, []);
 
-  const buildNarrationLine = useCallback((tl: number, tt: number) => {
-    if (tl <= 0) {
-      return getFinishLine(style, dishName, locale);
-    }
-    return getCurrentNarration(tl, tt, style, dishName, locale);
-  }, [style, dishName, locale]);
+  // Build the "current situation" message for the Agent
+  const buildSituationMessage = useCallback((tl: number, phase: SessionPhase): string => {
+    const elapsed = totalSeconds - tl;
+    const pct = totalSeconds > 0 ? Math.round((tl / totalSeconds) * 100) : 0;
 
-  const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
-    if (style === 'movie') {
-      if (phase === 'done') {
-        api.stopMusic();
-        await api.playSfx('cinematic ending impact, short trailer hit');
+    return [
+      `--- Current Situation ---`,
+      `dish: ${dishName}`,
+      `style: ${style}`,
+      `phase: ${phase}`,
+      `totalTime: ${totalSeconds}s`,
+      `remainingTime: ${tl}s`,
+      `elapsed: ${elapsed}s`,
+      `progress: ${100 - pct}%`,
+      `locale: ${locale}`,
+      `ai_director_instruction: ${settings.aiEnhancedInstruction || 'none'}`,
+      ``,
+      `Create one short vivid narration line for this exact moment.`,
+      `Stay fully in character for the ${style} style.`,
+      `Match sound and energy to the ${phase} phase.`,
+    ].join('\n');
+  }, [dishName, style, totalSeconds, locale, settings.aiEnhancedInstruction]);
+
+  // Play local SFX/music effects per phase
+  const handlePhaseEffects = useCallback(async (phase: SessionPhase) => {
+    try {
+      if (style === 'movie') {
+        if (phase === 'done') {
+          api.stopMusic();
+          await api.playSfx('cinematic ending impact, short trailer hit');
+          return;
+        }
+        if (phase === 'opening') {
+          await api.playMusic('cinematic trailer underscore, tense and dramatic');
+        }
+        if (phase === 'middle' || phase === 'final') {
+          await api.playSfx('cinematic whoosh rise, short transition');
+        }
         return;
       }
-      if (phase === 'opening') {
-        await api.playMusic('cinematic trailer underscore, tense and dramatic');
-      }
-      if (phase === 'middle' || phase === 'final') {
-        await api.playSfx('cinematic whoosh rise, short transition');
-      }
-      return;
-    }
 
-    if (style === 'nature') {
-      if (phase === 'done') {
-        api.stopMusic();
-        await api.playSfx('soft forest chime, gentle resolution');
-        return;
+      if (style === 'nature') {
+        if (phase === 'done') {
+          api.stopMusic();
+          await api.playSfx('soft forest chime, gentle resolution');
+          return;
+        }
+        if (phase === 'opening') {
+          await api.playMusic('calm nature ambience, soft wind and birds');
+        }
+        if (phase === 'middle' || phase === 'final') {
+          await api.playSfx('light natural rustle and airy swell');
+        }
       }
-      if (phase === 'opening') {
-        await api.playMusic('calm nature ambience, soft wind and birds');
-      }
-      if (phase === 'middle' || phase === 'final') {
-        await api.playSfx('light natural rustle and airy swell');
-      }
+    } catch (e) {
+      console.warn('Phase effects failed (non-critical):', e);
     }
   }, [style]);
 
-  const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
-    return {
-      sessionId: sessionIdRef.current ?? undefined,
-      style,
-      dishName,
-      totalTime: totalSeconds,
-      remainingTime: tl,
-      phase,
-      locale,
-    };
-  }, [style, dishName, totalSeconds, locale]);
-
+  // ---------- Agent connection ----------
   useEffect(() => {
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
-    sessionIdRef.current = sessionStorage.getItem('sessionId');
-    const mode = sessionStorage.getItem('sessionMode');
-    setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
-  }, [totalSeconds, style, dishName, locale]);
 
-  useEffect(() => {
-    if (isPaused) return;
-    const phase = getPhase(timeLeft, totalSeconds);
-    if (phaseRef.current === phase) {
-      return;
-    }
-    phaseRef.current = phase;
+    const dynamicVars: DynamicVars = {
+      dish_name: dishName,
+      style: style,
+      total_time: String(totalSeconds),
+      remaining_time: String(totalSeconds),
+      phase: 'opening',
+      locale: locale,
+      ai_instruction: settings.aiEnhancedInstruction || '',
+    };
 
-    const fallbackLine = buildNarrationLine(timeLeft, totalSeconds);
-    if (fallbackLine === lastQueuedNarrationRef.current) {
-      return;
-    }
-    lastQueuedNarrationRef.current = fallbackLine;
-    sessionIdRef.current = sessionStorage.getItem('sessionId');
-    const context = buildAgentNarrationContext(timeLeft, phase);
-
-    ttsQueueRef.current = ttsQueueRef.current
-      .then(async () => {
-        const narration = await api.requestAgentNarration(context);
-        prevNarrationRef.current = narration.text;
-        setNarrationText(narration.text);
-        if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, narration.text);
+    const callbacks: AgentCallbacks = {
+      onStatusChange: (status) => {
+        setAgentStatus(status);
+        agentConnectedRef.current = status === 'connected';
+      },
+      onAgentText: (text) => {
+        // Agent sent narration text → display it
+        if (text && text.trim()) {
+          prevNarrationRef.current = text;
+          setNarrationText(text);
         }
-        await narration.play();
-        await handlePhaseEffects(phase);
-      })
-      .catch(async (err) => {
-        const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
-        if (isAgentUnavailable) {
-          if (!hasLoggedAgentFallbackRef.current) {
-            console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
-            hasLoggedAgentFallbackRef.current = true;
+        narrationRequestInFlightRef.current = false;
+      },
+      onAgentAudioDone: () => {
+        narrationRequestInFlightRef.current = false;
+      },
+      onError: (err) => {
+        console.warn('ElevenLabs agent error:', err.message);
+        agentConnectedRef.current = false;
+      },
+    };
+
+    connectAgent(dynamicVars, callbacks).catch((err) => {
+      console.warn('Agent connect failed, using local fallback:', err);
+      agentConnectedRef.current = false;
+    });
+
+    // Sub-routine: Connect to Durable Objects Backend if a Session ID exists
+    if (settings.sessionId) {
+      import('../api/session-sync').then(({ SessionSyncClient }) => {
+        const client = new SessionSyncClient(
+          settings.sessionId!,
+          (state) => {
+            setIsPaused(state.isPaused);
+          },
+          (tl) => {
+            setTimeLeft(tl);
+            timeLeftRef.current = tl;
           }
-          sessionStorage.setItem('sessionMode', 'local-fallback');
-          setSessionMode('local-fallback');
-        } else {
-          console.error('Failed to process phase narration event (fallback to local TTS):', err);
-        }
-        prevNarrationRef.current = fallbackLine;
-        setNarrationText(fallbackLine);
+        );
+        client.connect();
+        syncClientRef.current = client;
+      }).catch(e => console.error("Sync client import fail:", e));
+    }
 
-        if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, fallbackLine).catch((saveError) => {
-            console.error('Failed to save fallback narration:', saveError);
-          });
-        }
+    return () => {
+      disconnectAgent();
+      agentConnectedRef.current = false;
+      if (syncClientRef.current) {
+        syncClientRef.current.disconnect();
+        syncClientRef.current = null;
+      }
+    };
+  }, [totalSeconds, style, dishName, locale, settings.sessionId, settings.aiEnhancedInstruction]);
 
-        await handlePhaseEffects(phase).catch((effectError) => {
-          console.error('Failed to run fallback phase effects:', effectError);
-        });
-
-        await api.playLocalNarration(fallbackLine, locale).catch((ttsError) => {
-          console.error('Failed local fallback TTS playback:', ttsError);
-        });
-      });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale]);
-
+  // ---------- Agent meter → visualizer ----------
   useEffect(() => {
-    const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
+    const unsub = subscribeAgentMeter(({ level, spectrum }) => {
       setTtsLevel(level);
       setTtsSpectrum(spectrum);
     });
     return () => {
-      unsubscribe();
-      api.stopTtsPlayback();
-      api.stopMusic();
+      unsub();
     };
   }, []);
 
+  // ---------- Phase-based narration triggers ----------
+  const handleTogglePause = () => {
+    if (isFinished) return;
+    setIsPaused((p) => {
+      const next = !p;
+      if (syncClientRef.current) {
+        if (next) syncClientRef.current.pause();
+        else syncClientRef.current.resume();
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (isPaused) return;
+
+    const phase = getPhase(timeLeft, totalSeconds);
+    if (phaseRef.current === phase) return;
+    phaseRef.current = phase;
+
+    // If agent is connected, send situation
+    if (agentConnectedRef.current && isAgentConnected()) {
+      if (!narrationRequestInFlightRef.current) {
+        narrationRequestInFlightRef.current = true;
+        const situationMsg = buildSituationMessage(timeLeft, phase);
+        sendUserMessage(situationMsg);
+      }
+    } else {
+      // Fallback: local narration
+      const fallbackLine = timeLeft <= 0
+        ? getFinishLine(style, dishName, locale)
+        : getCurrentNarration(timeLeft, totalSeconds, style, dishName, locale);
+      prevNarrationRef.current = fallbackLine;
+      setNarrationText(fallbackLine);
+
+      api.playLocalNarration(fallbackLine, locale).catch((e) => {
+        console.warn('Local TTS fallback failed:', e);
+      });
+    }
+
+    // SFX/music effects regardless
+    void handlePhaseEffects(phase);
+  }, [isPaused, timeLeft, totalSeconds, getPhase, buildSituationMessage, handlePhaseEffects, style, dishName, locale]);
+
+  // ---------- Countdown timer ----------
   useEffect(() => {
     if (isPaused || isFinished) return;
 
     intervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         const next = prev - 1;
+        timeLeftRef.current = next;
+
         if (next <= 0) {
           clearInterval(intervalRef.current!);
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
           playAlarmTone();
+
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
 
-          if (sessionIdRef.current) {
-            api.tickSession(sessionIdRef.current, 0).catch((err) => {
-              console.error('Failed to tick session on finish:', err);
-            });
+          // Tell the agent too
+          if (agentConnectedRef.current && isAgentConnected()) {
+            sendUserMessage(buildSituationMessage(0, 'done'));
           }
 
           flashTimeoutRef.current = setTimeout(() => setIsFlashing(false), 600);
-          finishTimeoutRef.current = setTimeout(() => onFinish(), 4000);
+          finishTimeoutRef.current = setTimeout(() => {
+            disconnectAgent();
+            onFinish();
+          }, 4000);
           return 0;
-        }
-        if (sessionIdRef.current) {
-          api.tickSession(sessionIdRef.current, next).catch((err) => {
-            console.error('Failed to tick session:', err);
-          });
         }
 
         return next;
@@ -260,15 +325,12 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone, buildSituationMessage]);
 
+  // ---------- Cleanup ----------
   useEffect(() => () => {
-    if (flashTimeoutRef.current) {
-      clearTimeout(flashTimeoutRef.current);
-    }
-    if (finishTimeoutRef.current) {
-      clearTimeout(finishTimeoutRef.current);
-    }
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
   }, []);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
@@ -302,6 +364,13 @@ export default function CountdownPage({
 
     return () => clearInterval(beatTimer);
   }, [isPaused, isFinished, narrationText, waveIntensity]);
+
+  // Agent status badge
+  const statusLabel = agentStatus === 'connected'
+    ? (locale === 'ja' ? '🟢 AI接続中' : '🟢 AI Connected')
+    : agentStatus === 'connecting'
+    ? (locale === 'ja' ? '🟡 AI接続中...' : '🟡 Connecting...')
+    : (locale === 'ja' ? '🔴 ローカルモード' : '🔴 Local Mode');
 
   return (
       <div
@@ -343,16 +412,18 @@ export default function CountdownPage({
           </div>
         </div>
 
-        {sessionMode === 'local-fallback' && (
-          <div className={`mx-4 mt-2 rounded-lg border px-3 py-2 text-center text-xs font-bold ${
-            isLight
-              ? 'border-amber-300 bg-amber-50 text-amber-800'
-              : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+        {/* Agent status indicator */}
+        <div className="mx-4 mt-2 text-center">
+          <span className={`inline-block rounded-full px-3 py-0.5 text-[10px] font-bold ${
+            agentStatus === 'connected'
+              ? isLight ? 'bg-green-100 text-green-700' : 'bg-green-900/30 text-green-300'
+              : agentStatus === 'connecting'
+              ? isLight ? 'bg-yellow-100 text-yellow-700' : 'bg-yellow-900/30 text-yellow-300'
+              : isLight ? 'bg-red-100 text-red-700' : 'bg-red-900/30 text-red-300'
           }`}>
-            <p>{t.aiConnectionError}</p>
-            <p>{t.localSessionFallback}</p>
-          </div>
-        )}
+            {statusLabel}
+          </span>
+        </div>
 
         <div className="absolute right-4 top-4 z-30">
           <button
