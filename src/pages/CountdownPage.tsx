@@ -389,16 +389,23 @@ export default function CountdownPage({
           </div>
         </div>
 
-        {sessionMode === 'local-fallback' && (
-          <div className={`mx-4 mt-2 rounded-lg border px-3 py-2 text-center text-xs font-bold ${
-            isLight
-              ? 'border-amber-300 bg-amber-50 text-amber-800'
-              : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-          }`}>
-            <p>{t.aiConnectionError}</p>
-            <p>{t.localSessionFallback}</p>
-          </div>
-        )}
+        <div className="absolute left-4 top-4 z-30">
+          {sessionMode === 'remote' ? (
+            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
+              isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+            }`}>
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]"></div>
+              <span>AI Connected</span>
+            </div>
+          ) : (
+             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
+              isLight ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+            }`}>
+              <div className="h-2 w-2 rounded-full bg-amber-500"></div>
+              <span>Local Session</span>
+            </div>
+          )}
+        </div>
 
         <div className="absolute right-4 top-4 z-30">
           <button

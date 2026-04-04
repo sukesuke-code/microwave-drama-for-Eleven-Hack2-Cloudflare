@@ -169,7 +169,7 @@ export interface AgentNarrationRequest {
 
 export interface AgentNarrationResponse {
   text: string;
-  play: () => Promise<void>;
+  play: (onReady?: () => void) => Promise<void>;
 }
 
 function emitTtsLevel(level: number): void {
@@ -703,10 +703,7 @@ Sound direction:
 - Match sound design to style and phase`;
 }
 
-export interface AgentNarrationResponse {
-  text: string;
-  play: (onReady?: () => void) => Promise<void>;
-}
+
 
 async function requestAgentNarration(
   request: AgentNarrationRequest
@@ -777,7 +774,7 @@ async function requestAgentNarration(
           try {
             const errorText = await ttsRes.text();
             console.error("Backend TTS returned an error status:", ttsRes.status, errorText);
-          } catch (e) {
+          } catch {
             console.error("Backend TTS failed and body could not be read.");
           }
         }
