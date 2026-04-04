@@ -26,8 +26,8 @@ type WavePattern = {
 const WAVE_PATTERNS: WavePattern[] = [
   {
     keyframe: 'eqBarClassic',
-    durationMin: 0.9,
-    durationMax: 0.9,
+    durationMin: 0.7,
+    durationMax: 0.7,
     minHeight: 8,
     maxHeight: 30,
     opacityMin: 0.45,
@@ -35,8 +35,8 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
   {
     keyframe: 'eqBar',
-    durationMin: 0.82,
-    durationMax: 1.02,
+    durationMin: 0.65,
+    durationMax: 0.8,
     minHeight: 6,
     maxHeight: 32,
     opacityMin: 0.4,
@@ -44,8 +44,8 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
   {
     keyframe: 'eqBarWide',
-    durationMin: 1.05,
-    durationMax: 1.35,
+    durationMin: 0.8,
+    durationMax: 1.0,
     minHeight: 10,
     maxHeight: 42,
     opacityMin: 0.36,
@@ -53,8 +53,8 @@ const WAVE_PATTERNS: WavePattern[] = [
   },
   {
     keyframe: 'eqBarStaccato',
-    durationMin: 0.55,
-    durationMax: 0.84,
+    durationMin: 0.45,
+    durationMax: 0.65,
     minHeight: 4,
     maxHeight: 26,
     opacityMin: 0.45,
@@ -230,7 +230,7 @@ export default function AudioWaveVisualizer({
           boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
           animationName: pattern.keyframe,
           animationDuration: `${randomDuration}s`,
-          animationTimingFunction: 'ease-in-out',
+          animationTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1.0)',
           animationIterationCount: 'infinite',
           animationDirection: 'alternate',
           '--eq-min-height': `${pattern.minHeight}px`,
