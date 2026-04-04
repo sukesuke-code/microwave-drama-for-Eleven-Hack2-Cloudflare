@@ -274,21 +274,24 @@ export async function connectAgent(
 
   setStatus("connecting");
 
-  // Try signedUrl first, fallback to agentId
+  // Use AGENT_ID directly if provided, otherwise try to fetch a signed URL
   let wsUrl: string;
-  const signedUrl = await fetchSignedUrl();
-  if (signedUrl) {
-    wsUrl = signedUrl;
-  } else if (AGENT_ID) {
+  
+  if (AGENT_ID) {
     wsUrl = `${WS_BASE}?agent_id=${AGENT_ID}`;
   } else {
-    setStatus("error");
-    callbacks.onError?.(
-      new Error(
-        "No signed URL or VITE_ELEVENLABS_AGENT_ID available. Set one in .env."
-      )
-    );
-    return;
+    const signedUrl = await fetchSignedUrl();
+    if (signedUrl) {
+      wsUrl = signedUrl;
+    } else {
+      setStatus("error");
+      callbacks.onError?.(
+        new Error(
+          "No signed URL or VITE_ELEVENLABS_AGENT_ID available. Set one in .env."
+        )
+      );
+      return;
+    }
   }
 
   return new Promise<void>((resolve, reject) => {
@@ -331,10 +334,12 @@ export async function connectAgent(
       }
     };
 
-    socket.onerror = () => {
+    socket.onerror = (e) => {
+      // Handshake failures usually don't provide event details to JS for security
       setStatus("error");
-      callbacks.onError?.(new Error("WebSocket connection error"));
-      reject(new Error("WebSocket error"));
+      const err = new Error("WebSocket connection error. Check if your ElevenLabs Agent is set to 'Public' and 'localhost:5173' is in Authorized Origins.");
+      callbacks.onError?.(err);
+      reject(err);
     };
 
     socket.onclose = () => {
