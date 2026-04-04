@@ -109,6 +109,7 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
     return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
   }
 
+  const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body: any = await request.json();
   const text = body.text;
   const voiceId = "JBFqnCBsd6RMkjVDRZzb"; // Optional: make this dynamic
@@ -117,7 +118,7 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "xi-api-key": env.ELEVENLABS_API_KEY,
+      "xi-api-key": apiKey,
     },
     body: JSON.stringify({
       text: text,
@@ -127,7 +128,8 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   });
 
   if (!res.ok) {
-    throw new Error(`ElevenLabs TTS HTTP Error: ${res.status}`);
+    const errorBody = await res.text().catch(() => "unknown");
+    throw new Error(`ElevenLabs TTS HTTP Error: ${res.status} - ${errorBody}`);
   }
 
   // Forward the audio binary directly to the frontend, along with CORS
@@ -144,6 +146,7 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
     return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
   }
 
+  const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body: any = await request.json();
   const prompt = body.prompt;
 
@@ -151,7 +154,7 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "xi-api-key": env.ELEVENLABS_API_KEY,
+      "xi-api-key": apiKey,
     },
     body: JSON.stringify({
       text: prompt,
@@ -174,6 +177,7 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
     return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
   }
 
+  const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body: any = await request.json();
   const prompt = body.prompt;
 
@@ -181,7 +185,7 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "xi-api-key": env.ELEVENLABS_API_KEY,
+      "xi-api-key": apiKey,
     },
     body: JSON.stringify({
       text: prompt + ", cinematic background music loop, no voice",

@@ -64,11 +64,6 @@ function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
   return undefined;
 }
 
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || "";
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const ELEVENLABS_VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
-
-
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   ensureSafeApiBase();
   let lastError: Error | null = null;
@@ -721,30 +716,34 @@ async function requestAgentNarration(
 
   let narrationText = "";
 
-  // 1. Generate text via Gemini (if key exists)
-  if (GEMINI_API_KEY) {
-    try {
-      const prompt = buildNarrationCue(sanitizedRequest as unknown as BuildNarrationCueInput);
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 60, temperature: 0.8 },
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        narrationText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      }
-    } catch (e) {
-      logDebug("Gemini text generation failed:", e);
+  // 1. Try to get AI-generated text from the backend
+  try {
+    const data = await requestJson<{
+      ok?: boolean;
+      text?: string;
+      error?: string;
+    }>("/api/agent/narration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sanitizedRequest),
+    });
+
+    if (data.ok && data.text) {
+      narrationText = data.text;
     }
+  } catch (err) {
+    logDebug("Backend narration failed, using fallback:", err);
   }
 
-  // Fallback text if no Gemini key or request failed
+  // Fallback text if backend is unavailable
   if (!narrationText) {
-    narrationText = "ああ！" + sanitizedRequest.dishName + "が完成に近づいている！！";
+    narrationText = buildNarrationCue({
+      foodName: sanitizedRequest.dishName,
+      style: sanitizedRequest.style,
+      phase: sanitizedRequest.phase,
+      totalTime: sanitizedRequest.totalTime,
+      remainingTime: sanitizedRequest.remainingTime,
+    });
   }
 
   return {
@@ -752,28 +751,36 @@ async function requestAgentNarration(
     play: async () => {
       if (!narrationText) return;
 
-              text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
-              model_id: "eleven_multilingual_v2",
-              voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-            }),
-            signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-          });
+      // Try TTS from the backend (ElevenLabs via secure proxy)
+      try {
+        const ttsRes = await fetch(`${API_BASE}/api/tts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
+            locale: sanitizedRequest.locale || "ja",
+          }),
+          signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
+        });
 
-          if (ttsRes.ok) {
-            const blob = await ttsRes.blob();
-            await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
-            return;
+        if (ttsRes.ok) {
+          const blob = await parseAudioBlob(ttsRes);
+          await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
+          return;
+        } else {
+          try {
+            const errorText = await ttsRes.text();
+            console.error("Backend TTS returned an error status:", ttsRes.status, errorText);
+          } catch (e) {
+            console.error("Backend TTS failed and body could not be read.");
           }
-        } catch (ttsErr) {
-          logDebug("ElevenLabs TTS failed, falling back to local:", ttsErr);
         }
+      } catch (ttsErr) {
+        logDebug("Backend TTS failed, falling back to local:", ttsErr);
       }
 
-      // Fallback: use browser's built-in speech synthesis
-      await playLocalNarration(
-        narrationText,
-        sanitizedRequest.locale || "ja"
-      );
+      // Fallback: browser speech synthesis
+      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja");
     },
   };
 }
@@ -901,66 +908,46 @@ async function playLocalMusic(prompt: string): Promise<void> {
 async function playSfx(prompt: string): Promise<void> {
   enforceEffectRateLimit("sfx");
 
-  if (ELEVENLABS_API_KEY) {
-    try {
-      const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH),
-          duration_seconds: 4,
-          prompt_influence: 0.3
-        }),
-        signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-      });
+  try {
+    const res = await fetch(`${API_BASE}/api/generate-sfx`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
+    });
 
-      if (res.ok) {
-        const blob = await res.blob();
-        await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
-        return;
-      }
-    } catch (e) {
-      logDebug("ElevenLabs SFX failed:", e);
+    if (res.ok) {
+      const blob = await parseAudioBlob(res);
+      await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
+      return;
     }
+  } catch (e) {
+    logDebug("Backend SFX failed, using local fallback:", e);
   }
 
-  // Fallback
   await playLocalSfx(prompt);
 }
 
 async function playMusic(prompt: string): Promise<void> {
   enforceEffectRateLimit("music");
 
-  if (ELEVENLABS_API_KEY) {
-    try {
-      const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text: normalizeTextInput(prompt + " background music loop", MAX_TEXT_PAYLOAD_LENGTH),
-          duration_seconds: 10,
-          prompt_influence: 0.3
-        }),
-        signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
-      });
+  try {
+    const res = await fetch(`${API_BASE}/api/generate-music`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
+    });
 
-      if (res.ok) {
-        const blob = await res.blob();
-        await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
-        return;
-      }
-    } catch (e) {
-      logDebug("ElevenLabs Music failed:", e);
+    if (res.ok) {
+      const blob = await parseAudioBlob(res);
+      await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+      return;
     }
+  } catch (e) {
+    logDebug("Backend Music failed, using local fallback:", e);
   }
 
-  // Fallback
   await playLocalMusic(prompt);
 }
 
