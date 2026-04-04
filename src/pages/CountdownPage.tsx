@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
-import { Locale, Settings, ThemeMode } from '../types';
+import { InitialAssets, Locale, Settings, ThemeMode } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
@@ -14,6 +14,7 @@ import { api } from '../api/client';
 interface CountdownPageProps {
   locale: Locale;
   settings: Settings;
+  initialAssets: InitialAssets | null;
   themeMode: ThemeMode;
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onBack: () => void;
@@ -23,6 +24,7 @@ interface CountdownPageProps {
 export default function CountdownPage({
   locale,
   settings,
+  initialAssets,
   themeMode,
   onThemeModeChange,
   onBack,
@@ -200,6 +202,41 @@ export default function CountdownPage({
 
   useEffect(() => {
     async function initSession() {
+      if (initialAssets) {
+        console.log("[CountdownPage] Using pre-fetched assets for session:", initialAssets.session.sessionId);
+        sessionIdRef.current = initialAssets.session.sessionId;
+        const mode = initialAssets.session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote';
+        setSessionMode(mode);
+        sessionStorage.setItem('sessionId', initialAssets.session.sessionId);
+        sessionStorage.setItem('sessionMode', mode);
+        
+        // Use pre-fetched opening narration
+        setNarrationText(initialAssets.narrationText);
+        phaseRef.current = 'opening';
+        lastQueuedNarrationRef.current = initialAssets.narrationText;
+
+        // Play initial audio immediately
+        if (!isPausedRef.current && !isUnmountedRef.current) {
+          console.log("[CountdownPage] Playing pre-fetched opening audio...");
+          const tasks: Promise<void>[] = [];
+          
+          if (initialAssets.musicAudio) {
+            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true }));
+          }
+          if (initialAssets.sfxAudio) {
+            tasks.push(api.playAudioBlob(initialAssets.sfxAudio));
+          }
+          
+          tasks.push(api.playAudioBlob(initialAssets.narrationAudio, { onStart: () => {
+             // In case narration text changed while waiting
+             setNarrationText(initialAssets.narrationText);
+          }}));
+          
+          await Promise.all(tasks).catch(console.error);
+        }
+        return;
+      }
+
       const existingSessionId = sessionStorage.getItem('sessionId');
       const existingMode = sessionStorage.getItem('sessionMode') as 'remote' | 'local-fallback' | 'connecting' | null;
 
@@ -228,15 +265,11 @@ export default function CountdownPage({
       }
     }
 
-    const timer = setTimeout(() => {
-      initSession();
-    }, 50); // Small delay to allow session storage to settle if just came from another page
+    initSession();
 
-    const text = buildNarrationLine(totalSeconds, totalSeconds);
+    const text = initialAssets?.narrationText || buildNarrationLine(totalSeconds, totalSeconds);
     setNarrationText(text);
-
-    return () => clearTimeout(timer);
-  }, [totalSeconds, style, dishName, locale, buildNarrationLine]);
+  }, [totalSeconds, style, dishName, locale, buildNarrationLine, initialAssets]);
 
   useEffect(() => {
     const sId = sessionStorage.getItem('sessionId');
@@ -471,7 +504,7 @@ export default function CountdownPage({
           </div>
         </div>
 
-        <div className="absolute left-16 top-4 z-30">
+        <div className="absolute right-12 top-4 z-30">
           {sessionMode === 'remote' && (
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
               isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'

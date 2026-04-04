@@ -119,6 +119,15 @@ async function requestJson<T>(
   throw lastError || new Error("REQUEST_FAILED");
 }
 
+import { 
+  InitialAssets, 
+  NarrationStyle, 
+  Session, 
+  SessionPhase 
+} from '../types';
+
+export type { InitialAssets, NarrationStyle, Session, SessionPhase };
+
 type TtsLevelListener = (level: number) => void;
 
 type TtsMeterSnapshot = {
@@ -128,33 +137,6 @@ type TtsMeterSnapshot = {
 
 const ttsLevelListeners = new Set<TtsLevelListener>();
 const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
-
-export type NarrationStyle =
-  | "sports"
-  | "horror"
-  | "documentary"
-  | "anime"
-  | "movie"
-  | "nature";
-
-export type SessionPhase =
-  | "opening"
-  | "quarter"
-  | "middle"
-  | "final"
-  | "done";
-
-export interface Session {
-  foodName: string;
-  totalTime: number;
-  remainingTime: number;
-  style: NarrationStyle;
-  phase: SessionPhase;
-  isRunning: boolean;
-  sessionId: string;
-  createdAt: number;
-  updatedAt: number;
-}
 
 export interface StartSessionPayload {
   foodName: string;
@@ -812,6 +794,101 @@ async function requestAgentNarration(
   };
 }
 
+async function generateTtsBlob(text: string, locale: string = "ja"): Promise<Blob> {
+  const ttsRes = await fetch(`${API_BASE}/api/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
+      locale,
+    }),
+    signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
+  });
+
+  if (!ttsRes.ok) {
+    throw new Error(`TTS generation failed: ${ttsRes.status}`);
+  }
+
+  return parseAudioBlob(ttsRes);
+}
+
+async function generateSfxBlob(prompt: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`SFX generation failed: ${res.status}`);
+  }
+
+  return parseAudioBlob(res);
+}
+
+async function generateMusicBlob(prompt: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/api/generate-music`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Music generation failed: ${res.status}`);
+  }
+
+  return parseAudioBlob(res);
+}
+
+
+async function prepareInitialAssets(
+  foodName: string,
+  totalTime: number,
+  style: NarrationStyle,
+  locale: string = "ja"
+): Promise<InitialAssets> {
+  // 1. Start Session
+  const session = await startSession(foodName, totalTime, style);
+  
+  // 2. Request first narration text
+  const narration = await requestAgentNarration({
+    sessionId: session.sessionId,
+    style,
+    dishName: foodName,
+    totalTime,
+    remainingTime: totalTime,
+    phase: "opening",
+    locale,
+  });
+
+  // 3. Concurrent generation of audio assets
+  const audioPromises: {
+    narration: Promise<Blob>;
+    music: Promise<Blob | undefined>;
+    sfx: Promise<Blob | undefined>;
+  } = {
+    narration: generateTtsBlob(narration.text, locale),
+    music: generateMusicBlob(`opening tension music for ${style} style narration`).catch(() => undefined),
+    sfx: generateSfxBlob(`microwave start sound for ${style} style`).catch(() => undefined),
+  };
+
+  const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
+    audioPromises.narration,
+    audioPromises.music,
+    audioPromises.sfx,
+  ]);
+
+  return {
+    session,
+    narrationText: narration.text,
+    narrationAudio,
+    musicAudio,
+    sfxAudio,
+  };
+}
+
 async function playLocalNarration(text: string, locale = "ja", onStart?: () => void): Promise<void> {
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
     if (onStart) onStart();
@@ -1023,6 +1100,11 @@ export {
   subscribeTtsMeter,
   playTtsFromBlob,
   initSession,
+  generateTtsBlob,
+  generateSfxBlob,
+  generateMusicBlob,
+  prepareInitialAssets,
+  playAudioBlob,
 };
 
 export const api = {
@@ -1043,4 +1125,9 @@ export const api = {
   subscribeTtsMeter,
   playTtsFromBlob,
   initSession,
+  generateTtsBlob,
+  generateSfxBlob,
+  generateMusicBlob,
+  prepareInitialAssets,
+  playAudioBlob,
 };

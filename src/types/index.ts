@@ -4,10 +4,37 @@ export type ThemeMode = 'dark' | 'light';
 
 export type AppScreen = 'top' | 'settings' | 'countdown' | 'result';
 
+export type SessionPhase =
+  | "opening"
+  | "quarter"
+  | "middle"
+  | "final"
+  | "done";
+
+export interface Session {
+  foodName: string;
+  totalTime: number;
+  remainingTime: number;
+  style: NarrationStyle;
+  phase: SessionPhase;
+  isRunning: boolean;
+  sessionId: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Settings {
   totalSeconds: number;
   dishName: string;
   style: NarrationStyle;
+}
+
+export interface InitialAssets {
+  session: Session;
+  narrationText: string;
+  narrationAudio: Blob;
+  musicAudio?: Blob;
+  sfxAudio?: Blob;
 }
 
 export interface NarrationCue {

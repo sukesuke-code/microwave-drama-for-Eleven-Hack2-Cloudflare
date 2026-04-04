@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { AppScreen, Locale, Settings, ThemeMode } from './types';
+import { AppScreen, InitialAssets, Locale, Settings, ThemeMode } from './types';
 import TopPage from './pages/TopPage';
 
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -80,13 +80,14 @@ function readSettings(): Settings | null {
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(() => readSettings());
   const [screen, setScreen] = useState<AppScreen>('top');
-  const [nextScreen, setNextScreen] = useState<AppScreen | null>(null);
+
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => readLocale());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStorage('ching-drama-theme');
     return saved === 'light' || saved === 'dark' ? saved : 'dark';
   });
+  const [initialAssets, setInitialAssets] = useState<InitialAssets | null>(null);
 
   useEffect(() => {
     writeStorage('ching-drama-locale', locale);
@@ -130,10 +131,8 @@ export default function App() {
   const transitionTo = (newScreen: AppScreen) => {
     if (screen === newScreen) return;
     setIsTransitioning(true);
-    setNextScreen(newScreen);
     const timer = setTimeout(() => {
       setScreen(newScreen);
-      setNextScreen(null);
       setIsTransitioning(false);
     }, 150);
     return () => clearTimeout(timer);
@@ -141,8 +140,9 @@ export default function App() {
 
   const handleStartSettings = () => transitionTo('settings');
 
-  const handleStartCountdown = (s: Settings) => {
+  const handleStartCountdown = (s: Settings, assets: InitialAssets) => {
     setSettings(s);
+    setInitialAssets(assets);
     transitionTo('countdown');
   };
 
@@ -190,6 +190,7 @@ export default function App() {
             <CountdownPage
               locale={locale}
               settings={settings}
+              initialAssets={initialAssets}
               themeMode={themeMode}
               onThemeModeChange={setThemeMode}
               onBack={() => transitionTo('settings')}
