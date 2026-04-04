@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "e2e": "playwright test",
-    "preview": "npm run build && wrangler dev",
+    "preview": "vite preview --config vite.preview.config.ts --host 0.0.0.0 --port 4173",
+    "preview:cf": "npm run build && wrangler dev",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "deploy": "npm run build && wrangler deploy"
   },

@@ -108,6 +108,17 @@ cp .env.example .env
 npm run dev
 ```
 
+#### Preview built app locally
+```bash
+npm run build
+npm run preview
+```
+
+For Cloudflare Worker local emulation, use:
+```bash
+npm run preview:cf
+```
+
 #### Lint / Typecheck / Build
 ```bash
 npm run lint
@@ -220,6 +231,17 @@ cp .env.example .env
 #### 開発起動
 ```bash
 npm run dev
+```
+
+#### ビルド後のローカルプレビュー
+```bash
+npm run build
+npm run preview
+```
+
+Cloudflare Workers 相当でのローカル確認は以下を使ってください:
+```bash
+npm run preview:cf
 ```
 
 #### 静的検証・ビルド
