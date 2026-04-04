@@ -55,6 +55,10 @@ function AutoFitSingleLineText({
     };
 
     fit();
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
     const observer = new ResizeObserver(fit);
     observer.observe(el);
     if (el.parentElement) observer.observe(el.parentElement);
