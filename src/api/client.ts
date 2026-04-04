@@ -703,6 +703,11 @@ Sound direction:
 - Match sound design to style and phase`;
 }
 
+export interface AgentNarrationResponse {
+  text: string;
+  play: (onReady?: () => void) => Promise<void>;
+}
+
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
@@ -748,7 +753,7 @@ async function requestAgentNarration(
 
   return {
     text: narrationText,
-    play: async () => {
+    play: async (onReady) => {
       if (!narrationText) return;
 
       // Try TTS from the backend (ElevenLabs via secure proxy)
@@ -765,6 +770,7 @@ async function requestAgentNarration(
 
         if (ttsRes.ok) {
           const blob = await parseAudioBlob(ttsRes);
+          if (onReady) onReady();
           await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
           return;
         } else {
@@ -780,6 +786,7 @@ async function requestAgentNarration(
       }
 
       // Fallback: browser speech synthesis
+      if (onReady) onReady();
       await playLocalNarration(narrationText, sanitizedRequest.locale || "ja");
     },
   };

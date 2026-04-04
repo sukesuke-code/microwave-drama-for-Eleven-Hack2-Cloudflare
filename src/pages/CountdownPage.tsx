@@ -49,6 +49,15 @@ export default function CountdownPage({
   const lastQueuedNarrationRef = useRef('');
   const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
   const hasLoggedAgentFallbackRef = useRef(false);
+  const isPausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+    if (isPaused) {
+      api.stopTtsPlayback();
+      api.stopMusic();
+    }
+  }, [isPaused]);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -100,6 +109,7 @@ export default function CountdownPage({
   }, [style, dishName, locale]);
 
   const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+    if (isPausedRef.current) return;
     if (style === 'movie') {
       if (phase === 'done') {
         api.stopMusic();
@@ -143,10 +153,34 @@ export default function CountdownPage({
   }, [style, dishName, totalSeconds, locale]);
 
   useEffect(() => {
-    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
-    prevNarrationRef.current = initial;
-    setNarrationText(initial);
-    sessionIdRef.current = sessionStorage.getItem('sessionId');
+    async function initSession() {
+      try {
+        const session = await api.startSession(dishName, totalSeconds, style);
+        sessionIdRef.current = session.sessionId;
+        sessionStorage.setItem('sessionId', session.sessionId);
+        setSessionMode(session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote');
+        sessionStorage.setItem('sessionMode', session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote');
+      } catch (err) {
+        console.warn('Failed to start remote session, using local defaults', err);
+        sessionIdRef.current = `local-${Date.now()}`;
+        sessionStorage.setItem('sessionId', sessionIdRef.current);
+        setSessionMode('local-fallback');
+        sessionStorage.setItem('sessionMode', 'local-fallback');
+      }
+    }
+
+    initSession();
+
+    const text = buildNarrationLine(totalSeconds, totalSeconds);
+    prevNarrationRef.current = text;
+    setNarrationText(text);
+  }, [totalSeconds, style, dishName, locale, buildNarrationLine]);
+
+  useEffect(() => {
+    const sId = sessionStorage.getItem('sessionId');
+    if (sId) {
+      sessionIdRef.current = sId;
+    }
     const mode = sessionStorage.getItem('sessionMode');
     setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
   }, [totalSeconds, style, dishName, locale]);
@@ -169,16 +203,29 @@ export default function CountdownPage({
 
     ttsQueueRef.current = ttsQueueRef.current
       .then(async () => {
+        if (isPausedRef.current) return;
         const narration = await api.requestAgentNarration(context);
-        prevNarrationRef.current = narration.text;
-        setNarrationText(narration.text);
+        
+        let textSet = false;
+        const triggerTextSync = () => {
+          if (textSet || isPausedRef.current) return;
+          textSet = true;
+          prevNarrationRef.current = narration.text;
+          setNarrationText(narration.text);
+        };
+
         if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, narration.text);
+          api.saveNarration(sessionIdRef.current, narration.text).catch(console.warn);
         }
-        await narration.play();
-        await handlePhaseEffects(phase);
+
+        if (!isPausedRef.current) {
+          await narration.play(triggerTextSync);
+          triggerTextSync(); // Fallback if onReady was not completely fired
+          await handlePhaseEffects(phase);
+        }
       })
       .catch(async (err) => {
+        if (isPausedRef.current) return;
         const isAgentUnavailable = err instanceof Error && err.message === 'AGENT_NARRATION_UNAVAILABLE';
         if (isAgentUnavailable) {
           if (!hasLoggedAgentFallbackRef.current) {
@@ -190,22 +237,21 @@ export default function CountdownPage({
         } else {
           console.error('Failed to process phase narration event (fallback to local TTS):', err);
         }
+        
         prevNarrationRef.current = fallbackLine;
         setNarrationText(fallbackLine);
 
         if (sessionIdRef.current) {
-          await api.saveNarration(sessionIdRef.current, fallbackLine).catch((saveError) => {
-            console.error('Failed to save fallback narration:', saveError);
-          });
+          api.saveNarration(sessionIdRef.current, fallbackLine).catch(() => {});
         }
 
-        await handlePhaseEffects(phase).catch((effectError) => {
-          console.error('Failed to run fallback phase effects:', effectError);
-        });
-
-        await api.playLocalNarration(fallbackLine, locale).catch((ttsError) => {
-          console.error('Failed local fallback TTS playback:', ttsError);
-        });
+        handlePhaseEffects(phase).catch(() => {});
+        
+        if (!isPausedRef.current) {
+          await api.playLocalNarration(fallbackLine, locale).catch((ttsError) => {
+            console.error('Failed local fallback TTS playback:', ttsError);
+          });
+        }
       });
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale]);
 
