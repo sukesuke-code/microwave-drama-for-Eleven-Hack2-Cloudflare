@@ -274,24 +274,23 @@ export async function connectAgent(
 
   setStatus("connecting");
 
-  // Use AGENT_ID directly if provided, otherwise try to fetch a signed URL
+  // Prioritize fetching a Signed URL from our Cloudflare backend
   let wsUrl: string;
+  const signedUrl = await fetchSignedUrl();
   
-  if (AGENT_ID) {
+  if (signedUrl) {
+    wsUrl = signedUrl;
+  } else if (AGENT_ID) {
+    console.warn("Backend Signed URL failed. Falling back to direct AGENT_ID connection.");
     wsUrl = `${WS_BASE}?agent_id=${AGENT_ID}`;
   } else {
-    const signedUrl = await fetchSignedUrl();
-    if (signedUrl) {
-      wsUrl = signedUrl;
-    } else {
-      setStatus("error");
-      callbacks.onError?.(
-        new Error(
-          "No signed URL or VITE_ELEVENLABS_AGENT_ID available. Set one in .env."
-        )
-      );
-      return;
-    }
+    setStatus("error");
+    callbacks.onError?.(
+      new Error(
+        "Could not get Signed URL from backend, and no VITE_ELEVENLABS_AGENT_ID fallback provided."
+      )
+    );
+    return;
   }
 
   return new Promise<void>((resolve, reject) => {
