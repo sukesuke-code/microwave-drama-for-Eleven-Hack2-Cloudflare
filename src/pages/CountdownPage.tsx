@@ -185,6 +185,8 @@ export default function CountdownPage({
             console.warn('Agent narration endpoint is unavailable. Falling back to local TTS for this session.');
             hasLoggedAgentFallbackRef.current = true;
           }
+          sessionStorage.setItem('sessionMode', 'local-fallback');
+          setSessionMode('local-fallback');
         } else {
           console.error('Failed to process phase narration event (fallback to local TTS):', err);
         }
@@ -200,8 +202,12 @@ export default function CountdownPage({
         await handlePhaseEffects(phase).catch((effectError) => {
           console.error('Failed to run fallback phase effects:', effectError);
         });
+
+        await api.playLocalNarration(fallbackLine, locale).catch((ttsError) => {
+          console.error('Failed local fallback TTS playback:', ttsError);
+        });
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
