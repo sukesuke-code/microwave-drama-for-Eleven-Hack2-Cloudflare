@@ -244,13 +244,18 @@ async function fetchSignedUrl(): Promise<string | null> {
       headers: { "Content-Type": "application/json" },
       signal: AbortSignal.timeout?.(8000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`fetchSignedUrl failed with status ${res.status}:`, errorText);
+      return null;
+    }
     const data = (await res.json()) as {
       ok?: boolean;
       signedUrl?: string;
     };
     return data.signedUrl || null;
-  } catch {
+  } catch (err) {
+    console.error("fetchSignedUrl threw an exception:", err);
     return null;
   }
 }
