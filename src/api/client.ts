@@ -61,9 +61,13 @@ function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
   if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
     return AbortSignal.timeout(timeoutMs);
   }
-
   return undefined;
 }
+
+const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || "";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+const ELEVENLABS_VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
+
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   ensureSafeApiBase();
@@ -557,7 +561,18 @@ async function startSession(
   logDebug("startSession response", data);
 
   if (!data.ok || !data.session?.sessionId) {
-    throw new Error(data?.error || "Failed to start session");
+    // Return dummy session if backend is missing
+    return {
+      foodName: sanitizedFoodName,
+      totalTime: normalizedTotalTime,
+      remainingTime: normalizedTotalTime,
+      style,
+      phase: "opening",
+      isRunning: true,
+      sessionId: `local-${Date.now()}`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
   }
 
   return data.session;
@@ -609,7 +624,7 @@ async function tickSession(
   logDebug("tickSession response", data);
 
   if (!data.ok) {
-    throw new Error(data?.error || "Failed to tick session");
+    logDebug("Failed to tick session, likely local fallback mode");
   }
 }
 
@@ -633,7 +648,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   logDebug("saveNarration response", data);
 
   if (!data.ok) {
-    throw new Error(data?.error || "Failed to save narration");
+    logDebug("Failed to save narration, likely local fallback mode");
   }
 }
 
@@ -704,41 +719,71 @@ async function requestAgentNarration(
     remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
   };
 
-  let data: {
-    ok?: boolean;
-    text?: string;
-    error?: string;
-  };
-  try {
-    data = await requestJson<{
-      ok?: boolean;
-      text?: string;
-      error?: string;
-    }>("/api/agent/narration", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(sanitizedRequest),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/HTTP_5\d{2}|Failed to fetch|NetworkError|Load failed|AbortError/i.test(message)) {
-      throw new Error("AGENT_NARRATION_UNAVAILABLE");
+  let narrationText = "";
+
+  // 1. Generate text via Gemini (if key exists)
+  if (GEMINI_API_KEY) {
+    try {
+      const prompt = buildNarrationCue(sanitizedRequest as unknown as BuildNarrationCueInput);
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 60, temperature: 0.8 },
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        narrationText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      }
+    } catch (e) {
+      logDebug("Gemini text generation failed:", e);
     }
-    throw error;
   }
 
-  logDebug("requestAgentNarration response", data);
-
-  if (!data.ok || !data.text) {
-    throw new Error(data.error || "AGENT_NARRATION_UNAVAILABLE");
+  // Fallback text if no Gemini key or request failed
+  if (!narrationText) {
+    narrationText = "ああ！" + sanitizedRequest.dishName + "が完成に近づいている！！";
   }
 
   return {
-    text: data.text,
+    text: narrationText,
     play: async () => {
-      return;
+      if (!narrationText) return;
+
+      // 2. Play Audio via ElevenLabs (if key exists)
+      if (ELEVENLABS_API_KEY) {
+        try {
+          const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "xi-api-key": ELEVENLABS_API_KEY,
+            },
+            body: JSON.stringify({
+              text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
+              model_id: "eleven_multilingual_v2",
+              voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+            }),
+            signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
+          });
+
+          if (ttsRes.ok) {
+            const blob = await ttsRes.blob();
+            await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
+            return;
+          }
+        } catch (ttsErr) {
+          logDebug("ElevenLabs TTS failed, falling back to local:", ttsErr);
+        }
+      }
+
+      // Fallback: use browser's built-in speech synthesis
+      await playLocalNarration(
+        narrationText,
+        sanitizedRequest.locale || "ja"
+      );
     },
   };
 }
@@ -864,63 +909,69 @@ async function playLocalMusic(prompt: string): Promise<void> {
 }
 
 async function playSfx(prompt: string): Promise<void> {
-  ensureSafeApiBase();
   enforceEffectRateLimit("sfx");
-  try {
-    const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-    });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(errText || "SFX generation failed");
-    }
+  if (ELEVENLABS_API_KEY) {
+    try {
+      const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({
+          text: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH),
+          duration_seconds: 4,
+          prompt_influence: 0.3
+        }),
+        signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
+      });
 
-    const blob = await parseAudioBlob(res);
-    await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/Failed to fetch|NetworkError|Load failed|HTTP_5\d{2}|timeout/i.test(message)) {
-      await playLocalSfx(prompt);
-      return;
+      if (res.ok) {
+        const blob = await res.blob();
+        await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
+        return;
+      }
+    } catch (e) {
+      logDebug("ElevenLabs SFX failed:", e);
     }
-    throw error;
   }
+
+  // Fallback
+  await playLocalSfx(prompt);
 }
 
 async function playMusic(prompt: string): Promise<void> {
-  ensureSafeApiBase();
   enforceEffectRateLimit("music");
-  try {
-    const res = await fetch(`${API_BASE}/api/generate-music`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-    });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(errText || "Music generation failed");
-    }
+  if (ELEVENLABS_API_KEY) {
+    try {
+      const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({
+          text: normalizeTextInput(prompt + " background music loop", MAX_TEXT_PAYLOAD_LENGTH),
+          duration_seconds: 10,
+          prompt_influence: 0.3
+        }),
+        signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
+      });
 
-    const blob = await parseAudioBlob(res);
-    await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/Failed to fetch|NetworkError|Load failed|HTTP_5\d{2}|timeout/i.test(message)) {
-      await playLocalMusic(prompt);
-      return;
+      if (res.ok) {
+        const blob = await res.blob();
+        await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+        return;
+      }
+    } catch (e) {
+      logDebug("ElevenLabs Music failed:", e);
     }
-    throw error;
   }
+
+  // Fallback
+  await playLocalMusic(prompt);
 }
 
 async function playTtsFromBlob(blob: Blob): Promise<void> {
