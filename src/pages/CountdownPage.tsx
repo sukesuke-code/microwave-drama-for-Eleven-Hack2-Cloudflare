@@ -39,7 +39,13 @@ export default function CountdownPage({
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
-  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>('remote');
+  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>(() => {
+    try {
+      return sessionStorage.getItem('sessionMode') === 'local-fallback' ? 'local-fallback' : 'remote';
+    } catch {
+      return 'remote';
+    }
+  });
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -144,9 +150,14 @@ export default function CountdownPage({
     const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
     prevNarrationRef.current = initial;
     setNarrationText(initial);
-    sessionIdRef.current = sessionStorage.getItem('sessionId');
-    const mode = sessionStorage.getItem('sessionMode');
-    setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
+    try {
+      sessionIdRef.current = sessionStorage.getItem('sessionId');
+      const mode = sessionStorage.getItem('sessionMode');
+      setSessionMode(mode === 'local-fallback' ? 'local-fallback' : 'remote');
+    } catch {
+      sessionIdRef.current = null;
+      setSessionMode('remote');
+    }
   }, [totalSeconds, style, dishName, locale]);
 
   useEffect(() => {
@@ -162,7 +173,17 @@ export default function CountdownPage({
       return;
     }
     lastQueuedNarrationRef.current = fallbackLine;
-    sessionIdRef.current = sessionStorage.getItem('sessionId');
+    if (sessionMode === 'local-fallback') {
+      prevNarrationRef.current = fallbackLine;
+      setNarrationText(fallbackLine);
+      return;
+    }
+
+    try {
+      sessionIdRef.current = sessionStorage.getItem('sessionId');
+    } catch {
+      sessionIdRef.current = null;
+    }
     const context = buildAgentNarrationContext(timeLeft, phase);
 
     ttsQueueRef.current = ttsQueueRef.current
@@ -199,7 +220,7 @@ export default function CountdownPage({
           console.error('Failed to run fallback phase effects:', effectError);
         });
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
+  }, [isPaused, timeLeft, totalSeconds, sessionMode, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -229,7 +250,7 @@ export default function CountdownPage({
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
 
-          if (sessionIdRef.current) {
+          if (sessionMode === 'remote' && sessionIdRef.current) {
             api.tickSession(sessionIdRef.current, 0).catch((err) => {
               console.error('Failed to tick session on finish:', err);
             });
@@ -239,7 +260,7 @@ export default function CountdownPage({
           setTimeout(() => onFinish(), 4000);
           return 0;
         }
-        if (sessionIdRef.current) {
+        if (sessionMode === 'remote' && sessionIdRef.current) {
           api.tickSession(sessionIdRef.current, next).catch((err) => {
             console.error('Failed to tick session:', err);
           });
@@ -252,7 +273,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone, sessionMode]);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 

@@ -1,6 +1,8 @@
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  "https://microwave-show-api-v2.lolololololol.workers.dev";
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').trim().replace(/\/$/, '');
+
+function buildApiUrl(path: string): string {
+  return API_BASE ? `${API_BASE}${path}` : path;
+}
 
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
 
@@ -415,7 +417,7 @@ async function startSession(
     style,
   };
 
-  const res = await fetch(`${API_BASE}/api/session/start`, {
+  const res = await fetch(buildApiUrl('/api/session/start'), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -440,7 +442,7 @@ async function startSession(
 
 async function getSession(sessionId: string): Promise<Session> {
   const res = await fetch(
-    `${API_BASE}/api/session?sessionId=${encodeURIComponent(sessionId)}`,
+    buildApiUrl(`/api/session?sessionId=${encodeURIComponent(sessionId)}`),
     {
       method: "GET",
       headers: {
@@ -473,7 +475,7 @@ async function tickSession(
     remainingTime: Number(remainingTime),
   };
 
-  const res = await fetch(`${API_BASE}/api/session/tick`, {
+  const res = await fetch(buildApiUrl('/api/session/tick'), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -499,7 +501,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
     text: String(text || "").trim(),
   };
 
-  const res = await fetch(`${API_BASE}/api/session/narration`, {
+  const res = await fetch(buildApiUrl('/api/session/narration'), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -520,7 +522,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
 }
 
 async function getSignedUrl(): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/get-signed-url`, {
+  const res = await fetch(buildApiUrl('/api/get-signed-url'), {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -580,7 +582,7 @@ Sound direction:
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
-  const res = await fetch(`${API_BASE}/api/agent/narration`, {
+  const res = await fetch(buildApiUrl('/api/agent/narration'), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -609,7 +611,7 @@ async function requestAgentNarration(
 }
 
 async function playSfx(prompt: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
+  const res = await fetch(buildApiUrl('/api/generate-sfx'), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -627,7 +629,7 @@ async function playSfx(prompt: string): Promise<void> {
 }
 
 async function playMusic(prompt: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/generate-music`, {
+  const res = await fetch(buildApiUrl('/api/generate-music'), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
