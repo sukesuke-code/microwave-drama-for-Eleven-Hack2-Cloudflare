@@ -72,7 +72,7 @@ async function requestJson<T>(
   ensureSafeApiBase();
   logDebug(`Requesting ${url}`, init?.body);
 
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   for (let attempt = 0; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
     const controller = new AbortController();
@@ -101,10 +101,10 @@ async function requestJson<T>(
       const data = await res.json();
       logDebug(`Response from ${path}:`, data);
       return data as T;
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      const isAbort = err.name === "AbortError";
-      const isNetwork = err.message?.includes("fetch") || err.message?.includes("Network");
+      const isAbort = (err as Error).name === "AbortError";
+      const isNetwork = (err as Error).message?.includes("fetch") || (err as Error).message?.includes("Network");
       
       if ((isAbort || isNetwork) && attempt < DEFAULT_RETRY_COUNT) {
         await new Promise(r => setTimeout(r, 400));
@@ -385,16 +385,22 @@ function stopMusic(): void {
   }
 }
 
+interface AudioJsonResponse {
+  audioBase64?: string;
+  audio?: string;
+  error?: string;
+}
+
 async function parseAudioBlob(res: Response): Promise<Blob> {
   const contentType = res.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
-    const json = (await res.json()) as {
-      audioBase64?: string;
-      audio?: string;
-      error?: string;
-    };
-
+    const json = (await res.json()) as AudioJsonResponse;
+    
+    if (json.error) {
+      throw new Error(json.error);
+    }
+    
     const base64Audio = json.audioBase64 || json.audio;
 
     if (!base64Audio) {
@@ -424,11 +430,13 @@ async function playAudioBlob(
     loop?: boolean;
     volume?: number;
     isMusic?: boolean;
+    onStart?: () => void;
   }
 ): Promise<void> {
   const loop = options?.loop ?? false;
   const volume = options?.volume ?? 1;
   const isMusic = options?.isMusic ?? false;
+  const onStart = options?.onStart;
 
   stopRequested = false;
 
@@ -459,6 +467,7 @@ async function playAudioBlob(
 
   try {
     await audio.play();
+    if (onStart) onStart();
   } catch (err) {
     console.warn("Audio play failed or was interrupted:", err);
     URL.revokeObjectURL(url);
@@ -576,7 +585,6 @@ async function startSession(
   logDebug("startSession response", data);
 
   if (!data.ok || !data.session?.sessionId) {
-    // Return dummy session if backend is missing
     return {
       foodName: sanitizedFoodName,
       totalTime: normalizedTotalTime,
@@ -723,8 +731,6 @@ Sound direction:
 - Match sound design to style and phase`;
 }
 
-
-
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
@@ -738,7 +744,6 @@ async function requestAgentNarration(
 
   let narrationText = "";
 
-  // 1. Try to get AI-generated text from the backend
   try {
     logDebug("Requesting narration for context:", sanitizedRequest);
     const data = await requestJson<{
@@ -758,7 +763,6 @@ async function requestAgentNarration(
     logDebug("Backend narration failed, using fallback:", err);
   }
 
-  // Fallback text if backend is unavailable
   if (!narrationText) {
     narrationText = buildNarrationCue({
       foodName: sanitizedRequest.dishName,
@@ -775,7 +779,6 @@ async function requestAgentNarration(
       stopRequested = false;
       if (!narrationText) return;
 
-      // Try TTS from the backend (ElevenLabs via secure proxy)
       try {
         const ttsRes = await fetch(`${API_BASE}/api/tts`, {
           method: "POST",
@@ -789,8 +792,7 @@ async function requestAgentNarration(
 
         if (ttsRes.ok) {
           const blob = await parseAudioBlob(ttsRes);
-          if (onReady) onReady();
-          await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false });
+          await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false, onStart: onReady });
           return;
         } else {
           try {
@@ -804,7 +806,6 @@ async function requestAgentNarration(
         logDebug("Backend TTS failed, falling back to local:", ttsErr);
       }
 
-      // Fallback: browser speech synthesis
       if (stopRequested) return;
       await playLocalNarration(narrationText, sanitizedRequest.locale || "ja", onReady);
     },
@@ -818,7 +819,7 @@ async function playLocalNarration(text: string, locale = "ja", onStart?: () => v
   }
 
   stopTtsPlayback();
-  stopRequested = false; // Reset the flag so future checks don't block playback
+  stopRequested = false;
   const sanitizedText = normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH);
   const utterance = new SpeechSynthesisUtterance(sanitizedText);
   utterance.rate = locale.startsWith("ja") ? 1.02 : 1.0;
@@ -936,6 +937,24 @@ async function playLocalMusic(prompt: string): Promise<void> {
   });
 }
 
+interface AgentSessionResponse {
+  sessionId: string;
+  sessionMode: "agent" | "local";
+}
+
+async function initSession(): Promise<{ sessionId: string; sessionMode: "agent" | "local" }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/session`, { method: "POST" });
+    if (res.ok) {
+      const data = (await res.json()) as AgentSessionResponse;
+      return { sessionId: data.sessionId, sessionMode: data.sessionMode };
+    }
+  } catch (err) {
+    console.error("Session init failed:", err);
+  }
+  return { sessionId: "local-" + Date.now(), sessionMode: "local" };
+}
+
 async function playSfx(prompt: string): Promise<void> {
   enforceEffectRateLimit("sfx");
 
@@ -1003,6 +1022,7 @@ export {
   subscribeTtsLevel,
   subscribeTtsMeter,
   playTtsFromBlob,
+  initSession,
 };
 
 export const api = {
@@ -1022,4 +1042,5 @@ export const api = {
   subscribeTtsLevel,
   subscribeTtsMeter,
   playTtsFromBlob,
+  initSession,
 };

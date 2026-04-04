@@ -252,11 +252,14 @@ export default function SettingsPage({
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.minutes}</p>
                 <input
                   type="number"
+                  id="minutes-input"
+                  title="Minutes"
+                  placeholder="0"
                   min={0}
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className={`w-full bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
               <span className="text-2xl font-black sm:text-3xl text-orange-400">:</span>
@@ -264,11 +267,14 @@ export default function SettingsPage({
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.seconds}</p>
                 <input
                   type="number"
+                  id="seconds-input"
+                  title="Seconds"
+                  placeholder="0"
                   min={0}
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className={`w-full bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
             </div>

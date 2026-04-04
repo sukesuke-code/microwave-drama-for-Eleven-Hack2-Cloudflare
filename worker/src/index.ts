@@ -2,8 +2,6 @@ export interface Env {
   AI: any;
   ELEVENLABS_API_KEY?: string;
   GEMINI_API_KEY?: string;
-  MICROWAVE_SESSION?: DurableObjectNamespace;
-  ELEVENLABS_AGENT_ID?: string;
 }
 
 const CORS_HEADERS = {
@@ -33,20 +31,11 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/generate-music") {
         return await handleGenerateMusic(request, env);
       }
-      
-      // Compatibility with old session endpoints
-      if (request.method === "POST" && (url.pathname === "/api/session/start" || url.pathname.startsWith("/api/session/"))) {
-        return new Response(JSON.stringify({ 
-          ok: true, 
-          sessionId: `session-${Date.now()}`,
-          aiEnhancedInstruction: "Get ready for a culinary explosion!" 
-        }), {
+      if (request.method === "POST" && url.pathname.startsWith("/api/session/")) {
+        // Mock session endpoints for compatibility
+        return new Response(JSON.stringify({ ok: true, session: { sessionId: `session-${Date.now()}` } }), {
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
-      }
-
-      if (url.pathname === "/api/get-signed-url" && env.ELEVENLABS_AGENT_ID) {
-        return await handleGetSignedUrl(env);
       }
 
       return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
@@ -91,6 +80,7 @@ Remaining Time: ${remainingTime}/${totalTime} seconds.`;
     }
   }
 
+  // Fallback to Cloudflare AI if Gemini fails or is not available
   if (!narrationText && env.AI) {
     try {
       const aiResponse: any = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
@@ -106,6 +96,7 @@ Remaining Time: ${remainingTime}/${totalTime} seconds.`;
     narrationText = `おおっと！${dishName}の調理が白熱しているぞ！残り${remainingTime}秒だー！`;
   }
 
+  // Clean up excessive newlines or quotes
   narrationText = narrationText.replace(/[\r\n]+/g, " ").replace(/"/g, "").trim();
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
@@ -121,7 +112,7 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body: any = await request.json();
   const text = body.text;
-  const voiceId = "JBFqnCBsd6RMkjVDRZzb";
+  const voiceId = "JBFqnCBsd6RMkjVDRZzb"; // Optional: make this dynamic
 
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",
@@ -141,7 +132,9 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
     throw new Error(`ElevenLabs TTS HTTP Error: ${res.status} - ${errorBody}`);
   }
 
+  // Forward the audio binary directly to the frontend, along with CORS
   const newResponse = new Response(res.body, res);
+  // Important: apply CORS headers to the audio response
   Object.entries(CORS_HEADERS).forEach(([k, v]) => {
     newResponse.headers.set(k, v);
   });
@@ -208,29 +201,4 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
   const newResponse = new Response(res.body, res);
   Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
   return newResponse;
-}
-
-async function handleGetSignedUrl(env: Env): Promise<Response> {
-  const res = await fetch(
-    `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${env.ELEVENLABS_AGENT_ID}`,
-    {
-      method: "GET",
-      headers: {
-        "xi-api-key": env.ELEVENLABS_API_KEY || "",
-      },
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    return new Response(JSON.stringify({ error: "Failed to get signed URL" }), {
-      status: 502,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    });
-  }
-
-  const data = await res.json() as any;
-  return new Response(JSON.stringify({ ok: true, signedUrl: data.signed_url }), {
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-  });
 }

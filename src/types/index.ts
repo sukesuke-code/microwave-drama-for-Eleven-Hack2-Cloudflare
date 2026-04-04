@@ -1,4 +1,4 @@
-export type NarrationStyle = 'sports' | 'movie' | 'horror' | 'nature';
+export type NarrationStyle = 'sports' | 'movie' | 'horror' | 'nature' | 'documentary' | 'anime';
 export type Locale = 'ja' | 'en';
 export type ThemeMode = 'dark' | 'light';
 

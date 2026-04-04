@@ -3,16 +3,10 @@
     "target": "es2022",
     "module": "es2022",
     "lib": ["es2022"],
-    "alwaysStrict": true,
-    "strict": true,
-    "preserveConstEnums": true,
-    "moduleResolution": "bundler",
-    "sourceMap": true,
-    "types": [
-      "@cloudflare/workers-types"
-    ],
+    "types": ["@cloudflare/workers-types"],
+    "moduleResolution": "node",
     "esModuleInterop": true,
+    "strict": true,
     "skipLibCheck": true
-  },
-  "include": ["src/**/*.ts"]
+  }
 }

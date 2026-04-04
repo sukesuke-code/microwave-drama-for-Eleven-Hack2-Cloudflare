@@ -6,12 +6,16 @@ export const STYLE_LABELS: Record<Locale, Record<NarrationStyle, string>> = {
     movie: '映画予告編',
     horror: 'ホラー',
     nature: '自然ドキュメンタリー',
+    documentary: '歴史ドキュメンタリー',
+    anime: '熱血アニメ',
   },
   en: {
     sports: 'Sports',
     movie: 'Movie Trailer',
     horror: 'Horror',
     nature: 'Nature Doc',
+    documentary: 'History Doc',
+    anime: 'Hot-Blooded Anime',
   },
 };
 
@@ -46,7 +50,7 @@ export const UI_TEXT = {
     mysteryDish: '謎の料理',
     aiConnectionError: 'AIに接続できませんでした',
     localSessionFallback: 'ローカルセッションにフォールバック中',
-    styleShort: ['🏟️ スポーツ', '🎬 映画', '😱 ホラー', '🌍 自然'],
+    styleShort: ['🏟️ スポーツ', '🎬 映画', '😱 ホラー', '🌍 自然', '📜 歴史', '🔥 アニメ'],
   },
   en: {
     topTagline1: 'Turn the world’s most boring wait into',
@@ -78,7 +82,7 @@ export const UI_TEXT = {
     mysteryDish: 'Mystery Dish',
     aiConnectionError: 'Could not connect with AI',
     localSessionFallback: 'Falling back to local session',
-    styleShort: ['🏟️ Sports', '🎬 Movie', '😱 Horror', '🌍 Nature'],
+    styleShort: ['🏟️ Sports', '🎬 Movie', '😱 Horror', '🌍 Nature', '📜 History', '🔥 Anime'],
   },
 } as const;
 
@@ -88,11 +92,15 @@ export const RESULT_MESSAGES: Record<Locale, Record<NarrationStyle, string[]>> =
     movie: ['エンドロールが流れる…', '名作、誕生。', 'スタンディングオベーション。'],
     horror: ['…生き残った。', '扉の向こう側へ。', '…今夜は眠れない。'],
     nature: ['生命の循環は続く。', '大自然の摂理に従い。', '次の旅が待っている。'],
+    documentary: ['歴史は刻まれた。', '新たな物語の誕生。', 'そして伝説へ。'],
+    anime: ['俺たちの勝利だ！！', '限界突破！！！', '友情の力を見たか！！'],
   },
   en: {
     sports: ['Gold-medal finish!', 'Historic run complete!', 'The crowd is on its feet!'],
     movie: ['Roll credits...', 'A masterpiece is born.', 'Standing ovation.'],
     horror: ['...You survived.', 'Beyond the final door.', '...No sleep tonight.'],
     nature: ['The cycle continues.', 'Nature keeps its order.', 'The next journey awaits.'],
+    documentary: ['History is made.', 'A new story begins.', 'Onto the hall of fame.'],
+    anime: ['We won!!!', 'Limit break!!!', 'Behold the power of friendship!!'],
   },
 };
