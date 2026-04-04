@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed } from 'lucide-react';
 import { Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
-import { api } from '../api/client';
+
 
 interface SettingsPageProps {
   locale: Locale;
@@ -125,65 +125,22 @@ export default function SettingsPage({
     setDuration(clampDuration(minutes * 60 + nextSeconds));
   };
 
-  const handleStart = async () => {
+  const handleStart = () => {
     if (isLoading) return;
     setIsLoading(true);
     setError(null);
 
-    try {
-      const mappedStyle = style === 'sports' ? 'sports'
-        : style === 'movie' ? 'documentary'
-        : style === 'horror' ? 'horror'
-        : 'anime';
+    const nextDishName = dishName.trim() || t.mysteryDish;
 
-      const nextDishName = dishName.trim() || t.mysteryDish;
-      let sessionId = '';
-      let usedLocalFallback = false;
+    const settings: Settings = {
+      totalSeconds: duration,
+      dishName: nextDishName,
+      style,
+    };
 
-      try {
-        const session = await api.startSession(
-          nextDishName,
-          duration,
-          mappedStyle as "sports" | "horror" | "documentary" | "anime"
-        );
-        sessionId = session.sessionId;
-      } catch (startError) {
-        usedLocalFallback = true;
-        const localSessionIdFactory = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? () => crypto.randomUUID()
-          : () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        sessionId = `local-${localSessionIdFactory()}`;
-
-        console.warn('Session API unavailable. Falling back to local session mode.', {
-          error: startError instanceof Error ? startError.message : String(startError),
-          fallbackSessionId: sessionId,
-        });
-      }
-
-      const settings: Settings = {
-        totalSeconds: duration,
-        dishName: nextDishName,
-        style,
-      };
-
-      sessionStorage.setItem('sessionId', sessionId);
-      sessionStorage.setItem('sessionMode', usedLocalFallback ? 'local-fallback' : 'remote');
-      onStart(settings);
-    } catch (err) {
-      const userMessage = locale === 'ja'
-        ? 'サーバーに接続できませんでした。通信環境をご確認のうえ、もう一度お試しください。'
-        : 'Could not connect to the server. Please check your connection and try again.';
-      setError(userMessage);
-
-      const developerMessage = err instanceof Error ? err.message : String(err);
-      console.error('Failed to start session (developer detail):', {
-        error: developerMessage,
-        duration,
-        style,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    // Agent connection is handled in CountdownPage via ElevenLabs WebSocket
+    onStart(settings);
+    setIsLoading(false);
   };
 
   useEffect(() => {
