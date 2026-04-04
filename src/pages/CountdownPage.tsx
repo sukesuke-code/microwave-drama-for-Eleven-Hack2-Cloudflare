@@ -305,7 +305,7 @@ export default function CountdownPage({
 
   return (
       <div
-      className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient}`}
+      className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient} page-container`}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
       <FlashOverlay visible={isFlashing} />

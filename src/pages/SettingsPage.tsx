@@ -196,7 +196,7 @@ export default function SettingsPage({
   }, [duration, dishName, style]);
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-[#00031a] text-white">
+    <div className="h-[100dvh] overflow-hidden bg-[#00031a] text-white page-container">
       <div className="mx-auto flex h-full w-full max-w-md flex-col justify-between p-3">
         <header className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button

@@ -80,6 +80,8 @@ function readSettings(): Settings | null {
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(() => readSettings());
   const [screen, setScreen] = useState<AppScreen>('top');
+  const [nextScreen, setNextScreen] = useState<AppScreen | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => readLocale());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStorage('ching-drama-theme');
@@ -125,65 +127,88 @@ export default function App() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  const handleStartSettings = () => setScreen('settings');
+  const transitionTo = (newScreen: AppScreen) => {
+    if (screen === newScreen) return;
+    setIsTransitioning(true);
+    setNextScreen(newScreen);
+    const timer = setTimeout(() => {
+      setScreen(newScreen);
+      setNextScreen(null);
+      setIsTransitioning(false);
+    }, 150);
+    return () => clearTimeout(timer);
+  };
+
+  const handleStartSettings = () => transitionTo('settings');
 
   const handleStartCountdown = (s: Settings) => {
     setSettings(s);
-    setScreen('countdown');
+    transitionTo('countdown');
   };
 
-  const handleFinish = () => setScreen('result');
+  const handleFinish = () => transitionTo('result');
 
   const handleReplay = () => {
-    if (settings) setScreen('countdown');
+    if (settings) transitionTo('countdown');
   };
 
-  const handleHome = () => setScreen('settings');
-  const handleTop = () => setScreen('top');
+  const handleHome = () => transitionTo('settings');
+  const handleTop = () => transitionTo('top');
+
+  const pageOpacity = isTransitioning ? 0 : 1;
+  const pageTransitionClass = isTransitioning ? 'page-fade-out' : 'page-fade-in';
 
   return (
     <div className="font-sans">
-      {screen === 'top' && (
-        <TopPage
-          onStart={handleStartSettings}
-          locale={locale}
-          themeMode={themeMode}
-          onLocaleChange={setLocale}
-          onThemeModeChange={setThemeMode}
-        />
-      )}
-      <Suspense fallback={<div className="min-h-screen bg-[#00031a]" />}>
-        {screen === 'settings' && (
-          <SettingsPage
+      <div
+        style={{
+          opacity: pageOpacity,
+          transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+        className={pageTransitionClass}
+      >
+        {screen === 'top' && (
+          <TopPage
+            onStart={handleStartSettings}
             locale={locale}
             themeMode={themeMode}
+            onLocaleChange={setLocale}
             onThemeModeChange={setThemeMode}
-            onBack={() => setScreen('top')}
-            onStart={handleStartCountdown}
           />
         )}
-        {screen === 'countdown' && settings && (
-          <CountdownPage
-            locale={locale}
-            settings={settings}
-            themeMode={themeMode}
-            onThemeModeChange={setThemeMode}
-            onBack={() => setScreen('settings')}
-            onFinish={handleFinish}
-          />
-        )}
-        {screen === 'result' && settings && (
-          <ResultPage
-            locale={locale}
-            settings={settings}
-            themeMode={themeMode}
-            onThemeModeChange={setThemeMode}
-            onReplay={handleReplay}
-            onHome={handleHome}
-            onTop={handleTop}
-          />
-        )}
-      </Suspense>
+        <Suspense fallback={<div className="min-h-screen bg-[#00031a]" />}>
+          {screen === 'settings' && (
+            <SettingsPage
+              locale={locale}
+              themeMode={themeMode}
+              onThemeModeChange={setThemeMode}
+              onBack={() => transitionTo('top')}
+              onStart={handleStartCountdown}
+            />
+          )}
+          {screen === 'countdown' && settings && (
+            <CountdownPage
+              locale={locale}
+              settings={settings}
+              themeMode={themeMode}
+              onThemeModeChange={setThemeMode}
+              onBack={() => transitionTo('settings')}
+              onFinish={handleFinish}
+            />
+          )}
+          {screen === 'result' && settings && (
+            <ResultPage
+              locale={locale}
+              settings={settings}
+              themeMode={themeMode}
+              onThemeModeChange={setThemeMode}
+              onReplay={handleReplay}
+              onHome={handleHome}
+              onTop={handleTop}
+            />
+          )}
+        </Suspense>
+      </div>
     </div>
   );
 }
