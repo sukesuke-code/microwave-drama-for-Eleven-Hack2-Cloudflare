@@ -1,0 +1,21 @@
+name = "microwave-show-backend"
+main = "src/index.ts"
+compatibility_date = "2024-03-20"
+
+# AI Binding: Allows us to use Workers AI (like Llama) to enhance narrations
+[ai]
+binding = "AI"
+
+# Durable Object: For real-time multiplayer synchronization
+[[durable_objects.bindings]]
+name = "MICROWAVE_SESSION"
+class_name = "MicrowaveSession"
+
+# Durable Object Migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["MicrowaveSession"]
+
+# ElevenLabs API Key should be set via `npx wrangler secret put ELEVENLABS_API_KEY`
+# Agent ID should be set via `npx wrangler secret put ELEVENLABS_AGENT_ID`
+# (Or in .dev.vars for local development)

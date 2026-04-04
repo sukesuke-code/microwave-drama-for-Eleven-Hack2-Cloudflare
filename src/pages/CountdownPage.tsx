@@ -58,6 +58,7 @@ export default function CountdownPage({
   const agentConnectedRef = useRef(false);
   const narrationRequestInFlightRef = useRef(false);
   const timeLeftRef = useRef(totalSeconds);
+  const syncClientRef = useRef<any>(null);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -114,12 +115,13 @@ export default function CountdownPage({
       `elapsed: ${elapsed}s`,
       `progress: ${100 - pct}%`,
       `locale: ${locale}`,
+      `ai_director_instruction: ${settings.aiEnhancedInstruction || 'none'}`,
       ``,
       `Create one short vivid narration line for this exact moment.`,
       `Stay fully in character for the ${style} style.`,
       `Match sound and energy to the ${phase} phase.`,
     ].join('\n');
-  }, [dishName, style, totalSeconds, locale]);
+  }, [dishName, style, totalSeconds, locale, settings.aiEnhancedInstruction]);
 
   // Play local SFX/music effects per phase
   const handlePhaseEffects = useCallback(async (phase: SessionPhase) => {
@@ -170,6 +172,7 @@ export default function CountdownPage({
       remaining_time: String(totalSeconds),
       phase: 'opening',
       locale: locale,
+      ai_instruction: settings.aiEnhancedInstruction || '',
     };
 
     const callbacks: AgentCallbacks = {
@@ -199,11 +202,33 @@ export default function CountdownPage({
       agentConnectedRef.current = false;
     });
 
+    // Sub-routine: Connect to Durable Objects Backend if a Session ID exists
+    if (settings.sessionId) {
+      import('../api/session-sync').then(({ SessionSyncClient }) => {
+        const client = new SessionSyncClient(
+          settings.sessionId!,
+          (state) => {
+            setIsPaused(state.isPaused);
+          },
+          (tl) => {
+            setTimeLeft(tl);
+            timeLeftRef.current = tl;
+          }
+        );
+        client.connect();
+        syncClientRef.current = client;
+      }).catch(e => console.error("Sync client import fail:", e));
+    }
+
     return () => {
       disconnectAgent();
       agentConnectedRef.current = false;
+      if (syncClientRef.current) {
+        syncClientRef.current.disconnect();
+        syncClientRef.current = null;
+      }
     };
-  }, [totalSeconds, style, dishName, locale]);
+  }, [totalSeconds, style, dishName, locale, settings.sessionId, settings.aiEnhancedInstruction]);
 
   // ---------- Agent meter → visualizer ----------
   useEffect(() => {
@@ -217,6 +242,18 @@ export default function CountdownPage({
   }, []);
 
   // ---------- Phase-based narration triggers ----------
+  const handleTogglePause = () => {
+    if (isFinished) return;
+    setIsPaused((p) => {
+      const next = !p;
+      if (syncClientRef.current) {
+        if (next) syncClientRef.current.pause();
+        else syncClientRef.current.resume();
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (isPaused) return;
 

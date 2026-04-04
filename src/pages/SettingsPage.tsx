@@ -125,22 +125,36 @@ export default function SettingsPage({
     setDuration(clampDuration(minutes * 60 + nextSeconds));
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (isLoading) return;
     setIsLoading(true);
     setError(null);
 
     const nextDishName = dishName.trim() || t.mysteryDish;
 
-    const settings: Settings = {
-      totalSeconds: duration,
-      dishName: nextDishName,
-      style,
-    };
+    try {
+      // Connect to Cloudflare backend to create the Durable Object session and run Workers AI
+      const { startMultiplayerSession } = await import('../api/session-sync');
+      const { sessionId, aiEnhancedInstruction } = await startMultiplayerSession(nextDishName, duration, style);
 
-    // Agent connection is handled in CountdownPage via ElevenLabs WebSocket
-    onStart(settings);
-    setIsLoading(false);
+      const settings: Settings = {
+        totalSeconds: duration,
+        dishName: nextDishName,
+        style,
+        sessionId,
+        aiEnhancedInstruction,
+      };
+
+      onStart(settings);
+    } catch (err) {
+      const userMessage = locale === 'ja'
+        ? 'サーバーに接続できませんでした。通信環境をご確認のうえ、もう一度お試しください。'
+        : 'Could not connect to the server. Please check your connection and try again.';
+      setError(userMessage);
+      console.error('Session start failed:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
