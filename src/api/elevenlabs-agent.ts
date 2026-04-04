@@ -14,8 +14,7 @@
  */
 
 const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  "https://microwave-show-api.lolololololol.workers.dev";
+  import.meta.env.VITE_API_BASE || "";
 
 const AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "";
 const WS_BASE = "wss://api.elevenlabs.io/v1/convai/conversation";
