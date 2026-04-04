@@ -16,9 +16,12 @@ let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 let stopRequested = false;
 let activeMeterCleanup: (() => void) | null = null;
+let speechMeterIntervalId: ReturnType<typeof setInterval> | null = null;
 
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+let localMusicContext: AudioContext | null = null;
+let localMusicNodes: Array<{ stop: () => void }> = [];
 const lastEffectRequestAt = new Map<string, number>();
 
 function normalizeTextInput(input: string, maxLen: number): string {
@@ -331,6 +334,20 @@ function stopTtsPlayback(): void {
     URL.revokeObjectURL(activeObjectUrl);
     activeObjectUrl = null;
   }
+
+  if (speechMeterIntervalId) {
+    clearInterval(speechMeterIntervalId);
+    speechMeterIntervalId = null;
+  }
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  emitTtsLevel(0);
+  ttsMeterListeners.forEach((listener) => {
+    listener({ level: 0, spectrum: [] });
+  });
 }
 
 function stopMusic(): void {
@@ -344,6 +361,14 @@ function stopMusic(): void {
   if (activeMusicObjectUrl) {
     URL.revokeObjectURL(activeMusicObjectUrl);
     activeMusicObjectUrl = null;
+  }
+
+  localMusicNodes.forEach((node) => node.stop());
+  localMusicNodes = [];
+
+  if (localMusicContext) {
+    void localMusicContext.close();
+    localMusicContext = null;
   }
 }
 
@@ -679,22 +704,35 @@ async function requestAgentNarration(
     remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
   };
 
-  const data = await requestJson<{
+  let data: {
     ok?: boolean;
     text?: string;
     error?: string;
-  }>("/api/agent/narration", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(sanitizedRequest),
-  });
+  };
+  try {
+    data = await requestJson<{
+      ok?: boolean;
+      text?: string;
+      error?: string;
+    }>("/api/agent/narration", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sanitizedRequest),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/HTTP_5\d{2}|Failed to fetch|NetworkError|Load failed|AbortError/i.test(message)) {
+      throw new Error("AGENT_NARRATION_UNAVAILABLE");
+    }
+    throw error;
+  }
 
   logDebug("requestAgentNarration response", data);
 
   if (!data.ok || !data.text) {
-    throw new Error(data.error || "Agent narration failed");
+    throw new Error(data.error || "AGENT_NARRATION_UNAVAILABLE");
   }
 
   return {
@@ -705,46 +743,184 @@ async function requestAgentNarration(
   };
 }
 
+async function playLocalNarration(text: string, locale = "ja"): Promise<void> {
+  if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    return;
+  }
+
+  stopTtsPlayback();
+  const sanitizedText = normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH);
+  const utterance = new SpeechSynthesisUtterance(sanitizedText);
+  utterance.rate = locale.startsWith("ja") ? 1.02 : 1.0;
+  utterance.pitch = locale.startsWith("ja") ? 1.03 : 1.0;
+  utterance.volume = 1;
+  utterance.lang = locale.startsWith("ja") ? "ja-JP" : "en-US";
+
+  const voices = window.speechSynthesis.getVoices();
+  const preferredVoice = voices.find((voice) => voice.lang.startsWith(utterance.lang));
+  if (preferredVoice) {
+    utterance.voice = preferredVoice;
+  }
+
+  speechMeterIntervalId = setInterval(() => {
+    const level = 0.25 + Math.random() * 0.6;
+    const spectrum = Array.from({ length: 16 }, () => 0.2 + Math.random() * 0.8);
+    emitTtsLevel(level);
+    ttsMeterListeners.forEach((listener) => {
+      listener({ level, spectrum });
+    });
+  }, 70);
+
+  await new Promise<void>((resolve, reject) => {
+    utterance.onend = () => resolve();
+    utterance.onerror = () => reject(new Error("LOCAL_TTS_FAILED"));
+    window.speechSynthesis.speak(utterance);
+  }).finally(() => {
+    if (speechMeterIntervalId) {
+      clearInterval(speechMeterIntervalId);
+      speechMeterIntervalId = null;
+    }
+    emitTtsLevel(0);
+    ttsMeterListeners.forEach((listener) => {
+      listener({ level: 0, spectrum: [] });
+    });
+  });
+}
+
+function playLocalSfx(prompt: string): Promise<void> {
+  const AudioContextImpl =
+    window.AudioContext ||
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextImpl) return Promise.resolve();
+
+  const ctx = new AudioContextImpl();
+  const now = ctx.currentTime;
+  const isSoft = /soft|light|gentle|nature|forest/i.test(prompt);
+  const baseFreq = isSoft ? 660 : 880;
+  const gainPeak = isSoft ? 0.08 : 0.15;
+
+  const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
+  notes.forEach((freq, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = isSoft ? "sine" : "triangle";
+    osc.frequency.setValueAtTime(freq, now + index * 0.09);
+    gain.gain.setValueAtTime(0.0001, now + index * 0.09);
+    gain.gain.exponentialRampToValueAtTime(gainPeak, now + index * 0.09 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.09 + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + index * 0.09);
+    osc.stop(now + index * 0.09 + 0.22);
+  });
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      void ctx.close();
+      resolve();
+    }, 500);
+  });
+}
+
+async function playLocalMusic(prompt: string): Promise<void> {
+  stopMusic();
+  const AudioContextImpl =
+    window.AudioContext ||
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextImpl) return;
+
+  const ctx = new AudioContextImpl();
+  localMusicContext = ctx;
+  const isNature = /nature|calm|wind|birds/i.test(prompt);
+  const root = isNature ? 220 : 110;
+  const mode = isNature ? [1, 1.122, 1.334, 1.498] : [1, 1.189, 1.334, 1.587];
+
+  mode.forEach((ratio, idx) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = isNature ? "sine" : "sawtooth";
+    osc.frequency.value = root * ratio;
+    gain.gain.value = isNature ? 0.01 : 0.018;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.type = "sine";
+    lfo.frequency.value = 0.08 + idx * 0.03;
+    lfoGain.gain.value = 4 + idx;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    lfo.start();
+
+    localMusicNodes.push({
+      stop: () => {
+        osc.stop();
+        lfo.stop();
+      },
+    });
+  });
+}
+
 async function playSfx(prompt: string): Promise<void> {
   ensureSafeApiBase();
   enforceEffectRateLimit("sfx");
-  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-  });
+  try {
+    const res = await fetch(`${API_BASE}/api/generate-sfx`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(errText || "SFX generation failed");
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || "SFX generation failed");
+    }
+
+    const blob = await parseAudioBlob(res);
+    await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/Failed to fetch|NetworkError|Load failed|HTTP_5\d{2}|timeout/i.test(message)) {
+      await playLocalSfx(prompt);
+      return;
+    }
+    throw error;
   }
-
-  const blob = await parseAudioBlob(res);
-  await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
 }
 
 async function playMusic(prompt: string): Promise<void> {
   ensureSafeApiBase();
   enforceEffectRateLimit("music");
-  const res = await fetch(`${API_BASE}/api/generate-music`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-  });
+  try {
+    const res = await fetch(`${API_BASE}/api/generate-music`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(errText || "Music generation failed");
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || "Music generation failed");
+    }
+
+    const blob = await parseAudioBlob(res);
+    await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/Failed to fetch|NetworkError|Load failed|HTTP_5\d{2}|timeout/i.test(message)) {
+      await playLocalMusic(prompt);
+      return;
+    }
+    throw error;
   }
-
-  const blob = await parseAudioBlob(res);
-  await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
 }
 
 async function playTtsFromBlob(blob: Blob): Promise<void> {
@@ -764,6 +940,7 @@ export {
   playMusic,
   stopMusic,
   stopTtsPlayback,
+  playLocalNarration,
   subscribeTtsLevel,
   subscribeTtsMeter,
   playTtsFromBlob,
@@ -782,6 +959,7 @@ export const api = {
   playMusic,
   stopMusic,
   stopTtsPlayback,
+  playLocalNarration,
   subscribeTtsLevel,
   subscribeTtsMeter,
   playTtsFromBlob,
