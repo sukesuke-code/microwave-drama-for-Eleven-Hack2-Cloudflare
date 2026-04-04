@@ -221,12 +221,12 @@ export default function AudioWaveVisualizer({
           ? 0.34
             + activeLevel * 2.25
             + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.33) * 0.28
-          : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95) * 0.18;
+          : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.22) * 0.18;
         const jitterX = Math.sin((syncSeed ?? 0) * 0.07 + i * 1.17 + motionTick * 0.52) * (0.08 + activeLevel * 0.32);
         const rotate = Math.sin((syncSeed ?? 0) * 0.05 + i * 0.41 + motionTick * 0.4) * (2 + activeLevel * 5.5);
         const barStyle: CSSProperties & Record<string, string | number> = {
           backgroundColor: color,
-          animationDelay: `${i * delayMultiplier}s`,
+          animationDelay: addBaseMotion ? `-${(i * delayMultiplier).toFixed(3)}s` : `${i * delayMultiplier}s`,
           boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
           animationName: pattern.keyframe,
           animationDuration: `${randomDuration}s`,
