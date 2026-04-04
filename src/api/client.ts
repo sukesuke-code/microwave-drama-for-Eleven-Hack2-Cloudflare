@@ -3,6 +3,14 @@ const API_BASE =
   "https://microwave-show-api-v2.lolololololol.workers.dev";
 
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
+const DEFAULT_RETRY_COUNT = 1;
+const AUDIO_METER_FPS = 30;
+const IS_DEV = import.meta.env.DEV;
+const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_TEXT_PAYLOAD_LENGTH = 280;
+const MAX_DISH_NAME_LENGTH = 100;
+const EFFECT_RATE_LIMIT_MS = 1500;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
@@ -11,6 +19,89 @@ let activeMeterCleanup: (() => void) | null = null;
 
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+const lastEffectRequestAt = new Map<string, number>();
+
+function normalizeTextInput(input: string, maxLen: number): string {
+  let output = "";
+  for (const char of input) {
+    const code = char.charCodeAt(0);
+    const isControl = code < 32 || code === 127;
+    output += isControl ? " " : char;
+  }
+  return output.replace(/\s+/g, " ").trim().slice(0, maxLen);
+}
+
+function ensureSafeApiBase(): void {
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(API_BASE);
+  const isHttps = API_BASE.startsWith("https://");
+  if (!isHttps && !isLocalhost) {
+    throw new Error("VITE_API_BASE must use HTTPS outside localhost.");
+  }
+}
+
+function enforceEffectRateLimit(effectKey: "sfx" | "music"): void {
+  const now = Date.now();
+  const lastAt = lastEffectRequestAt.get(effectKey) ?? 0;
+  if (now - lastAt < EFFECT_RATE_LIMIT_MS) {
+    throw new Error("EFFECT_RATE_LIMITED");
+  }
+  lastEffectRequestAt.set(effectKey, now);
+}
+
+function logDebug(...args: unknown[]): void {
+  if (IS_DEV) {
+    console.debug(...args);
+  }
+}
+
+function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+
+  return undefined;
+}
+
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  ensureSafeApiBase();
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        signal:
+          init?.signal ??
+          withTimeoutSignal(
+            init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000
+          ),
+      });
+
+      if (!res.ok) {
+        const shouldRetry = RETRYABLE_HTTP_STATUS.has(res.status);
+        throw new Error(`HTTP_${res.status}:${shouldRetry ? "RETRYABLE" : "FINAL"}`);
+      }
+
+      const data = (await res.json()) as T;
+      return data;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isRetryableHttp = /HTTP_\d+:RETRYABLE/.test(lastError.message);
+      const isAbortError = lastError.name === "AbortError";
+      const isNetworkLike = /Failed to fetch|NetworkError|Load failed/i.test(lastError.message);
+      const canRetry = isRetryableHttp || isAbortError || isNetworkLike;
+
+      if (attempt >= DEFAULT_RETRY_COUNT || !canRetry) {
+        break;
+      }
+
+      const backoffMs = 250 * (attempt + 1);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  throw lastError ?? new Error("REQUEST_FAILED");
+}
 
 type TtsLevelListener = (level: number) => void;
 
@@ -125,8 +216,16 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
   analyser.connect(audioContext.destination);
 
   let frameId = 0;
+  const minFrameIntervalMs = 1000 / AUDIO_METER_FPS;
+  let lastFrameAt = 0;
 
-  const tick = () => {
+  const tick = (now: number) => {
+    if (now - lastFrameAt < minFrameIntervalMs) {
+      frameId = window.requestAnimationFrame(tick);
+      return;
+    }
+    lastFrameAt = now;
+
     analyser.getByteTimeDomainData(waveformData);
     analyser.getByteFrequencyData(frequencyData);
 
@@ -146,7 +245,8 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
     const logMin = Math.log10(minHz);
     const logMax = Math.log10(maxHz);
 
-    const spectrum = Array.from({ length: spectrumBins }, (_, index) => {
+    const spectrum = new Array<number>(spectrumBins);
+    for (let index = 0; index < spectrumBins; index += 1) {
       const startRatio = index / spectrumBins;
       const endRatio = (index + 1) / spectrumBins;
 
@@ -178,8 +278,8 @@ function attachAudioMeter(audio: HTMLAudioElement): () => void {
       }
 
       const avg = sum / Math.max(1, endBin - startBin);
-      return Math.min(1, (avg / 255) * 2.2);
-    });
+      spectrum[index] = Math.min(1, (avg / 255) * 2.2);
+    }
 
     emitTtsLevel(level);
 
@@ -409,13 +509,19 @@ async function startSession(
   totalTime: number,
   style: NarrationStyle
 ): Promise<Session> {
+  const sanitizedFoodName = normalizeTextInput(String(foodName || ""), MAX_DISH_NAME_LENGTH);
+  const normalizedTotalTime = Number.isFinite(totalTime) ? Math.max(1, Math.min(600, Math.floor(totalTime))) : 60;
   const payload: StartSessionPayload = {
-    foodName: String(foodName || "").trim(),
-    totalTime: Number(totalTime),
+    foodName: sanitizedFoodName,
+    totalTime: normalizedTotalTime,
     style,
   };
 
-  const res = await fetch(`${API_BASE}/api/session/start`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    session?: Session;
+    error?: string;
+  }>("/api/session/start", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -423,15 +529,9 @@ async function startSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    session?: Session;
-    error?: string;
-  };
+  logDebug("startSession response", data);
 
-  console.log("startSession response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.session?.sessionId) {
+  if (!data.ok || !data.session?.sessionId) {
     throw new Error(data?.error || "Failed to start session");
   }
 
@@ -439,25 +539,20 @@ async function startSession(
 }
 
 async function getSession(sessionId: string): Promise<Session> {
-  const res = await fetch(
-    `${API_BASE}/api/session?sessionId=${encodeURIComponent(sessionId)}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const data = (await res.json()) as {
+  const data = await requestJson<{
     ok?: boolean;
     session?: Session;
     error?: string;
-  };
+  }>(`/api/session?sessionId=${encodeURIComponent(sessionId)}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
-  console.log("getSession response", res.status, data);
+  logDebug("getSession response", data);
 
-  if (!res.ok || !data.ok || !data.session) {
+  if (!data.ok || !data.session) {
     throw new Error(data?.error || "Failed to get session");
   }
 
@@ -469,11 +564,16 @@ async function tickSession(
   remainingTime: number
 ): Promise<void> {
   const payload = {
-    sessionId,
-    remainingTime: Number(remainingTime),
+    sessionId: normalizeTextInput(sessionId, 120),
+    remainingTime: Number.isFinite(remainingTime)
+      ? Math.max(0, Math.min(600, Math.floor(remainingTime)))
+      : 0,
   };
 
-  const res = await fetch(`${API_BASE}/api/session/tick`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    error?: string;
+  }>("/api/session/tick", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -481,25 +581,23 @@ async function tickSession(
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    error?: string;
-  };
+  logDebug("tickSession response", data);
 
-  console.log("tickSession response", res.status, data);
-
-  if (!res.ok || !data.ok) {
+  if (!data.ok) {
     throw new Error(data?.error || "Failed to tick session");
   }
 }
 
 async function saveNarration(sessionId: string, text: string): Promise<void> {
   const payload = {
-    sessionId,
-    text: String(text || "").trim(),
+    sessionId: normalizeTextInput(sessionId, 120),
+    text: normalizeTextInput(String(text || ""), MAX_TEXT_PAYLOAD_LENGTH),
   };
 
-  const res = await fetch(`${API_BASE}/api/session/narration`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    error?: string;
+  }>("/api/session/narration", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -507,36 +605,29 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    error?: string;
-  };
+  logDebug("saveNarration response", data);
 
-  console.log("saveNarration response", res.status, data);
-
-  if (!res.ok || !data.ok) {
+  if (!data.ok) {
     throw new Error(data?.error || "Failed to save narration");
   }
 }
 
 async function getSignedUrl(): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/get-signed-url`, {
+  const data = await requestJson<{
+    ok?: boolean;
+    signedUrl?: string;
+    agentId?: string;
+    error?: string;
+  }>("/api/get-signed-url", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
     },
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    signedUrl?: string;
-    agentId?: string;
-    error?: string;
-  };
+  logDebug("getSignedUrl response", data);
 
-  console.log("getSignedUrl response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.signedUrl) {
+  if (!data.ok || !data.signedUrl) {
     throw new Error(data?.error || "Failed to get signed URL");
   }
 
@@ -580,23 +671,29 @@ Sound direction:
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
-  const res = await fetch(`${API_BASE}/api/agent/narration`, {
+  const sanitizedRequest: AgentNarrationRequest = {
+    ...request,
+    sessionId: request.sessionId ? normalizeTextInput(request.sessionId, 120) : undefined,
+    dishName: normalizeTextInput(request.dishName, MAX_DISH_NAME_LENGTH),
+    totalTime: Math.max(1, Math.min(600, Math.floor(request.totalTime))),
+    remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
+  };
+
+  const data = await requestJson<{
+    ok?: boolean;
+    text?: string;
+    error?: string;
+  }>("/api/agent/narration", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify(sanitizedRequest),
   });
 
-  const data = (await res.json()) as {
-    ok?: boolean;
-    text?: string;
-    error?: string;
-  };
+  logDebug("requestAgentNarration response", data);
 
-  console.log("requestAgentNarration response", res.status, data);
-
-  if (!res.ok || !data.ok || !data.text) {
+  if (!data.ok || !data.text) {
     throw new Error(data.error || "Agent narration failed");
   }
 
@@ -609,12 +706,15 @@ async function requestAgentNarration(
 }
 
 async function playSfx(prompt: string): Promise<void> {
+  ensureSafeApiBase();
+  enforceEffectRateLimit("sfx");
   const res = await fetch(`${API_BASE}/api/generate-sfx`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
   });
 
   if (!res.ok) {
@@ -627,12 +727,15 @@ async function playSfx(prompt: string): Promise<void> {
 }
 
 async function playMusic(prompt: string): Promise<void> {
+  ensureSafeApiBase();
+  enforceEffectRateLimit("music");
   const res = await fetch(`${API_BASE}/api/generate-music`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
   });
 
   if (!res.ok) {

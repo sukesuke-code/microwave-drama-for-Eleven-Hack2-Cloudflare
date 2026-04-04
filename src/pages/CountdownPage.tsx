@@ -42,6 +42,8 @@ export default function CountdownPage({
   const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback'>('remote');
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastQueuedNarrationRef = useRef('');
@@ -235,8 +237,8 @@ export default function CountdownPage({
             });
           }
 
-          setTimeout(() => setIsFlashing(false), 600);
-          setTimeout(() => onFinish(), 4000);
+          flashTimeoutRef.current = setTimeout(() => setIsFlashing(false), 600);
+          finishTimeoutRef.current = setTimeout(() => onFinish(), 4000);
           return 0;
         }
         if (sessionIdRef.current) {
@@ -254,14 +256,25 @@ export default function CountdownPage({
     };
   }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
 
+  useEffect(() => () => {
+    if (flashTimeoutRef.current) {
+      clearTimeout(flashTimeoutRef.current);
+    }
+    if (finishTimeoutRef.current) {
+      clearTimeout(finishTimeoutRef.current);
+    }
+  }, []);
+
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
-  const waveSeed = useMemo(() => {
-    const textSeed = narrationText
-      .split('')
-      .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0);
-    return textSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13;
-  }, [narrationText, totalSeconds, timeLeft, waveBeat]);
+  const narrationSeed = useMemo(() => narrationText
+    .split('')
+    .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0), [narrationText]);
+
+  const waveSeed = useMemo(
+    () => narrationSeed + (totalSeconds - timeLeft) * 31 + waveBeat * 13,
+    [narrationSeed, totalSeconds, timeLeft, waveBeat]
+  );
 
   const waveIntensity = useMemo<'low' | 'medium' | 'high'>(() => {
     if (isDanger || /[!?！？]/.test(narrationText)) return 'high';
