@@ -444,8 +444,10 @@ function stopTtsPlayback(): void {
   }
 
   if (activeObjectUrl) {
-    URL.revokeObjectURL(activeObjectUrl);
+    const urlToRevoke = activeObjectUrl;
     activeObjectUrl = null;
+    // Delay revocation slightly to ensure browser has finished with the blob
+    setTimeout(() => URL.revokeObjectURL(urlToRevoke), 100);
   }
 
   if (speechMeterIntervalId) {
@@ -472,8 +474,9 @@ function stopMusic(): void {
   }
 
   if (activeMusicObjectUrl) {
-    URL.revokeObjectURL(activeMusicObjectUrl);
+    const urlToRevoke = activeMusicObjectUrl;
     activeMusicObjectUrl = null;
+    setTimeout(() => URL.revokeObjectURL(urlToRevoke), 100);
   }
 
   localMusicNodes.forEach((node) => node.stop());
@@ -582,8 +585,15 @@ async function playAudioBlob(
     await audio.play();
     if (onStart) onStart();
   } catch (err) {
-    console.warn("Audio play failed or was interrupted:", err);
-    URL.revokeObjectURL(url);
+    const isAbort = err instanceof Error && err.name === "AbortError";
+    if (!isAbort) {
+      console.warn("Audio play failed:", err);
+    } else {
+      logDebug("Audio play interrupted (expected during rapid transitions)");
+    }
+    
+    // Revoke URL but with a small delay to avoid ERR_FILE_NOT_FOUND
+    setTimeout(() => URL.revokeObjectURL(url), 100);
     throw err;
   }
 
@@ -662,8 +672,8 @@ async function playAudioBlob(
     }
   } else if (isSfx) {
     if (activeSfxObjectUrl === url) {
-      URL.revokeObjectURL(url);
       activeSfxObjectUrl = null;
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     }
     if (activeSfxAudio) {
       activeSfxAudio.src = "";
@@ -672,8 +682,8 @@ async function playAudioBlob(
     }
   } else {
     if (activeObjectUrl === url) {
-      URL.revokeObjectURL(url);
       activeObjectUrl = null;
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     }
     if (activeTtsAudio) {
       activeTtsAudio.src = "";

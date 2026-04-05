@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 @layer base {
   * {
@@ -650,4 +650,24 @@ button:active {
   box-shadow:
     0 0 18px rgba(249, 115, 22, 0.35),
     0 0 30px rgba(56, 189, 248, 0.2);
+}
+
+.dynamic-vignette {
+  background: radial-gradient(ellipse at center, transparent 40%, var(--accent-color-15) 100%);
+  animation: vignettePulse 0.5s ease-in-out infinite;
+}
+
+.dynamic-text-color {
+  color: var(--accent-color);
+}
+
+.dynamic-progress-bar {
+  width: var(--progress-percent);
+  background: linear-gradient(90deg, var(--accent-color-80), var(--accent-color));
+  box-shadow: 0 0 8px var(--accent-color-60);
+}
+
+.dynamic-danger-text {
+  animation: dangerPulse 0.5s ease-in-out infinite;
+  text-shadow: 0 0 15px var(--accent-color);
 }
