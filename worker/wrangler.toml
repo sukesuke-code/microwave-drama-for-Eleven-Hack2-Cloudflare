@@ -1,16 +1,29 @@
 name = "microwave-show-api-v2"
 main = "src/index.ts"
-compatibility_date = "2024-03-20"
+compatibility_date = "2024-04-03"
 
 [ai]
 binding = "AI"
+
+[browser]
+binding = "BROWSER"
+
+[[durable_objects.bindings]]
+name = "SESSION_STORAGE"
+class_name = "MicrowaveSession"
+
+[[migrations]]
+tag = "v2"
+new_classes = ["MicrowaveSession"]
+
+[[vectorize]]
+binding = "MEMORY"
+index_name = "microwave-memory"
 
 [vars]
 # You will set ELEVENLABS_API_KEY securely using:
 # npx wrangler secret put ELEVENLABS_API_KEY
 # (Optional) If you want to use Gemini instead of Cloudflare AI
 # npx wrangler secret put GEMINI_API_KEY
-
-[[migrations]]
-tag = "v1"
-deleted_classes = ["MicrowaveSessionAgent", "TimerSession"]
+COST_BUDGET_PER_SESSION = "0.05"
+MAX_TOKEN_USAGE_PER_SESSION = "2000"
