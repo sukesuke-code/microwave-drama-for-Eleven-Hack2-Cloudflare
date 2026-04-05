@@ -20,6 +20,10 @@ new_classes = ["MicrowaveSession"]
 binding = "MEMORY"
 index_name = "microwave-memory"
 
+[[r2_buckets]]
+binding = "SNAPSHOT_STORAGE"
+bucket_name = "microwave-snapshots"
+
 [vars]
 # You will set ELEVENLABS_API_KEY securely using:
 # npx wrangler secret put ELEVENLABS_API_KEY
