@@ -19,6 +19,10 @@ const EXTERNAL_FETCH_RETRIES = 2;
 const MAX_TEXT_LENGTH = 280;
 const MAX_DISH_NAME_LENGTH = 100;
 const MAX_STYLE_LENGTH = 24;
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+};
 
 function normalizeNarrationText(text: string): string {
   return text.replace(/[\r\n]+/g, " ").replace(/"/g, "").replace(/\s+/g, " ").trim();
@@ -122,17 +126,17 @@ export default {
       if (request.method === "POST" && url.pathname.startsWith("/api/session/")) {
         // Mock session endpoints for compatibility
         return new Response(JSON.stringify({ ok: true, session: { sessionId: `session-${Date.now()}` } }), {
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+          headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json" }
         });
       }
 
-      return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+      return new Response("Not Found", { status: 404, headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Cache-Control": "no-store" } });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error(err);
       return new Response(JSON.stringify({ error: message }), {
         status: 500,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
       });
     }
   },
@@ -254,11 +258,11 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   if (isEnglish) {
     // Remove Japanese text in parentheses or brackets
     narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
-    narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
+    narrationText = narrationText.replace(/[[［][^\]］]*[\]］]/g, " ");
   } else {
     // Remove English text in parentheses or brackets
     narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
-    narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
+    narrationText = narrationText.replace(/[[［][^\]］]*[\]］]/g, " ");
   }
 
   narrationText = trimNarrationToDuration(
@@ -268,7 +272,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   );
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
 
@@ -280,7 +284,13 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body = await request.json() as { text: string; locale?: string };
   const text = sanitizeInput(body.text || "", MAX_TEXT_LENGTH);
-  const locale = body.locale || 'ja';
+  const locale = body.locale === "en" ? "en" : "ja";
+  if (!text) {
+    return new Response(JSON.stringify({ ok: false, error: "text is required" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
 
   const voiceId = locale === 'en' ? '5pPXnKrQTMV5dNWwILnl' : 'JBFqnCBsd6RMkjVDRZzb';
 
@@ -308,6 +318,9 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => {
     newResponse.headers.set(k, v);
   });
+  Object.entries(SECURITY_HEADERS).forEach(([k, v]) => {
+    newResponse.headers.set(k, v);
+  });
   return newResponse;
 }
 
@@ -319,6 +332,12 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body = await request.json() as { prompt: string };
   const prompt = sanitizeInput(body.prompt || "", MAX_TEXT_LENGTH);
+  if (!prompt) {
+    return new Response(JSON.stringify({ ok: false, error: "prompt is required" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
 
   const res = await fetchWithRetry("https://api.elevenlabs.io/v1/sound-generation", {
     method: "POST",
@@ -339,6 +358,7 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
 
   const newResponse = new Response(res.body, res);
   Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
+  Object.entries(SECURITY_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
   return newResponse;
 }
 
@@ -350,6 +370,12 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body = await request.json() as { prompt: string };
   const prompt = sanitizeInput(body.prompt || "", MAX_TEXT_LENGTH);
+  if (!prompt) {
+    return new Response(JSON.stringify({ ok: false, error: "prompt is required" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
 
   const res = await fetchWithRetry("https://api.elevenlabs.io/v1/sound-generation", {
     method: "POST",
@@ -370,5 +396,6 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
 
   const newResponse = new Response(res.body, res);
   Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
+  Object.entries(SECURITY_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
   return newResponse;
 }

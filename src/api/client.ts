@@ -230,6 +230,20 @@ export type { InitialAssets, NarrationStyle, Session, SessionPhase };
 
 const PHASE_ORDER: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
 const phaseAssetCache = new Map<string, Partial<Record<SessionPhase, PhaseAssets>>>();
+const MAX_PHASE_CACHE_SESSIONS = 20;
+
+function setPhaseAssetCache(sessionId: string, assets: Partial<Record<SessionPhase, PhaseAssets>>): void {
+  if (phaseAssetCache.has(sessionId)) {
+    phaseAssetCache.delete(sessionId);
+  }
+  phaseAssetCache.set(sessionId, assets);
+  if (phaseAssetCache.size > MAX_PHASE_CACHE_SESSIONS) {
+    const oldestKey = phaseAssetCache.keys().next().value;
+    if (oldestKey) {
+      phaseAssetCache.delete(oldestKey);
+    }
+  }
+}
 
 type TtsLevelListener = (level: number) => void;
 
@@ -1107,25 +1121,29 @@ async function prepareInitialAssets(
     locale,
     phase: "opening",
   });
-  phaseAssetCache.set(session.sessionId, allPhases);
+  setPhaseAssetCache(session.sessionId, allPhases);
 
-  // Background prefetch for remaining phases to keep later transitions smooth.
+  // Background prefetch for remaining phases to keep later transitions smooth
+  // while avoiding burst traffic spikes against external audio providers.
   const deferredPhases = PHASE_ORDER.filter((phase) => phase !== "opening");
-  void Promise.allSettled(
-    deferredPhases.map(async (phase) => {
-      const assets = await buildPhaseAssets({
-        sessionId: session.sessionId,
-        foodName,
-        totalTime,
-        style,
-        locale,
-        phase,
-      });
-      allPhases[phase] = assets;
-    })
-  ).then(() => {
-    phaseAssetCache.set(session.sessionId, allPhases);
-  });
+  void (async () => {
+    for (const phase of deferredPhases) {
+      try {
+        const assets = await buildPhaseAssets({
+          sessionId: session.sessionId,
+          foodName,
+          totalTime,
+          style,
+          locale,
+          phase,
+        });
+        allPhases[phase] = assets;
+      } catch (err) {
+        logDebug(`Deferred phase prefetch failed for ${phase}`, err);
+      }
+    }
+    setPhaseAssetCache(session.sessionId, allPhases);
+  })();
 
   return {
     session,
