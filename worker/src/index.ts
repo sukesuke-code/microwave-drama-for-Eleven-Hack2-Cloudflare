@@ -496,9 +496,9 @@ Maximum narration duration: ${maxDurationSeconds} seconds.
 ${memoryContext}
 ${historyContext}
 
-IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only.
+IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses.
 Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
-    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。
+    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。括弧内に翻訳や説明を追加しないでください。
 
 重要：ナレーションは通常の話すペース（約${Math.floor(maxDurationSeconds * 2.5)}語の最大値）で朗読する場合、${maxDurationSeconds}秒以内の長さである必要があります。
 
@@ -508,7 +508,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 残り時間: ${remainingTime}/${totalTime}秒
 最大ナレーション時間: ${maxDurationSeconds}秒
 
-重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。
+重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。括弧や記号で英語訳を付けないでください。
 簡潔にしてください - AI音声は${maxDurationSeconds}秒以内に話し終わる必要があります！`;
 
   let narrationText = "";
@@ -557,15 +557,18 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   narrationText = normalizeNarrationText(narrationText);
 
   // Remove any parenthetical translations or dual language content
+  // Handle both closed and unclosed parentheses (unclosed can occur when output is truncated by maxOutputTokens)
+  narrationText = narrationText.replace(/[(（][^)）]*[)）]?/g, " ");
+  narrationText = narrationText.replace(/[[［][^\]］]*[\]］]?/g, " ");
+
   if (isEnglish) {
-    // Remove Japanese text in parentheses or brackets
-    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
-    narrationText = narrationText.replace(/[[［][^\]］]*[\]］]/g, " ");
+    // Remove any remaining Japanese/CJK characters
+    narrationText = narrationText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+/g, " ");
   } else {
-    // Remove English text in parentheses or brackets
-    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
-    narrationText = narrationText.replace(/[[［][^\]］]*[\]］]/g, " ");
+    // Remove any remaining Latin/English word sequences
+    narrationText = narrationText.replace(/[a-zA-Z][a-zA-Z0-9\s'!\-,.?]*/g, " ");
   }
+  narrationText = narrationText.replace(/\s+/g, " ").trim();
 
   narrationText = trimNarrationToDuration(
     sanitizeInput(narrationText, MAX_TEXT_LENGTH),
