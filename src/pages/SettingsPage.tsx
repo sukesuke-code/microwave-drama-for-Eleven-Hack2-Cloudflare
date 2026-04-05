@@ -7,7 +7,6 @@ import { api } from '../api/client';
 
 interface SettingsPageProps {
   locale: Locale;
-  initialVoiceLanguage?: 'ja' | 'en';
   themeMode: ThemeMode;
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onBack: () => void;
@@ -112,7 +111,6 @@ function readSettingsDraft(locale: Locale): { duration: number; dishName: string
 
 export default function SettingsPage({
   locale,
-  initialVoiceLanguage,
   themeMode,
   onThemeModeChange,
   onBack,
@@ -122,16 +120,11 @@ export default function SettingsPage({
   const [duration, setDuration] = useState(draft.duration);
   const [dishName, setDishName] = useState(draft.dishName);
   const [style, setStyle] = useState<NarrationStyle>(draft.style);
-  const [voiceLanguage, setVoiceLanguage] = useState<'ja' | 'en'>(initialVoiceLanguage ?? locale);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync voiceLanguage state when initialVoiceLanguage prop changes (e.g. on returning from countdown)
-  useEffect(() => {
-    if (initialVoiceLanguage !== undefined) {
-      setVoiceLanguage(initialVoiceLanguage);
-    }
-  }, [initialVoiceLanguage]);
+  // voiceLanguage is always synchronized with UI locale
+  const voiceLanguage = locale;
 
   const t = UI_TEXT[locale];
   const isLight = themeMode === 'light';
@@ -350,36 +343,14 @@ export default function SettingsPage({
           <section className="space-y-2 shrink-0">
             <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1.5">
               <Volume2 size={13} />
-              <span>{locale === 'ja' ? 'AI音声言語' : 'AI Voice Language'}</span>
+              <span>{locale === 'ja' ? 'AI言語' : 'AI Language'}</span>
             </p>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setVoiceLanguage('ja')}
-                className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all ${
-                  voiceLanguage === 'ja'
-                    ? 'bg-orange-500 text-white border-orange-400 shadow-lg'
-                    : isLight
-                      ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
-                      : 'border-gray-800 bg-gray-900 text-gray-300 hover:bg-gray-800'
-                }`}
-              >
-                日本語
-              </button>
-              <button
-                type="button"
-                onClick={() => setVoiceLanguage('en')}
-                className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all ${
-                  voiceLanguage === 'en'
-                    ? 'bg-orange-500 text-white border-orange-400 shadow-lg'
-                    : isLight
-                      ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
-                      : 'border-gray-800 bg-gray-900 text-gray-300 hover:bg-gray-800'
-                }`}
-              >
-                English
-              </button>
+            <div className={`rounded-xl border px-3 py-2 text-xs font-bold ${isLight ? 'border-gray-300 bg-gray-50 text-gray-700' : 'border-gray-800 bg-gray-900 text-gray-300'}`}>
+              {locale === 'ja' ? '日本語' : 'English'}
             </div>
+            <p className={`text-[10px] ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>
+              {locale === 'ja' ? '※ 言語スイッチャーと連動します' : '※ Synced with language switcher'}
+            </p>
           </section>
 
           <div className="space-y-2">
