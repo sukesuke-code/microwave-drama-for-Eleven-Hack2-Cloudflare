@@ -27,6 +27,7 @@ export interface Settings {
   totalSeconds: number;
   dishName: string;
   style: NarrationStyle;
+  voiceLanguage: 'ja' | 'en';
   sessionId?: string;
   aiEnhancedInstruction?: string;
 }

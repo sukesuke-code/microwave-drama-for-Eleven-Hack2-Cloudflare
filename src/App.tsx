@@ -69,6 +69,7 @@ function readSettings(): Settings | null {
         totalSeconds: parsed.totalSeconds,
         dishName: parsed.dishName,
         style: parsed.style,
+        voiceLanguage: parsed.voiceLanguage === 'en' ? 'en' : 'ja',
       };
     }
     return null;

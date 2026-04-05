@@ -30,7 +30,7 @@ export default function CountdownPage({
   onBack,
   onFinish,
 }: CountdownPageProps) {
-  const { totalSeconds, dishName, style } = settings;
+  const { totalSeconds, dishName, style, voiceLanguage } = settings;
   const t = UI_TEXT[locale];
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
   const [narrationText, setNarrationText] = useState('');
@@ -194,9 +194,9 @@ export default function CountdownPage({
       totalTime: totalSeconds,
       remainingTime: tl,
       phase,
-      locale,
+      locale: voiceLanguage,
     };
-  }, [style, dishName, totalSeconds, locale]);
+  }, [style, dishName, totalSeconds, voiceLanguage]);
 
 
 

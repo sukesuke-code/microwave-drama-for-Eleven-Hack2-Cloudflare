@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed, Volume2 } from 'lucide-react';
 import { InitialAssets, Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
 import { api } from '../api/client';
@@ -120,6 +120,7 @@ export default function SettingsPage({
   const [duration, setDuration] = useState(draft.duration);
   const [dishName, setDishName] = useState(draft.dishName);
   const [style, setStyle] = useState<NarrationStyle>(draft.style);
+  const [voiceLanguage, setVoiceLanguage] = useState<'ja' | 'en'>('ja');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -150,18 +151,18 @@ export default function SettingsPage({
     try {
       const nextDishName = dishName.trim() || t.mysteryDish;
       
-      // 1. Prepare ALL initial assets (Session + Opening Narration + Audio Blobs)
       const initialAssets = await api.prepareInitialAssets(
         nextDishName,
         duration,
         style,
-        locale
+        voiceLanguage
       );
 
       const settings: Settings = {
         totalSeconds: duration,
         dishName: nextDishName,
         style,
+        voiceLanguage,
         sessionId: initialAssets.session.sessionId,
       };
 
@@ -332,6 +333,41 @@ export default function SettingsPage({
                   </button>
                 );
               })}
+            </div>
+          </section>
+
+          <section className="space-y-2 shrink-0">
+            <p className="text-orange-400 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-1.5">
+              <Volume2 size={13} />
+              <span>{locale === 'ja' ? 'AI音声言語' : 'AI Voice Language'}</span>
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setVoiceLanguage('ja')}
+                className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all ${
+                  voiceLanguage === 'ja'
+                    ? 'bg-orange-500 text-white border-orange-400 shadow-lg'
+                    : isLight
+                      ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                      : 'border-gray-800 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                }`}
+              >
+                日本語
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoiceLanguage('en')}
+                className={`rounded-xl border px-3 py-2 text-xs font-bold transition-all ${
+                  voiceLanguage === 'en'
+                    ? 'bg-orange-500 text-white border-orange-400 shadow-lg'
+                    : isLight
+                      ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                      : 'border-gray-800 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                }`}
+              >
+                English
+              </button>
             </div>
           </section>
 

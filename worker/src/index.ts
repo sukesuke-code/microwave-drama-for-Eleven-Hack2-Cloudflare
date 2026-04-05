@@ -51,11 +51,28 @@ export default {
 
 async function handleAgentNarration(request: Request, env: Env): Promise<Response> {
   const body: any = await request.json();
-  const { dishName, style, phase, remainingTime, totalTime } = body;
+  const { dishName, style, phase, remainingTime, totalTime, locale } = body;
 
   const maxDurationSeconds = totalTime - 1;
+  const isEnglish = locale === 'en';
 
-  const prompt = `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show. No greeting, no explanation. Just one sentence.
+  const languageNote = isEnglish
+    ? "Generate the narration ONLY in English."
+    : "Generate the narration ONLY in Japanese.";
+
+  const styleDescriptions: Record<string, { en: string; ja: string }> = {
+    sports: { en: 'sports commentator', ja: 'スポーツ実況者' },
+    movie: { en: 'movie trailer announcer', ja: '映画予告編アナウンサー' },
+    horror: { en: 'horror narrator', ja: 'ホラーナレーター' },
+    nature: { en: 'BBC nature documentary narrator', ja: 'BBC自然ドキュメンタリーナレーター' },
+    documentary: { en: 'historical documentarian', ja: '歴史ドキュメンタリストの語り口' },
+    anime: { en: 'anime narrator with passion', ja: '熱血アニメナレーター' },
+  };
+
+  const styleDesc = styleDescriptions[style]?.[isEnglish ? 'en' : 'ja'] || style;
+
+  const prompt = isEnglish
+    ? `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show narrated by a ${styleDesc}. No greeting, no explanation. Just one sentence.
 
 CRITICAL: The narration MUST be short enough to be spoken in ${maxDurationSeconds} seconds or less when read aloud at normal speaking pace (approximately ${Math.floor(maxDurationSeconds * 2.5)} words maximum).
 
@@ -65,7 +82,20 @@ Phase: ${phase}
 Remaining Time: ${remainingTime}/${totalTime} seconds.
 Maximum narration duration: ${maxDurationSeconds} seconds.
 
-Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`;
+${languageNote}
+Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
+    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。
+
+重要：ナレーションは通常の話すペース（約${Math.floor(maxDurationSeconds * 2.5)}語の最大値）で朗読する場合、${maxDurationSeconds}秒以内の長さである必要があります。
+
+料理名: ${dishName}
+スタイル: ${style}
+フェーズ: ${phase}
+残り時間: ${remainingTime}/${totalTime}秒
+最大ナレーション時間: ${maxDurationSeconds}秒
+
+${languageNote}
+簡潔にしてください - AI音声は${maxDurationSeconds}秒以内に話し終わる必要があります！`;
 
   let narrationText = "";
 
@@ -119,7 +149,9 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body: any = await request.json();
   const text = body.text;
-  const voiceId = "JBFqnCBsd6RMkjVDRZzb"; // Optional: make this dynamic
+  const locale = body.locale || 'ja';
+
+  const voiceId = locale === 'en' ? '5pPXnKrQTMV5dNWwILnl' : 'JBFqnCBsd6RMkjVDRZzb';
 
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",

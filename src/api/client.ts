@@ -822,12 +822,14 @@ async function requestAgentNarration(
 }
 
 async function generateTtsBlob(text: string, locale: string = "ja"): Promise<Blob> {
+  const normalizedLocale = locale.startsWith('en') ? 'en' : 'ja';
+
   const ttsRes = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
-      locale,
+      locale: normalizedLocale,
     }),
     signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
   });
