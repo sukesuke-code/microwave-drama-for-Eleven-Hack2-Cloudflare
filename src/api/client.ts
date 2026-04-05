@@ -163,6 +163,7 @@ export interface AgentNarrationRequest {
   remainingTime: number;
   phase: SessionPhase;
   locale?: string;
+  maxDuration?: number;
 }
 
 export interface AgentNarrationResponse {
@@ -739,12 +740,15 @@ Sound direction:
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
+  const maxDuration = request.maxDuration ?? (request.totalTime - 1);
+
   const sanitizedRequest: AgentNarrationRequest = {
     ...request,
     sessionId: request.sessionId ? normalizeTextInput(request.sessionId, 120) : undefined,
     dishName: normalizeTextInput(request.dishName, MAX_DISH_NAME_LENGTH),
     totalTime: Math.max(1, Math.min(600, Math.floor(request.totalTime))),
     remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
+    maxDuration: Math.max(1, Math.min(600, Math.floor(maxDuration))),
   };
 
   let narrationText = "";

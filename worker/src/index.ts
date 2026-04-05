@@ -53,11 +53,19 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
   const body: any = await request.json();
   const { dishName, style, phase, remainingTime, totalTime } = body;
 
+  const maxDurationSeconds = totalTime - 1;
+
   const prompt = `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show. No greeting, no explanation. Just one sentence.
+
+CRITICAL: The narration MUST be short enough to be spoken in ${maxDurationSeconds} seconds or less when read aloud at normal speaking pace (approximately ${Math.floor(maxDurationSeconds * 2.5)} words maximum).
+
 Dish: ${dishName}
 Style: ${style}
 Phase: ${phase}
-Remaining Time: ${remainingTime}/${totalTime} seconds.`;
+Remaining Time: ${remainingTime}/${totalTime} seconds.
+Maximum narration duration: ${maxDurationSeconds} seconds.
+
+Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`;
 
   let narrationText = "";
 
@@ -96,7 +104,6 @@ Remaining Time: ${remainingTime}/${totalTime} seconds.`;
     narrationText = `おおっと！${dishName}の調理が白熱しているぞ！残り${remainingTime}秒だー！`;
   }
 
-  // Clean up excessive newlines or quotes
   narrationText = narrationText.replace(/[\r\n]+/g, " ").replace(/"/g, "").trim();
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
