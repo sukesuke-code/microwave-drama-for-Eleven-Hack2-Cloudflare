@@ -11,6 +11,8 @@ const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 const MAX_TEXT_PAYLOAD_LENGTH = 280;
 const MAX_DISH_NAME_LENGTH = 100;
 const EFFECT_RATE_LIMIT_MS = 1500;
+const ENGLISH_WORDS_PER_SECOND = 2.4;
+const JAPANESE_CHARS_PER_SECOND = 5.2;
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
@@ -34,6 +36,56 @@ function normalizeTextInput(input: string, maxLen: number): string {
     output += isControl ? " " : char;
   }
   return output.replace(/\s+/g, " ").trim().slice(0, maxLen);
+}
+
+function estimateNarrationDurationSeconds(text: string, locale = "ja"): number {
+  const normalized = normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH);
+  if (!normalized) return 0;
+  const isEnglish = locale.startsWith("en");
+  if (isEnglish) {
+    const words = normalized.split(/\s+/).filter(Boolean).length;
+    return words / ENGLISH_WORDS_PER_SECOND;
+  }
+  const charCount = normalized.replace(/\s+/g, "").length;
+  return charCount / JAPANESE_CHARS_PER_SECOND;
+}
+
+function fitNarrationWithinDuration(
+  text: string,
+  maxDurationSeconds: number,
+  locale = "ja"
+): string {
+  const normalized = normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH);
+  if (!normalized) return "";
+
+  const durationLimit = Math.max(1, Math.floor(maxDurationSeconds));
+  if (estimateNarrationDurationSeconds(normalized, locale) <= durationLimit) {
+    return normalized;
+  }
+
+  const sentenceCandidates = normalized
+    .split(/(?<=[。！？.!?])/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  let candidate = "";
+  for (const segment of sentenceCandidates) {
+    const proposed = candidate ? `${candidate} ${segment}` : segment;
+    if (estimateNarrationDurationSeconds(proposed, locale) > durationLimit) break;
+    candidate = proposed;
+  }
+
+  if (candidate) return candidate;
+
+  if (locale.startsWith("en")) {
+    const words = normalized.split(/\s+/).filter(Boolean);
+    const maxWords = Math.max(3, Math.floor(durationLimit * ENGLISH_WORDS_PER_SECOND));
+    return words.slice(0, maxWords).join(" ").trim();
+  }
+
+  const chars = Array.from(normalized.replace(/\s+/g, ""));
+  const maxChars = Math.max(6, Math.floor(durationLimit * JAPANESE_CHARS_PER_SECOND));
+  return chars.slice(0, maxChars).join("").trim();
 }
 
 function ensureSafeApiBase(): void {
@@ -749,7 +801,8 @@ Sound direction:
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
-  const maxDuration = request.maxDuration ?? (request.totalTime - 1);
+  const maxAllowedByRemaining = Math.max(1, Math.floor(request.remainingTime) - 1);
+  const maxDuration = request.maxDuration ?? maxAllowedByRemaining;
 
   const sanitizedRequest: AgentNarrationRequest = {
     ...request,
@@ -757,7 +810,10 @@ async function requestAgentNarration(
     dishName: normalizeTextInput(request.dishName, MAX_DISH_NAME_LENGTH),
     totalTime: Math.max(1, Math.min(600, Math.floor(request.totalTime))),
     remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
-    maxDuration: Math.max(1, Math.min(600, Math.floor(maxDuration))),
+    maxDuration: Math.max(
+      1,
+      Math.min(600, Math.floor(maxDuration), maxAllowedByRemaining)
+    ),
   };
 
   let narrationText = "";
@@ -775,23 +831,27 @@ async function requestAgentNarration(
     });
 
     if (data.ok && data.text) {
-      narrationText = data.text;
+      narrationText = fitNarrationWithinDuration(
+        data.text,
+        sanitizedRequest.maxDuration ?? maxAllowedByRemaining,
+        sanitizedRequest.locale || "ja"
+      );
     }
   } catch (err) {
     logDebug("Backend narration failed, using fallback:", err);
   }
 
   if (!narrationText) {
-    narrationText = buildNarrationCue({
+    narrationText = fitNarrationWithinDuration(buildNarrationCue({
       foodName: sanitizedRequest.dishName,
       style: sanitizedRequest.style,
       phase: sanitizedRequest.phase,
       totalTime: sanitizedRequest.totalTime,
       remainingTime: sanitizedRequest.remainingTime,
-    });
+    }), sanitizedRequest.maxDuration ?? maxAllowedByRemaining, sanitizedRequest.locale || "ja");
   }
 
-  const maxNarrationMs = (sanitizedRequest.totalTime - 1) * 1000;
+  const maxNarrationMs = (sanitizedRequest.maxDuration ?? maxAllowedByRemaining) * 1000;
 
   return {
     text: narrationText,
@@ -900,6 +960,7 @@ async function prepareInitialAssets(
       if (phase === "middle") remainingTime = Math.floor(totalTime * 0.5);
       if (phase === "final") remainingTime = Math.floor(totalTime * 0.25);
       if (phase === "done") remainingTime = 0;
+      const maxDuration = Math.max(1, remainingTime - 1);
 
       const narration = await requestAgentNarration({
         sessionId: session.sessionId,
@@ -909,6 +970,7 @@ async function prepareInitialAssets(
         remainingTime,
         phase,
         locale,
+        maxDuration,
       });
 
       // Provide dynamic music/sfx prompts
@@ -921,13 +983,9 @@ async function prepareInitialAssets(
       if (phase === "done") { musicPrompt = null; sfxPrompt = `victory finish sound for ${style}`; }
 
       const audioPromises = {
-        // Only opening narration strictly throws if TTS fails, others fallback to local TTS on client gracefully
-        narration: generateTtsBlob(narration.text, locale).catch(e => {
-          if (phase === "opening") throw e;
-          return undefined;
-        }),
-        music: musicPrompt ? generateMusicBlob(musicPrompt).catch(() => undefined) : Promise.resolve(undefined),
-        sfx: sfxPrompt ? generateSfxBlob(sfxPrompt).catch(() => undefined) : Promise.resolve(undefined),
+        narration: generateTtsBlob(narration.text, locale),
+        music: musicPrompt ? generateMusicBlob(musicPrompt) : Promise.resolve(undefined),
+        sfx: sfxPrompt ? generateSfxBlob(sfxPrompt) : Promise.resolve(undefined),
       };
 
       const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
@@ -938,17 +996,21 @@ async function prepareInitialAssets(
 
       allPhases[phase] = {
         narrationText: narration.text,
-        narrationAudio: narrationAudio as Blob | undefined,
+        narrationAudio: narrationAudio as Blob,
         musicAudio,
         sfxAudio,
       };
     })
   );
 
+  if (!allPhases.opening.narrationText || !allPhases.opening.narrationAudio || !allPhases.opening.musicAudio || !allPhases.opening.sfxAudio) {
+    throw new Error("OPENING_ASSETS_NOT_READY");
+  }
+
   return {
     session,
     narrationText: allPhases["opening"].narrationText,
-    narrationAudio: allPhases["opening"].narrationAudio as Blob, // Guarenteed by the throw above
+    narrationAudio: allPhases["opening"].narrationAudio as Blob,
     musicAudio: allPhases["opening"].musicAudio,
     sfxAudio: allPhases["opening"].sfxAudio,
     allPhases,

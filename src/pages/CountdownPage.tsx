@@ -42,6 +42,7 @@ export default function CountdownPage({
   const [ttsLevel, setTtsLevel] = useState(0);
   const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback' | 'connecting'>('connecting');
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+  const [isCountdownActive, setIsCountdownActive] = useState(false);
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,6 +73,10 @@ export default function CountdownPage({
   useEffect(() => {
     isFinishedRef.current = isFinished;
   }, [isFinished]);
+
+  useEffect(() => {
+    setIsCountdownActive(false);
+  }, [settings.sessionId, totalSeconds, dishName, style, voiceLanguage]);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -218,6 +223,12 @@ export default function CountdownPage({
           console.log("[CountdownPage] Playing pre-fetched opening audio immediately...");
           const maxNarrationMs = (totalSeconds - 1) * 1000;
           const tasks: Promise<void>[] = [];
+          let countdownStarted = false;
+          const startCountdown = () => {
+            if (countdownStarted) return;
+            countdownStarted = true;
+            setIsCountdownActive(true);
+          };
 
           if (initialAssets.narrationAudio) {
             tasks.push(api.playAudioBlob(initialAssets.narrationAudio, {
@@ -225,6 +236,7 @@ export default function CountdownPage({
               maxDurationMs: maxNarrationMs,
               onStart: () => {
                 console.log("[CountdownPage] Narration audio started playing");
+                startCountdown();
               }
             }));
           }
@@ -236,6 +248,9 @@ export default function CountdownPage({
             tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true, volume: 0.25 }));
           }
 
+          if (!initialAssets.narrationAudio) {
+            startCountdown();
+          }
           await Promise.all(tasks).catch(console.error);
         }
         return;
@@ -267,6 +282,8 @@ export default function CountdownPage({
         setSessionMode('local-fallback');
         sessionStorage.setItem('sessionMode', 'local-fallback');
       }
+
+      setIsCountdownActive(true);
     }
 
     initSession();
@@ -324,11 +341,11 @@ export default function CountdownPage({
             console.log(`[CountdownPage] Using pre-fetched assets for ${phase}`);
             currentText = preFetched.narrationText;
             playAudio = async (onReady) => {
-              const maxNarrationMs = (totalSeconds - 1) * 1000;
+              const phaseMaxNarrationMs = Math.max(1, timeLeft - 1) * 1000;
               const tasks: Promise<void>[] = [];
 
               if (preFetched.narrationAudio) {
-                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { volume: 1, maxDurationMs: maxNarrationMs, onStart: onReady }));
+                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { volume: 1, maxDurationMs: phaseMaxNarrationMs, onStart: onReady }));
               }
               if (preFetched.musicAudio) {
                 tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.15 }));
@@ -404,7 +421,7 @@ export default function CountdownPage({
   }, []);
 
   useEffect(() => {
-    if (isPaused || isFinished) return;
+    if (isPaused || isFinished || !isCountdownActive) return;
 
     intervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -442,7 +459,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone, isCountdownActive]);
 
   useEffect(() => () => {
     if (flashTimeoutRef.current) {
