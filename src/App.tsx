@@ -60,10 +60,12 @@ function readSettings(): Settings | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<Settings>;
+    const validStyles = ['sports', 'movie', 'horror', 'nature', 'documentary', 'anime'];
     if (
       typeof parsed.totalSeconds === 'number' &&
       typeof parsed.dishName === 'string' &&
-      (parsed.style === 'sports' || parsed.style === 'movie' || parsed.style === 'horror' || parsed.style === 'nature')
+      typeof parsed.style === 'string' &&
+      validStyles.includes(parsed.style)
     ) {
       return {
         totalSeconds: parsed.totalSeconds,

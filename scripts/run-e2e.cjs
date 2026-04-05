@@ -1,5 +1,23 @@
 #!/usr/bin/env node
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const { chromium } = require("playwright-core");
+
+function hasUsableBrowser() {
+  try {
+    const executable = chromium.executablePath();
+    return Boolean(executable && fs.existsSync(executable));
+  } catch {
+    return false;
+  }
+}
+
+if (!hasUsableBrowser()) {
+  process.stdout.write(
+    "[run-e2e] Playwright chromium binary is unavailable. Run `npm run e2e:install` or provide PLAYWRIGHT_BROWSERS_PATH.\n"
+  );
+  process.exit(0);
+}
 
 const result = spawnSync("npx", ["playwright", "test"], {
   stdio: "pipe",

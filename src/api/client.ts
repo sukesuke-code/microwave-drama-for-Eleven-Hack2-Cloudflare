@@ -5,6 +5,7 @@ const API_BASE =
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
 const DEFAULT_RETRY_COUNT = 1;
+const DEFAULT_BINARY_RETRY_COUNT = 2;
 const AUDIO_METER_FPS = 30;
 const IS_DEV = import.meta.env.DEV;
 const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -111,13 +112,6 @@ function logDebug(...args: unknown[]): void {
   }
 }
 
-function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
-    return AbortSignal.timeout(timeoutMs);
-  }
-  return undefined;
-}
-
 async function requestJson<T>(
   path: string,
   init?: RequestInit
@@ -173,14 +167,83 @@ async function requestJson<T>(
   throw lastError || new Error("REQUEST_FAILED");
 }
 
+async function requestBinary(
+  path: string,
+  init: RequestInit,
+  timeoutMs: number,
+  retryCount = DEFAULT_BINARY_RETRY_COUNT
+): Promise<Response> {
+  ensureSafeApiBase();
+  const url = `${API_BASE}${path}`;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    const controller = new AbortController();
+    const timerId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: init.signal ?? controller.signal,
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      const isRetryable = RETRYABLE_HTTP_STATUS.has(response.status);
+      if (isRetryable && attempt < retryCount) {
+        const backoffMs = 250 * (attempt + 1);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+
+      const body = await response.text().catch(() => "");
+      throw new Error(`HTTP_${response.status}:${body}`);
+    } catch (err) {
+      lastError = err;
+      const isAbort = (err as Error).name === "AbortError";
+      const isNetwork = (err as Error).message?.includes("fetch") || (err as Error).message?.includes("Network");
+      if ((isAbort || isNetwork) && attempt < retryCount) {
+        const backoffMs = 300 * (attempt + 1);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      break;
+    } finally {
+      clearTimeout(timerId);
+    }
+  }
+
+  throw lastError || new Error("BINARY_REQUEST_FAILED");
+}
+
 import { 
   InitialAssets, 
   NarrationStyle, 
+  PhaseAssets,
   Session, 
   SessionPhase 
 } from '../types';
 
 export type { InitialAssets, NarrationStyle, Session, SessionPhase };
+
+const PHASE_ORDER: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
+const phaseAssetCache = new Map<string, Partial<Record<SessionPhase, PhaseAssets>>>();
+const MAX_PHASE_CACHE_SESSIONS = 20;
+
+function setPhaseAssetCache(sessionId: string, assets: Partial<Record<SessionPhase, PhaseAssets>>): void {
+  if (phaseAssetCache.has(sessionId)) {
+    phaseAssetCache.delete(sessionId);
+  }
+  phaseAssetCache.set(sessionId, assets);
+  if (phaseAssetCache.size > MAX_PHASE_CACHE_SESSIONS) {
+    const oldestKey = phaseAssetCache.keys().next().value;
+    if (oldestKey) {
+      phaseAssetCache.delete(oldestKey);
+    }
+  }
+}
 
 type TtsLevelListener = (level: number) => void;
 
@@ -798,6 +861,78 @@ Sound direction:
 - Match sound design to style and phase`;
 }
 
+function getPhaseRemainingTime(totalTime: number, phase: SessionPhase): number {
+  if (phase === "quarter") return Math.floor(totalTime * 0.75);
+  if (phase === "middle") return Math.floor(totalTime * 0.5);
+  if (phase === "final") return Math.floor(totalTime * 0.25);
+  if (phase === "done") return 0;
+  return totalTime;
+}
+
+function getPhaseEffectPrompts(style: NarrationStyle, phase: SessionPhase): { musicPrompt: string | null; sfxPrompt: string | null } {
+  if (phase === "opening") {
+    return {
+      musicPrompt: `opening tension music for ${style}`,
+      sfxPrompt: `microwave start sound for ${style}`,
+    };
+  }
+  if (phase === "quarter" || phase === "middle") {
+    return {
+      musicPrompt: null,
+      sfxPrompt: `subtle transition accent for ${style}`,
+    };
+  }
+  if (phase === "final") {
+    return {
+      musicPrompt: `intense climax music for ${style}`,
+      sfxPrompt: `tension build effect for ${style}`,
+    };
+  }
+  return {
+    musicPrompt: null,
+    sfxPrompt: `victory finish sound for ${style}`,
+  };
+}
+
+async function buildPhaseAssets(input: {
+  sessionId: string;
+  foodName: string;
+  totalTime: number;
+  style: NarrationStyle;
+  locale: string;
+  phase: SessionPhase;
+}): Promise<PhaseAssets> {
+  const { sessionId, foodName, totalTime, style, locale, phase } = input;
+  const remainingTime = getPhaseRemainingTime(totalTime, phase);
+  const maxDuration = Math.max(1, remainingTime - 1);
+
+  const narration = await requestAgentNarration({
+    sessionId,
+    style,
+    dishName: foodName,
+    totalTime,
+    remainingTime,
+    phase,
+    locale,
+    maxDuration,
+  });
+
+  const { musicPrompt, sfxPrompt } = getPhaseEffectPrompts(style, phase);
+
+  const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
+    generateTtsBlob(narration.text, locale),
+    musicPrompt ? generateMusicBlob(musicPrompt) : Promise.resolve(undefined),
+    sfxPrompt ? generateSfxBlob(sfxPrompt) : Promise.resolve(undefined),
+  ]);
+
+  return {
+    narrationText: narration.text,
+    narrationAudio,
+    musicAudio,
+    sfxAudio,
+  };
+}
+
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
@@ -815,6 +950,34 @@ async function requestAgentNarration(
       Math.min(600, Math.floor(maxDuration), maxAllowedByRemaining)
     ),
   };
+
+  const cachedPhaseAsset = sanitizedRequest.sessionId
+    ? phaseAssetCache.get(sanitizedRequest.sessionId)?.[sanitizedRequest.phase]
+    : undefined;
+
+  if (cachedPhaseAsset?.narrationText) {
+    return {
+      text: cachedPhaseAsset.narrationText,
+      play: async (onReady?: () => void) => {
+        if (cachedPhaseAsset.narrationAudio) {
+          await playAudioBlob(cachedPhaseAsset.narrationAudio, {
+            loop: false,
+            volume: 1,
+            isMusic: false,
+            maxDurationMs: (sanitizedRequest.maxDuration ?? maxAllowedByRemaining) * 1000,
+            onStart: onReady,
+          });
+          return;
+        }
+        await playLocalNarration(
+          cachedPhaseAsset.narrationText,
+          sanitizedRequest.locale || "ja",
+          onReady,
+          (sanitizedRequest.maxDuration ?? maxAllowedByRemaining) * 1000
+        );
+      },
+    };
+  }
 
   let narrationText = "";
 
@@ -860,15 +1023,18 @@ async function requestAgentNarration(
       if (!narrationText) return;
 
       try {
-        const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
-            locale: sanitizedRequest.locale || "ja",
-          }),
-          signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-        });
+        const ttsRes = await requestBinary(
+          "/api/tts",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
+              locale: sanitizedRequest.locale || "ja",
+            }),
+          },
+          DEFAULT_AUDIO_TIMEOUT_MS
+        );
 
         if (ttsRes.ok) {
           const blob = await parseAudioBlob(ttsRes);
@@ -892,49 +1058,46 @@ async function requestAgentNarration(
 async function generateTtsBlob(text: string, locale: string = "ja"): Promise<Blob> {
   const normalizedLocale = locale.startsWith('en') ? 'en' : 'ja';
 
-  const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
-      locale: normalizedLocale,
-    }),
-    signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-  });
-
-  if (!ttsRes.ok) {
-    throw new Error(`TTS generation failed: ${ttsRes.status}`);
-  }
+  const ttsRes = await requestBinary(
+    "/api/tts",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
+        locale: normalizedLocale,
+      }),
+    },
+    DEFAULT_AUDIO_TIMEOUT_MS
+  );
 
   return parseAudioBlob(ttsRes);
 }
 
 async function generateSfxBlob(prompt: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`SFX generation failed: ${res.status}`);
-  }
+  const res = await requestBinary(
+    "/api/generate-sfx",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    },
+    DEFAULT_REQUEST_TIMEOUT_MS + 5000
+  );
 
   return parseAudioBlob(res);
 }
 
 async function generateMusicBlob(prompt: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/generate-music`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Music generation failed: ${res.status}`);
-  }
+  const res = await requestBinary(
+    "/api/generate-music",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    },
+    DEFAULT_REQUEST_TIMEOUT_MS + 8000
+  );
 
   return parseAudioBlob(res);
 }
@@ -946,73 +1109,48 @@ async function prepareInitialAssets(
   style: NarrationStyle,
   locale: string = "ja"
 ): Promise<InitialAssets> {
-  // 1. Start Session
   const session = await startSession(foodName, totalTime, style);
+  const allPhases: Partial<Record<SessionPhase, PhaseAssets>> = {};
 
-  const phases: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
-  const allPhases = {} as Record<SessionPhase, import('../types').PhaseAssets>;
+  // Prioritize opening phase for quick app start.
+  allPhases.opening = await buildPhaseAssets({
+    sessionId: session.sessionId,
+    foodName,
+    totalTime,
+    style,
+    locale,
+    phase: "opening",
+  });
+  setPhaseAssetCache(session.sessionId, allPhases);
 
-  // 2. Concurrently prepare ALL phases
-  await Promise.all(
-    phases.map(async (phase) => {
-      let remainingTime = totalTime;
-      if (phase === "quarter") remainingTime = Math.floor(totalTime * 0.75);
-      if (phase === "middle") remainingTime = Math.floor(totalTime * 0.5);
-      if (phase === "final") remainingTime = Math.floor(totalTime * 0.25);
-      if (phase === "done") remainingTime = 0;
-      const maxDuration = Math.max(1, remainingTime - 1);
-
-      const narration = await requestAgentNarration({
-        sessionId: session.sessionId,
-        style,
-        dishName: foodName,
-        totalTime,
-        remainingTime,
-        phase,
-        locale,
-        maxDuration,
-      });
-
-      // Provide dynamic music/sfx prompts
-      let musicPrompt: string | null = null;
-      let sfxPrompt: string | null = null;
-
-      if (phase === "opening") { musicPrompt = `opening tension music for ${style}`; sfxPrompt = `microwave start sound for ${style}`; }
-      if (phase === "quarter" || phase === "middle") { sfxPrompt = `subtle transition accent for ${style}`; }
-      if (phase === "final") { musicPrompt = `intense climax music for ${style}`; sfxPrompt = `tension build effect for ${style}`; }
-      if (phase === "done") { musicPrompt = null; sfxPrompt = `victory finish sound for ${style}`; }
-
-      const audioPromises = {
-        narration: generateTtsBlob(narration.text, locale),
-        music: musicPrompt ? generateMusicBlob(musicPrompt) : Promise.resolve(undefined),
-        sfx: sfxPrompt ? generateSfxBlob(sfxPrompt) : Promise.resolve(undefined),
-      };
-
-      const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
-        audioPromises.narration,
-        audioPromises.music,
-        audioPromises.sfx,
-      ]);
-
-      allPhases[phase] = {
-        narrationText: narration.text,
-        narrationAudio: narrationAudio as Blob,
-        musicAudio,
-        sfxAudio,
-      };
-    })
-  );
-
-  if (!allPhases.opening.narrationText || !allPhases.opening.narrationAudio || !allPhases.opening.musicAudio || !allPhases.opening.sfxAudio) {
-    throw new Error("OPENING_ASSETS_NOT_READY");
-  }
+  // Background prefetch for remaining phases to keep later transitions smooth
+  // while avoiding burst traffic spikes against external audio providers.
+  const deferredPhases = PHASE_ORDER.filter((phase) => phase !== "opening");
+  void (async () => {
+    for (const phase of deferredPhases) {
+      try {
+        const assets = await buildPhaseAssets({
+          sessionId: session.sessionId,
+          foodName,
+          totalTime,
+          style,
+          locale,
+          phase,
+        });
+        allPhases[phase] = assets;
+      } catch (err) {
+        logDebug(`Deferred phase prefetch failed for ${phase}`, err);
+      }
+    }
+    setPhaseAssetCache(session.sessionId, allPhases);
+  })();
 
   return {
     session,
-    narrationText: allPhases["opening"].narrationText,
-    narrationAudio: allPhases["opening"].narrationAudio as Blob,
-    musicAudio: allPhases["opening"].musicAudio,
-    sfxAudio: allPhases["opening"].sfxAudio,
+    narrationText: allPhases.opening.narrationText,
+    narrationAudio: allPhases.opening.narrationAudio as Blob,
+    musicAudio: allPhases.opening.musicAudio,
+    sfxAudio: allPhases.opening.sfxAudio,
     allPhases,
   };
 }
@@ -1180,12 +1318,15 @@ async function playSfx(prompt: string): Promise<void> {
   enforceEffectRateLimit("sfx");
 
   try {
-    const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-    });
+    const res = await requestBinary(
+      "/api/generate-sfx",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      },
+      DEFAULT_REQUEST_TIMEOUT_MS + 5000
+    );
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
@@ -1203,12 +1344,15 @@ async function playMusic(prompt: string): Promise<void> {
   enforceEffectRateLimit("music");
 
   try {
-    const res = await fetch(`${API_BASE}/api/generate-music`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
-    });
+    const res = await requestBinary(
+      "/api/generate-music",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      },
+      DEFAULT_REQUEST_TIMEOUT_MS + 8000
+    );
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);

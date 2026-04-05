@@ -1,167 +1,216 @@
 # Microwave Show
 
-> **As of April 5, 2026**, this repository is a React + Cloudflare Worker app that turns microwave waiting time into a short, dramatic narration experience with generated voice/SFX/music.
+> **Last audited: April 5, 2026 (UTC)**
+> React + TypeScript + Vite frontend with Cloudflare Worker backend.
 
 ---
 
 ## English
 
-### 1) What this app is (current implementation)
+### TL;DR (Conclusion First)
+Microwave Show is a creative, short-session entertainment app that turns microwave wait time into an AI-narrated mini show. The current implementation is usable and visually strong, but for commercial launch you still need stricter abuse controls (auth/rate limiting), clearer production hardening, and stronger defensibility (moat). This README documents the app as-is, without exposing sensitive implementation details that would create avoidable security risk.
 
-Microwave Show is an entertainment web app with a 4-screen flow:
-1. Landing (`TopPage`)
-2. Input/settings (`SettingsPage`)
-3. Live countdown with narration/audio effects (`CountdownPage`)
-4. Result/share (`ResultPage`)
+---
 
-It supports Japanese/English UI and dark/light themes.
+## 1) Product Overview (What it does now)
 
-### 2) Stack and architecture (fact-based)
+Current user flow:
+1. **Top page** (`TopPage`)
+2. **Settings page** (`SettingsPage`): time, dish name, narration style, voice language
+3. **Countdown page** (`CountdownPage`): live narration + TTS + music/SFX + visual effects
+4. **Result page** (`ResultPage`): replay/home/top actions
 
-#### Frontend
+Implemented experience:
+- Bilingual UI (`ja` / `en`)
+- Dark/light theme toggle
+- AI narration + synthesized voice + generated SFX/music (with local fallback behavior)
+
+---
+
+## 2) UI Analysis (Simple & Intuitive?)
+
+### What is already good
+- **Single primary action per screen** keeps navigation understandable.
+- **Progressive disclosure flow** avoids dumping all options at once.
+- **Preset durations** reduce input effort.
+- **Immediate feedback** (audio + motion + text) sustains engagement in short sessions.
+
+### Where UX friction still exists
+- Visual/audio density is intentionally high; some users may feel sensory overload.
+- Choice set in settings can increase decision time for first-time users.
+- Error states are user-friendly, but loading-stage transparency could be more explicit.
+
+### Low-risk UX improvements (without changing the brand style)
+- Add a **Quick Start** CTA (default 60s + default style).
+- Add **Reduced Effects** mode for accessibility/performance-sensitive devices.
+- Add explicit loading phases (“Preparing narration”, “Generating voice”, etc.).
+
+---
+
+## 3) Technical Architecture (Fact-based)
+
+### Frontend
 - React + TypeScript + Vite
-- Tailwind CSS for styling
-- Main app state is local (`useState`) plus browser storage (`localStorage`, `sessionStorage`)
+- Tailwind CSS
+- Lazy-loaded page modules (`SettingsPage`, `CountdownPage`, `ResultPage`)
+- Local persistence via `localStorage` / `sessionStorage`
 
-#### Backend (edge)
-- Cloudflare Worker (`worker/src/index.ts`) with REST endpoints:
-  - `POST /api/agent/narration`
-  - `POST /api/tts`
-  - `POST /api/generate-sfx`
-  - `POST /api/generate-music`
-  - mock session endpoints for `/api/session/*`
+### Backend (Cloudflare Worker)
+Exposed routes currently include:
+- `POST /api/agent/narration`
+- `POST /api/tts`
+- `POST /api/generate-sfx`
+- `POST /api/generate-music`
+- `POST /api/session/*` (compatibility-style mocked response path)
 
-#### AI/voice providers used
-- Narration text generation: Gemini API (if key exists) then Workers AI fallback
-- Voice and sound generation: ElevenLabs APIs
+### Providers
+- Text generation: Gemini (if configured), fallback Workers AI
+- Voice/SFX/Music: ElevenLabs APIs
 
-### 3) Cloudflare × ElevenLabs hackathon fit
+### Infrastructure flow diagram (current + target-enhanced path)
 
-Prompt requirement summary:
-- Build something creative using Cloudflare platform + ElevenLabs
-- Emphasize Workers, Durable Objects, scalable AI agents, and viral demo quality
+```text
+[User Browser / Mobile WebView]
+        |
+        v
+[Vite React Frontend @ Edge CDN]
+        |
+        v
+[Cloudflare Worker API Gateway]
+   |          |              |
+   |          |              +--> [Durable Objects] (session state / orchestration target)
+   |          |
+   |          +--> [Workers AI] (fallback inference)
+   |
+   +--> [ElevenLabs APIs]
+           |- TTS
+           |- SFX / Music generation
+           |- (Optional future) Conversational voice agents
 
-How this repo fits **today**:
-- ✅ Creative consumer-facing concept and UI polish
-- ✅ Uses Cloudflare Worker as backend entrypoint
-- ✅ Uses ElevenLabs voice/sound APIs
-- ⚠️ Durable Objects are not currently wired into active routing in `worker/src/index.ts` (a DO class file exists but is not bound/used in the running API path)
-- ⚠️ Cloudflare Agents-specific platform features (durable execution orchestration, browser rendering, vector memory workflows) are not fully implemented
+Optional platform tools for scale:
+  - Browser Rendering (automated viral-video capture pipeline)
+  - Vectorize (style memory / retrieval / personalization)
+```
 
-### 4) Product analysis
+### Cloudflare Agents + ElevenLabs design intent (explicit mapping)
+- **Workers (compute):** request routing, auth/rate-limit hooks, and orchestration logic at the edge.
+- **Workers AI (inference):** low-latency fallback/primary model inference depending environment and cost profile.
+- **Durable Objects (state):** authoritative per-session agent state, timing phases, and replay consistency.
+- **Browser Rendering (tooling):** automated social-video capture pipeline for submission/UGC export.
+- **Vectorize (memory):** style-history retrieval and user preference memory for personalized narration.
+- **ElevenLabs APIs:** production-grade TTS + SFX/music + (optional) conversational voice-agent layer.
 
-#### Functional value
-- Converts idle microwave time into playful voice-first entertainment
-- Strong short-session engagement loop (set time → experience → share/replay)
+### Current vs target architecture maturity
+- **Current:** Worker + ElevenLabs flow is active; some agent-platform elements are partial.
+- **Target:** full Cloudflare Agents posture (durable execution + inference + memory + rendering) with measurable SLOs and cost controls.
+- **Submission expectation:** demonstrate a creative, viral-quality user journey that proves edge reliability and voice quality under real usage.
 
-#### Demand hypothesis
-- Best fit: casual social sharing, novelty UX, short-form content creators
-- Weak fit: utility-first users who only want a plain timer
+---
 
-#### Competition landscape (inference)
-- Adjacent alternatives: timer apps, novelty voice generators, meme apps
-- Direct competitors with same niche concept are likely limited, but low entry barriers mean imitators are easy
+## 4) Code Review Summary (Brutally Honest)
 
-#### Differentiation opportunities
-- Session persistence and synchronized multi-device “watch party” mode
-- More style packs and creator voices
-- One-click auto video export for social posting
-- Personalized narrator identity over repeated sessions
+### Strong points
+- Frontend already includes fallback handling and progressive loading behavior.
+- Audio paths are resilient compared to a naive direct-call implementation.
+- Input sanitization and bounded payload handling exist in worker paths.
 
-#### Moat assessment (current)
-- **Weak moat now**: concept is creative but replicable
-- Potential moat sources:
-  - proprietary prompt/audio timing orchestration quality
-  - viral content loop + community templates
-  - historical user taste profiles for “best narration style” personalization
+### Risks that still matter
+- **CORS wildcard (`*`) + no user auth** means abuse protection is still weak for public deployment.
+- Session endpoints are compatibility/mocked style; if you need strict server authority/state integrity, backend contract should be tightened.
+- Worker code is still monolithic; long-term maintainability would benefit from route/service separation.
 
-#### Monetization options
-- Freemium: free base styles, paid premium voices/themes
-- Credits: pay-per-premium render/audio bundle
-- B2B brand collab: themed seasonal narration packs
-- UGC affiliate loop: branded share templates
+### Priority fixes for production
+1. Add auth and per-IP/user rate limits at the edge.
+2. Add abuse telemetry and request anomaly alerts.
+3. Move provider adapters to isolated modules + contract tests.
+4. Define explicit SLOs (latency/error budget) and enforce with CI gates.
 
-### 5) UI/UX evaluation (strict)
+---
 
-#### What is strong
-- Clear 1-primary-action screens and progressive flow
-- Immediate visual identity (neon/hero treatment)
-- Bilingual support and theme toggling on key screens
-- Time presets reduce input friction
+## 5) Security, Visibility, and Access Control
 
-#### What harms “simple & intuitive”
-- Visual density is intentionally high; this can overwhelm first-time users
-- Style card count is high for a short interaction and may increase decision time
-- Multiple simultaneous effects (narration + music + sfx + flashes) can feel noisy on low-end devices
+### “Can outsiders see README and backend code?”
+- If this repository is **public**, both `README.md` and backend source (`worker/`) are visible by design.
+- Deployed worker endpoints are internet-reachable unless access controls are added.
+- API secrets should remain server-side via Wrangler secrets (never commit secrets in repo).
 
-#### Practical UX improvements (without redesigning concept)
-- Add “Quick Start (60s + default style)” shortcut
-- Add “Reduced Effects” accessibility toggle
-- Keep selected style/time visible as persistent compact summary during countdown
-- Add explicit loading stages (“Generating narration”, “Generating voice”) for trust
+### Is backend inaccessible from outside by default?
+- **No.** A deployed HTTP API is externally reachable by default.
+- To restrict access, add auth tokens, signed requests, origin policy checks, and rate limiting.
 
-### 6) Code review (high-priority findings)
+---
 
-#### Security / privacy
-- Secrets are server-side only (good), but CORS is wildcard `*` on all API routes (risk for abuse)
-- No robust per-user auth/rate-limiting at Worker level in current code
-- Frontend fallback allows `VITE_ELEVENLABS_AGENT_ID` usage; operationally convenient but must avoid exposing privileged identifiers/settings
+## 6) Legal / Copyright / Commercial Risk Check (Non-lawyer)
 
-#### Reliability
-- Frontend expects richer session APIs; Worker currently provides simplified/mock session responses for `/api/session/*`
-- Partial mismatch risk between expected session lifecycle and Worker implementation
+### What looks clean today
+- No obvious bundled copyrighted media assets found in repo.
+- Uses OSS dependencies in standard npm workflow.
 
-#### Performance
-- Good: lazy-loaded pages and idle prefetch in `App.tsx`
-- Risk: repeated audio generation calls during phase transitions can add latency and provider cost spikes
+### What still requires legal diligence before commercialization
+- Provider ToS compliance (Gemini, Workers AI, ElevenLabs).
+- Voice/content rights and jurisdiction-specific publicity/impersonation boundaries.
+- Proper license notices and attribution obligations for dependencies.
 
-#### Maintainability
-- Frontend API client is large and multi-responsibility; recommend module split (session, narration, audio, transport)
-- Worker has mixed concerns in one file (routing + provider adapters + prompting)
+> This is a technical/product risk assessment, **not legal advice**. Use counsel for launch-critical decisions.
 
-### 7) Legal/commercial/copyright check (non-lawyer assessment)
+---
 
-- **No obvious embedded third-party copyrighted media files** were found in this repo.
-- Dependencies include OSS packages with their own licenses; commercial use requires preserving license obligations.
-- AI-generated voice/audio output can still create legal risk depending on prompts, model terms, and jurisdiction.
-- ElevenLabs and model provider ToS/policy compliance is essential for commercial launch.
-- If voice cloning or celebrity-like style is introduced later, consent/right-of-publicity checks become critical.
+## 7) Market, Demand, Competition, Differentiation, Moat, Monetization
 
-> This is a technical risk review, not legal advice. For launch decisions, confirm with counsel.
+### Market need
+- Strong for “micro-entertainment in idle moments”.
+- Good fit for social-friendly short interactions.
 
-### 8) Security visibility question: “Can external users see README/backend code?”
+### Competition
+- Adjacent: timer apps, novelty AI voice apps, short meme experiences.
+- Direct niche competition likely limited now, but concept-level imitation is easy.
 
-- If this GitHub repository is public, `README.md` and backend source under `worker/` are visible by design.
-- Current Worker API endpoints are internet-accessible once deployed unless you add auth/network restrictions.
-- The **secret values themselves** are not in source and should remain hidden via Wrangler Secrets.
+### Differentiation opportunities
+- Better timing orchestration quality than generic AI toy apps.
+- Social export + remix loops.
+- Persistent narrator persona tuned to user preference history.
 
-### 9) Accurate setup (complete and current)
+### Moat (current vs target)
+- **Current moat: weak-to-moderate** (creative concept, but replicable).
+- **Target moat:** proprietary orchestration quality + distribution loop + creator ecosystem.
 
-#### Prerequisites
+### Monetization candidates
+- Freemium style packs/voice packs
+- Credit-based premium renders
+- B2B branded seasonal packs
+- Creator partnerships and affiliate content loops
+
+### Submission storyboard (viral-style)
+1. **Hook (0–8s):** “Microwave waiting is boring” → instant transformation teaser.
+2. **Build (8–35s):** style selection + AI narration kickoff + phase escalation visuals/audio.
+3. **Payoff (35–65s):** finish moment + replay/share + alt style in one quick cut.
+4. **Proof (65–90s):** edge reliability/cross-language clip + “built on Cloudflare + ElevenLabs”.
+
+---
+
+## 8) Installation & Runbook (Complete)
+
+### Prerequisites
 - Node.js 18+
 - npm
-- Cloudflare account and Wrangler CLI login
+- Cloudflare account + Wrangler login
 - ElevenLabs API key
 
-#### 9.1 Frontend setup
+### Frontend
 ```bash
 npm install
 cp .env.example .env
+npm run dev
 ```
 
-Edit `.env`:
+Example `.env` values:
 ```dotenv
 VITE_API_BASE=http://localhost:8787
 VITE_API_SESSION_START_PATH=/api/session/start
 VITE_ELEVENLABS_AGENT_ID=
 ```
 
-Run:
-```bash
-npm run dev
-```
-
-#### 9.2 Worker setup
+### Worker (local)
 ```bash
 cd worker
 npm install
@@ -172,166 +221,246 @@ npx wrangler secret put GEMINI_API_KEY
 npx wrangler dev
 ```
 
-### 10) Migration/disaster-recovery note
+### Checks
+```bash
+npm run lint
+npm run typecheck
+npm run build
+# optional e2e bootstrap (tries primary+mirror, skips gracefully if blocked)
+npm run e2e:install
+# optional e2e
+npm run e2e
+```
 
-This repo currently has only a minimal Durable Object migration section in `worker/wrangler.toml`, and active runtime routes do not fully depend on Durable Objects.
-If you need one-command environment recovery, add:
-- explicit schema/state version file,
-- migration script pipeline,
-- smoke test that verifies all required endpoints post-restore.
+---
+
+## 9) Migration / Recovery Note
+
+Current `worker/wrangler.toml` has a minimal migration section.
+For full disaster recovery in production, maintain a single authoritative recovery process that includes:
+- environment bootstrap,
+- secret provisioning,
+- migration/state versioning,
+- post-restore smoke tests.
+
+---
+
+## 10) README Quality Rules (Applied)
+
+This README intentionally avoids:
+- ambiguous or outdated claims,
+- incomplete setup steps,
+- personal/private information,
+- sensitive security implementation details,
+- detailed unfinished internal features.
 
 ---
 
 ## 日本語
 
-### 1) このアプリの実態（現行コード基準）
+### 要約（結論先出し）
+Microwave Show は「待ち時間を短時間エンタメ化する」体験として成立しています。UIも直感的に使える水準です。ただし商用本番で戦うには、**認証・レート制限・不正利用対策・運用監視**がまだ不足しています。ここでは現行コードと運用実態に合わせて、過不足なく説明します。
 
-Microwave Show は、電子レンジ待ち時間を“実況エンタメ化”する Web アプリです。画面フローは以下の4段階です。
-1. ランディング (`TopPage`)
-2. 設定入力 (`SettingsPage`)
-3. カウントダウン実況 (`CountdownPage`)
-4. 結果・共有 (`ResultPage`)
+---
 
-日本語/英語 UI とダーク/ライトテーマに対応しています。
+## 1) プロダクト概要（現状機能）
 
-### 2) 技術構成（事実ベース）
+現在の利用フロー:
+1. **トップ** (`TopPage`)
+2. **設定** (`SettingsPage`)：時間・料理名・スタイル・音声言語
+3. **カウントダウン** (`CountdownPage`)：実況テキスト + 音声 + BGM/SFX + 演出
+4. **結果** (`ResultPage`)：リプレイ/戻る導線
 
-#### フロントエンド
+実装済み体験:
+- 日本語/英語UI
+- ダーク/ライトテーマ
+- AI実況 + 音声生成 + 効果音/音楽生成（ローカルフォールバックあり）
+
+---
+
+## 2) UI分析（シンプルで直感的か）
+
+### 良い点
+- **1画面1主目的**で迷いにくい
+- 段階的フローで理解コストが低い
+- 時間プリセットが入力負荷を下げる
+- フィードバックが速く、短時間体験として没入しやすい
+
+### 課題
+- 演出密度が高く、ユーザーによっては疲れやすい
+- 初回ユーザーには選択肢が多く感じる可能性
+- 生成中の内部ステータス表示が不足
+
+### デザインを壊さない改善案
+- **クイックスタート**（60秒・既定スタイル）
+- **演出軽減モード**（アクセシビリティ/低スペック端末向け）
+- 生成ステージ明示（実況生成中・音声生成中など）
+
+---
+
+## 3) 技術構成（事実ベース）
+
+### フロント
 - React + TypeScript + Vite
 - Tailwind CSS
-- 主要状態管理は `useState` とブラウザストレージ
+- 画面は遅延読み込み
+- `localStorage` / `sessionStorage` で状態保持
 
-#### バックエンド（エッジ）
-- Cloudflare Worker (`worker/src/index.ts`) の REST API
-  - `POST /api/agent/narration`
-  - `POST /api/tts`
-  - `POST /api/generate-sfx`
-  - `POST /api/generate-music`
-  - `/api/session/*` は簡易モック応答
+### バックエンド（Cloudflare Worker）
+- `POST /api/agent/narration`
+- `POST /api/tts`
+- `POST /api/generate-sfx`
+- `POST /api/generate-music`
+- `POST /api/session/*`（互換目的の簡易応答）
 
-#### AI/音声
-- ナレーション文生成: Gemini（キーがある場合）→ Workers AI フォールバック
-- 音声・効果音・音楽: ElevenLabs API
+### 外部AI/音声
+- Gemini（利用可能時）→ Workers AI フォールバック
+- ElevenLabs（音声・効果音・音楽）
 
-### 3) Hackathon 条件との整合性
+### インフラフロー図（現状＋拡張ターゲット）
 
-現状の適合:
-- ✅ Cloudflare Worker + ElevenLabs を使った創造的アプリ
-- ✅ 体験価値は高く、動画映えしやすい
-- ⚠️ Durable Objects はコードファイルはあるが、現行 API ルーティングで本格活用されていない
-- ⚠️ Cloudflare Agents 系の耐久実行/高度オーケストレーションは未実装領域がある
+```text
+[ユーザーブラウザ / モバイルWebView]
+        |
+        v
+[Vite React フロントエンド @ Edge CDN]
+        |
+        v
+[Cloudflare Worker API Gateway]
+   |          |              |
+   |          |              +--> [Durable Objects]（セッション状態/将来のオーケストレーション）
+   |          |
+   |          +--> [Workers AI]（推論フォールバック）
+   |
+   +--> [ElevenLabs APIs]
+           |- TTS
+           |- SFX / 音楽生成
+           |- （将来任意）会話型ボイスエージェント
 
-### 4) 機能・需要・競合・差別化・Moat・収益化
+スケール向け拡張ツール:
+  - Browser Rendering（バイラル動画の自動生成パイプライン）
+  - Vectorize（スタイル記憶/検索/個人最適化）
+```
 
-#### 機能価値
-- “待ち時間の退屈”を“短時間の没入体験”に変換
-- 1セッションが短く、共有導線と相性が良い
+### Cloudflare Agents + ElevenLabs 設計対応（明示）
+- **Workers（計算基盤）:** エッジでのルーティング、認証/制限フック、体験オーケストレーション。
+- **Workers AI（推論）:** 環境やコストに応じた低遅延推論の主経路/フォールバック。
+- **Durable Objects（状態）:** セッションごとの状態整合、フェーズ管理、リプレイ一貫性。
+- **Browser Rendering（ツール）:** 提出動画/UGC動画の自動キャプチャ基盤。
+- **Vectorize（記憶）:** スタイル履歴と嗜好の検索による個人最適実況。
+- **ElevenLabs APIs:** 高品質TTS + 効果音/音楽 + （任意）会話型ボイスエージェント。
 
-#### 需要仮説
-- 強い: SNSで遊ぶ層、ショート動画制作者
-- 弱い: 実用タイマーのみ求める層
+### 現状と目標の成熟度
+- **現状:** Worker + ElevenLabs は稼働、Agents基盤要素は一部段階。
+- **目標:** durable execution + inference + memory + rendering を統合し、SLO/コスト制御まで実装。
+- **提出要件:** 創造性・バイラル品質・エッジ信頼性を同時に示すデモ動画を用意する。
 
-#### 競合（推論）
-- タイマーアプリ、音声遊び系アプリ、ミーム系体験が隣接競合
-- 同コンセプトの直競合は多くない可能性がある一方、模倣コストは低い
+---
 
-#### 差別化案
-- 複数端末同期の同時観戦モード
-- 音声スタイルの拡張・パーソナライズ
-- SNS向け動画自動書き出し
-- リピートで育つ“あなた専用実況者”体験
+## 4) コードレビュー（厳しめ）
 
-#### Moat評価
-- **現状Moatは弱め**（アイデア自体は再現されやすい）
-- 強化要素:
-  - 音声タイミング制御品質
-  - 投稿テンプレートとUGCループ
-  - 履歴学習ベースの最適スタイル提示
+### 強み
+- フロントはフォールバック経路が比較的厚い
+- 音声系呼び出しは耐障害性を意識した実装
+- Worker側で入力サニタイズと長さ制限あり
 
-#### 収益化
-- フリーミアム（標準無料 + 高品質音声/テーマ課金）
-- クレジット制（プレミアム音声生成ごと課金）
-- 企業タイアップ（季節・商品連動テーマ）
+### まだ危ない点
+- **CORS `*` + 認証なし** のため、公開運用時の濫用耐性は不足
+- セッションAPIは簡易互換応答で、厳密な状態管理向けではない
+- Workerの責務が単一ファイルに集約され保守性が伸びにくい
 
-### 5) UI/UX 徹底分析（厳しめ）
+### 優先対応
+1. 認証 + レート制限（IP/ユーザー単位）
+2. 不正利用検知・監視アラート
+3. ルーティング/プロバイダ処理の分割
+4. CIでSLO（遅延/失敗率）を継続監視
 
-#### 良い点
-- 1画面1目的で導線が明快
-- 開始までの操作が短い
-- プリセット時間が直感的
-- 言語切替・テーマ切替が分かりやすい
+---
 
-#### 直感性を下げる点
-- ビジュアル演出が濃く、初見では情報密度が高い
-- スタイル選択肢が多く、迷いやすい
-- 音声・BGM・SE・フラッシュ同時演出は端末性能により体感が荒れる
+## 5) README/バックエンドの外部可視性について
 
-#### 改善提案（世界観維持前提）
-- 「クイック開始（60秒固定）」ボタン追加
-- 「演出軽量モード」追加
-- カウントダウン中に選択中スタイル/料理名を固定表示
-- 生成中ステップ表示で待ち不安を下げる
+### 「READMEやバックエンドコードは外部から見えるか？」
+- リポジトリが**公開**なら `README.md` と `worker/` ソースは見えます。
+- デプロイ済みAPIは、制限を入れない限り外部到達可能です。
+- 秘密情報はWrangler secrets運用ならソースに露出しません。
 
-### 6) コードレビュー（重要指摘）
+### 「外部からアクセス不可か？」
+- **デフォルトでは不可ではありません（アクセス可能）**。
+- 制限したいなら認証・署名・オリジン検証・レート制限が必要です。
 
-#### セキュリティ
-- 秘密鍵をコードに直書きしていない点は良い
-- ただし CORS が `*` で全開放のため、濫用対策は要強化
-- Worker 側で利用者単位の認証/レート制御が不足
+---
 
-#### 信頼性
-- フロントが期待するセッション運用に対し、Worker の `/api/session/*` は現状モック寄り
-- セッション整合性で将来的な不具合余地あり
+## 6) 著作権・法的・商用観点（非弁護士見解）
 
-#### 性能
-- ページ遅延ロード・アイドル時プリロードは良い
-- フェーズごとの音声生成頻度が高いとAPI遅延とコスト増に直結
+### 現時点で問題が見えにくい点
+- リポジトリ内に明確な第三者著作物バンドルは見当たりません。
+- OSS依存は一般的な構成です。
 
-#### 保守性
-- `src/api/client.ts` が肥大化して責務過多
-- Worker も単一ファイル集中で分離余地が大きい
+### 商用で要確認
+- 各プロバイダ規約遵守（Gemini/Workers AI/ElevenLabs）
+- 音声・人格権・肖像/パブリシティ権の境界
+- OSSライセンス表示義務
 
-### 7) 著作権・法的・商用リスク（法務助言ではない）
+> これは法的助言ではありません。公開・販売前は必ず法務確認してください。
 
-- リポジトリ内に明確な第三者コンテンツの無断同梱は見当たりません。
-- OSS依存パッケージのライセンス遵守（表示・再配布条件）は必須です。
-- 生成音声/生成テキストでも、利用規約違反や権利侵害の可能性はゼロではありません。
-- 商用展開前に ElevenLabs 等の規約・ポリシー整合を必ず確認してください。
-- 将来、声色クローン・有名人類似表現を扱う場合は同意/パブリシティ権の検討が必須です。
+---
 
-### 8) 「READMEやバックエンドが外部から見えないか？」への回答
+## 7) 機能・需要・競合・差別化・Moat・収益化
 
-- GitHub リポジトリが公開なら `README.md` と `worker/` 配下コードは外部から閲覧可能です。
-- Worker を公開デプロイすれば API エンドポイントにも外部到達できます（認証を足さない限り）。
-- ただし、Wrangler Secrets に保存した秘匿値そのものはソースに出ません。
+### 需要
+- “待ち時間の可処分注意”を取る体験として需要あり
+- SNS共有との相性が良い
 
-### 9) 正確なセットアップ手順
+### 競合
+- 隣接: タイマーアプリ、AI音声お遊び、ミーム体験
+- 直競合は限定的でも、アイデア模倣は容易
 
-#### 前提
+### 差別化
+- 音声と時間演出の同期品質
+- 共有・再編集ループ
+- 個人最適化された実況者体験
+
+### Moat
+- **現状は弱〜中**（発想は真似されやすい）
+- 配布力・体験品質・クリエイター経済圏で強化可能
+
+### 収益化
+- フリーミアム（スタイル/音声パック）
+- クレジット課金（高品質生成）
+- B2Bタイアップ（季節・商品テーマ）
+- クリエイター連携
+
+### 提出ストーリーボード（高品質動画向け）
+1. **フック（0〜8秒）:** 「待ち時間は退屈」を一瞬で反転する導入。
+2. **ビルド（8〜35秒）:** スタイル選択→実況開始→フェーズ上昇の演出。
+3. **ペイオフ（35〜65秒）:** 完了演出→共有/リプレイ→別スタイルを短く見せる。
+4. **信頼性証明（65〜90秒）:** 多言語/フォールバック/エッジ実行の強みを1カットで提示。
+
+---
+
+## 8) セットアップ（不完全情報を避けた手順）
+
+### 前提
 - Node.js 18+
 - npm
-- Cloudflareアカウント + Wranglerログイン
-- ElevenLabs API Key
+- Cloudflare + Wranglerログイン
+- ElevenLabs APIキー
 
-#### 9.1 フロント
+### フロント
 ```bash
 npm install
 cp .env.example .env
+npm run dev
 ```
 
-`.env` を編集:
+`.env` 例:
 ```dotenv
 VITE_API_BASE=http://localhost:8787
 VITE_API_SESSION_START_PATH=/api/session/start
 VITE_ELEVENLABS_AGENT_ID=
 ```
 
-起動:
-```bash
-npm run dev
-```
-
-#### 9.2 Worker
+### Worker
 ```bash
 cd worker
 npm install
@@ -342,21 +471,33 @@ npx wrangler secret put GEMINI_API_KEY
 npx wrangler dev
 ```
 
-### 10) 復旧・マイグレーションについて
-
-現行リポジトリでは、`worker/wrangler.toml` に最低限の migration 記述はあるものの、稼働 API は Durable Objects 依存が限定的です。
-障害復旧を厳密化するなら、以下を追加してください。
-- バージョン付き状態スキーマ
-- migrate/apply/verify を一気通貫で実行するスクリプト
-- 復旧後の API 疎通スモークテスト
+### 検証
+```bash
+npm run lint
+npm run typecheck
+npm run build
+npm run e2e:install
+npm run e2e
+```
 
 ---
 
-## Notes on what should NOT be documented (applied)
+## 9) マイグレーション / 障害復旧
 
-This README intentionally avoids:
-- vague or unverifiable claims,
-- private personal information,
-- detailed exploit/security-sensitive internals,
-- outdated statements that diverge from current code,
-- over-explaining unshipped internal prototypes.
+`worker/wrangler.toml` の migration 定義は最小構成です。
+本番の復旧性を上げるには、
+- 環境再構築手順
+- Secret再投入手順
+- migration/stateバージョン管理
+- 復旧後スモークテスト
+を一体化した「単一の復旧ランブック」を維持してください。
+
+---
+
+## 10) このREADMEで意図的に書かないこと
+
+- 不正確/曖昧/古い情報
+- 不完全な導入手順
+- 個人情報
+- 脆弱性を悪用しやすくする詳細
+- 未完成機能の内部仕様の過剰公開
