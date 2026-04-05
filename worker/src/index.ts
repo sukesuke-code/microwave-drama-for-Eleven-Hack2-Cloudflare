@@ -36,11 +36,12 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const ENGLISH_WORDS_PER_SECOND = 2.4;
-const JAPANESE_CHARS_PER_SECOND = 5.2;
+// Calibrated to ElevenLabs actual TTS speaking rate (used for trimming to fit time budget)
+const ENGLISH_WORDS_PER_SECOND = 3.0;
+const JAPANESE_CHARS_PER_SECOND = 7.0;
 const EXTERNAL_FETCH_TIMEOUT_MS = 12000;
 const EXTERNAL_FETCH_RETRIES = 2;
-const MAX_TEXT_LENGTH = 280;
+const MAX_TEXT_LENGTH = 500; // increased to support longer phase-filling narrations
 const MAX_DISH_NAME_LENGTH = 100;
 const MAX_STYLE_LENGTH = 24;
 const SECURITY_HEADERS = {
@@ -484,36 +485,47 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
     : "";
 
   const prompt = isEnglish
-    ? `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show narrated by a ${styleDesc}. No greeting, no explanation. Just one sentence. Do NOT include any Japanese text, translations, or text in any language other than English.
+    ? `Create a dramatic live narration for a microwave cooking show narrated by a ${styleDesc}. No greeting, no explanation. Do NOT include any Japanese text, translations, or text in any language other than English.
 
-CRITICAL: The narration MUST be short enough to be spoken in ${maxDurationSeconds} seconds or less when read aloud at normal speaking pace (approximately ${Math.floor(maxDurationSeconds * 2.5)} words maximum).
+CRITICAL: FILL the entire ${maxDurationSeconds}-second window. Target exactly ${targetWords} spoken English words — write enough vivid, escalating content to use the full duration. Do NOT stop at one short sentence if more time is available.
 
 Dish: ${dishName}
 Style: ${style}
 Phase: ${phase}
 Remaining Time: ${remainingTime}/${totalTime} seconds.
-Maximum narration duration: ${maxDurationSeconds} seconds.
+Target narration length: ~${targetWords} words (to fill ${maxDurationSeconds} seconds).
 ${memoryContext}
 ${historyContext}
 
 IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses.
 ❌ WRONG (do NOT output): "Kono ryōri no shunkan!" or "Kessen no hi ga kita!" or any romanized Japanese.
 ✅ RIGHT: "The moment of truth has arrived for this dish!" — real English words only.
-Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
-    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。括弧内に翻訳や説明を追加しないでください。
+Use the FULL ${maxDurationSeconds} seconds — dramatic, vivid, escalating English content!`
+    : `マイクロウェーブ調理番組の${styleDesc}によるライブナレーションを作成してください。挨拶なし、説明なし。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。括弧内に翻訳や説明を追加しないでください。
 
-重要：ナレーションは通常の話すペース（約${Math.floor(maxDurationSeconds * 2.5)}語の最大値）で朗読する場合、${maxDurationSeconds}秒以内の長さである必要があります。
+重要：${maxDurationSeconds}秒の時間枠を全て埋めること。約${targetChars}文字の日本語を目標にすること。時間枠全体を劇的で臨場感あふれる内容で埋めること。短い1文で終わらせないこと。
 
 料理名: ${dishName}
 スタイル: ${style}
 フェーズ: ${phase}
 残り時間: ${remainingTime}/${totalTime}秒
-最大ナレーション時間: ${maxDurationSeconds}秒
+目標文字数: 約${targetChars}文字（${maxDurationSeconds}秒を埋めるため）
 
 重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。括弧や記号で英語訳を付けないでください。ローマ字（アルファベットによる日本語の転写）は絶対に使用しないでください。必ず漢字・ひらがな・カタカナのみで書いてください。
-簡潔にしてください - AI音声は${maxDurationSeconds}秒以内に話し終わる必要があります！`;
+${maxDurationSeconds}秒間を全力で使い切れ！劇的で臨場感あふれる日本語ナレーションを！`;
 
   let narrationText = "";
+
+  // maxOutputTokens scales with phase duration so narrations fill their time window.
+  // English: ~3.0 wps × 1.4 tokens/word. Japanese: ~7.0 cps × 1.5 tokens/char.
+  // Add a 15-token buffer and cap to keep latency acceptable.
+  const maxOutputTokens = isEnglish
+    ? Math.min(250, Math.max(60, Math.ceil(maxDurationSeconds * 4.2)))
+    : Math.min(350, Math.max(80, Math.ceil(maxDurationSeconds * 10.5)));
+
+  // Target word/char count for the Gemini prompt (slightly conservative so ElevenLabs finishes early)
+  const targetWords = Math.floor(maxDurationSeconds * 2.5);
+  const targetChars = Math.floor(maxDurationSeconds * 6.0);
 
   const systemInstruction = isEnglish
     ? `You are a dramatic English live narrator for a microwave cooking show. ABSOLUTE RULES — never break these under any circumstances:
@@ -521,13 +533,15 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 2. NEVER output Japanese characters (kanji, hiragana, katakana) — not even one character.
 3. NEVER output romanized Japanese (romaji) — words like "kono", "ryori", "hajimaru", "sugoi" etc. are FORBIDDEN.
 4. NEVER output translations, parenthetical notes, bilingual text, or mixed-language text.
-5. Your output goes directly to an English voice AI — pure English only, always.`
+5. Your output goes directly to an English voice AI — pure English only, always.
+6. FILL the entire ${maxDurationSeconds}-second window. Aim for approximately ${targetWords} spoken English words. Do NOT write a single short sentence when more time is available — use the full duration with vivid, escalating dramatic content.`
     : `あなたは電子レンジ料理番組の劇的な日本語ライブナレーターです。絶対のルール — いかなる状況でも破ってはならない：
 1. 漢字・ひらがな・カタカナのみ使用すること。絶対に例外なし。
 2. ローマ字（アルファベットによる日本語の転写）を一切使用しないこと。
 3. 英語を一切使用しないこと。
 4. 翻訳・括弧内の説明・バイリンガルテキストを一切付けないこと。
-5. あなたの出力は日本語音声AIに直接渡される。常に純粋な日本語のみ。`;
+5. あなたの出力は日本語音声AIに直接渡される。常に純粋な日本語のみ。
+6. ${maxDurationSeconds}秒の時間枠を全て埋めること。約${targetChars}文字の日本語を目標にすること。短い1文で終わらせず、時間枠全体を劇的で臨場感あふれる内容で埋めること。`;
 
   if (env.GEMINI_API_KEY) {
     try {
@@ -537,7 +551,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 60, temperature: 0.8 },
+          generationConfig: { maxOutputTokens, temperature: 0.8 },
         }),
       }, EXTERNAL_FETCH_TIMEOUT_MS);
       if (res.ok) {
