@@ -53,11 +53,18 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
   const body: any = await request.json();
   const { dishName, style, phase, remainingTime, totalTime } = body;
 
-  const prompt = `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show. No greeting, no explanation. Just one sentence.
-Dish: ${dishName}
-Style: ${style}
-Phase: ${phase}
-Remaining Time: ${remainingTime}/${totalTime} seconds.`;
+  const availableSeconds = body.availableSeconds || 5;
+  const charsPerSec = 5; // Reduced to 5 chars/sec for safer, guaranteed brevity in Japanese
+  const maxChars = Math.max(10, Math.floor(availableSeconds * charsPerSec));
+
+  const prompt = `Create EXACTLY ONE ULTRA-SHORT dramatic live narration line for a microwave cooking show. 
+    Style: ${style}
+    Dish: ${dishName}
+    Phase: ${phase}
+    STRICT TIME LIMIT: You have at most ${availableSeconds} seconds. 
+    ESSENTIAL: You MUST definitely finish speaking BEFORE the countdown reaches 0. 
+    CRITICAL: Keep your response STRICTLY under ${maxChars} characters (in ${dishName.includes(' ') ? 'English' : 'Japanese'}).
+    No greeting, no extra text, just the raw emotional narration line.`;
 
   let narrationText = "";
 

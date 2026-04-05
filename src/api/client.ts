@@ -2,7 +2,7 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://microwave-show-api-v2.lolololololol.workers.dev";
 
-const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
+const DEFAULT_AUDIO_TIMEOUT_MS = 60000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
 const DEFAULT_RETRY_COUNT = 1;
 const AUDIO_METER_FPS = 30;
@@ -11,6 +11,11 @@ const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 const MAX_TEXT_PAYLOAD_LENGTH = 280;
 const MAX_DISH_NAME_LENGTH = 100;
 const EFFECT_RATE_LIMIT_MS = 1500;
+
+// Audio Constants for Ducking and Theatre Mode Volume
+export const DUCKING_LEVEL = 0.15; 
+export const NORMAL_MUSIC_LEVEL = 0.65; 
+export const SFX_DEFAULT_VOLUME = 0.85; 
 
 let activeTtsAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
@@ -163,6 +168,7 @@ export interface AgentNarrationRequest {
   remainingTime: number;
   phase: SessionPhase;
   locale?: string;
+  availableSeconds?: number;
 }
 
 export interface AgentNarrationResponse {
@@ -321,9 +327,19 @@ function stopTtsPlayback(): void {
   }
 
   if (activeTtsAudio) {
+    // Prevent noise by clearing listeners before stopping
+    activeTtsAudio.onended = null;
+    activeTtsAudio.onerror = null;
+    activeTtsAudio.onpause = null;
+    
     activeTtsAudio.pause();
-    activeTtsAudio.src = "";
-    activeTtsAudio.load();
+    try {
+      activeTtsAudio.src = ""; // Revert to empty string to avoid CSP/media-src violations
+      activeTtsAudio.removeAttribute('src'); // Better cleanup
+      activeTtsAudio.load();
+    } catch {
+      // ignore
+    }
     activeTtsAudio = null;
   }
 
@@ -418,16 +434,44 @@ async function playAudioBlob(
     onStart?: () => void;
   }
 ): Promise<void> {
+  if (!blob || blob.size === 0) {
+    console.warn("playAudioBlob: Received empty or undefined blob. Skipping playback.");
+    if (options?.onStart) options.onStart();
+    return;
+  }
+
   const loop = options?.loop ?? false;
-  const volume = options?.volume ?? 1;
   const isMusic = options?.isMusic ?? false;
   const isSfx = options?.isSfx ?? false;
+  const volume = options?.volume ?? (isSfx ? SFX_DEFAULT_VOLUME : 1);
   const onStart = options?.onStart;
+
+  const isNarration = !isMusic && !isSfx;
 
   stopRequested = false;
 
-  const url = URL.createObjectURL(blob);
+  let url = "";
+  try {
+    url = URL.createObjectURL(blob);
+  } catch (e) {
+    console.error("playAudioBlob: Failed to create object URL", e);
+    if (onStart) onStart();
+    return;
+  }
+
   const audio = new Audio();
+  
+  const applyDucking = () => {
+    if (isNarration && activeMusicAudio) {
+      activeMusicAudio.volume = DUCKING_LEVEL;
+    }
+  };
+
+  const releaseDucking = () => {
+    if (isNarration && activeMusicAudio) {
+      activeMusicAudio.volume = NORMAL_MUSIC_LEVEL;
+    }
+  };
 
   audio.preload = "auto";
   audio.src = url;
@@ -441,18 +485,25 @@ async function playAudioBlob(
     activeMusicAudio = audio;
     activeMusicObjectUrl = url;
   } else if (isSfx) {
-    // SFX Slot
+    if (activeSfxAudio) {
+      activeSfxAudio.pause();
+      activeSfxAudio.src = "";
+    }
     if (activeSfxObjectUrl) {
-      URL.revokeObjectURL(activeSfxObjectUrl);
-      activeSfxObjectUrl = null;
+      const oldUrl = activeSfxObjectUrl;
+      setTimeout(() => URL.revokeObjectURL(oldUrl), 5000);
     }
     activeSfxAudio = audio;
     activeSfxObjectUrl = url;
   } else {
     // Narration Slot
+    if (activeTtsAudio) {
+      activeTtsAudio.pause();
+      activeTtsAudio.src = "";
+    }
     if (activeObjectUrl) {
-      URL.revokeObjectURL(activeObjectUrl);
-      activeObjectUrl = null;
+      const oldUrl = activeObjectUrl;
+      setTimeout(() => URL.revokeObjectURL(oldUrl), 5000);
     }
 
     activeTtsAudio = audio;
@@ -461,11 +512,51 @@ async function playAudioBlob(
   }
 
   try {
-    await audio.play();
+    // Wait for the browser to at least be able to play some of it
+    await new Promise((resolve, reject) => {
+      const onCanPlay = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onErr = () => {
+        cleanup();
+        reject(audio.error || new Error("Failed to load audio source"));
+      };
+      const cleanup = () => {
+        audio.removeEventListener("canplaythrough", onCanPlay);
+        audio.removeEventListener("error", onErr);
+      };
+      audio.addEventListener("canplaythrough", onCanPlay);
+      audio.addEventListener("error", onErr);
+      
+      // No longer revoking here blindly; revocation is handled by onended and onerror
+      setTimeout(() => {
+        if (audio.readyState < 2) { // HAVE_CURRENT_DATA
+          cleanup();
+          resolve(null);
+        }
+      }, 5000); // Increased timeout for slower connections/devices
+    });
+
+    applyDucking();
+    try {
+      await audio.play();
+    } catch (firstPlayErr: unknown) {
+      // Automatic Retry for 'Empty src' or 'Interrupted' errors
+      console.warn("Audio play failed, retrying once...", firstPlayErr instanceof Error ? firstPlayErr.message : firstPlayErr);
+      audio.load();
+      await new Promise(r => setTimeout(r, 150));
+      await audio.play();
+    }
     if (onStart) onStart();
   } catch (err) {
-    console.warn("Audio play failed or was interrupted:", err);
-    URL.revokeObjectURL(url);
+    releaseDucking();
+    const isInterrupted = err instanceof Error && (err.message.includes("stopped") || err.message.includes("interrupted"));
+    const isCode4 = (err as Record<string, unknown>)?.code === 4; // Ignore Empty src attribute errors caused by stopping
+    
+    if (!isInterrupted && !isCode4) {
+      console.warn("Audio playback completely failed after retry:", err);
+    }
     throw err;
   }
 
@@ -513,6 +604,7 @@ async function playAudioBlob(
     audio.onended = () => {
       if (completed) return;
       completed = true;
+      releaseDucking();
       cleanup();
       resolve();
     };
@@ -520,45 +612,79 @@ async function playAudioBlob(
     audio.onerror = () => {
       if (completed) return;
       completed = true;
+      releaseDucking();
       cleanup();
-      reject(audio.error ?? new Error("Unknown audio playback error"));
+
+      const error = audio.error;
+      const isExpectedStop = stopRequested || !audio.src || audio.src === "" || audio.src === window.location.href;
+      if (isExpectedStop || (error && error.code === 4)) {
+        // Treat as normal stop/cancel
+        resolve();
+        return;
+      }
+
+      reject(error ?? new Error("Unknown audio playback error"));
     };
   });
 
   if (isMusic) {
     if (activeMusicObjectUrl === url) {
-      URL.revokeObjectURL(url);
       activeMusicObjectUrl = null;
     }
-    if (activeMusicAudio) {
-      activeMusicAudio.src = "";
-      activeMusicAudio.load();
-      activeMusicAudio = null;
+    if (activeMusicAudio === audio) {
+       activeMusicAudio = null;
     }
   } else if (isSfx) {
     if (activeSfxObjectUrl === url) {
-      URL.revokeObjectURL(url);
       activeSfxObjectUrl = null;
     }
-    if (activeSfxAudio) {
-      activeSfxAudio.src = "";
-      activeSfxAudio.load();
-      activeSfxAudio = null;
+    if (activeSfxAudio === audio) {
+       activeSfxAudio = null;
     }
   } else {
     if (activeObjectUrl === url) {
-      URL.revokeObjectURL(url);
       activeObjectUrl = null;
     }
-    if (activeTtsAudio) {
-      activeTtsAudio.src = "";
-      activeTtsAudio.load();
+    if (activeTtsAudio === audio) {
       activeTtsAudio = null;
     }
     if (activeMeterCleanup) {
       activeMeterCleanup();
       activeMeterCleanup = null;
     }
+  }
+}
+
+function stopAllAudio(): void {
+  stopRequested = true;
+  
+  // 1. Stop TTS
+  stopTtsPlayback();
+
+  // 2. Stop Music
+  if (activeMusicAudio) {
+    activeMusicAudio.pause();
+    activeMusicAudio.src = "";
+    activeMusicAudio.removeAttribute('src');
+    activeMusicAudio.load();
+    activeMusicAudio = null;
+  }
+  if (activeMusicObjectUrl) {
+    URL.revokeObjectURL(activeMusicObjectUrl);
+    activeMusicObjectUrl = null;
+  }
+
+  // 3. Stop SFX
+  if (activeSfxAudio) {
+    activeSfxAudio.pause();
+    activeSfxAudio.src = "";
+    activeSfxAudio.removeAttribute('src');
+    activeSfxAudio.load();
+    activeSfxAudio = null;
+  }
+  if (activeSfxObjectUrl) {
+    URL.revokeObjectURL(activeSfxObjectUrl);
+    activeSfxObjectUrl = null;
   }
 }
 
@@ -970,13 +1096,23 @@ async function playLocalNarration(text: string, locale = "ja", onStart?: () => v
       listener({ level, spectrum });
     });
   }, 70);
-
+  // Guard: Never play local TTS if AI audio is already active or being loaded
+  if (activeTtsAudio && !activeTtsAudio.paused) {
+    console.log("playLocalNarration: AI audio is already active, skipping local fallback");
+    return Promise.resolve();
+  }
   await new Promise<void>((resolve, reject) => {
     utterance.onstart = () => {
       if (onStart) onStart();
     };
     utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error("LOCAL_TTS_FAILED"));
+    utterance.onerror = (e) => {
+      if (e.error === 'interrupted' || e.error === 'canceled') {
+        resolve(); // Normal behavior during phase transitions
+      } else {
+        reject(new Error("LOCAL_TTS_FAILED"));
+      }
+    };
     window.speechSynthesis.speak(utterance);
   }).finally(() => {
     if (speechMeterIntervalId) {
@@ -1097,7 +1233,7 @@ async function playSfx(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: false, volume: 0.55, isSfx: true });
+      await playAudioBlob(blob, { loop: false, volume: 0.4, isSfx: true });
       return;
     }
   } catch (e) {
@@ -1120,7 +1256,7 @@ async function playMusic(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+      await playAudioBlob(blob, { loop: true, volume: 0.2, isMusic: true });
       return;
     }
   } catch (e) {
@@ -1157,6 +1293,7 @@ export {
   generateMusicBlob,
   prepareInitialAssets,
   playAudioBlob,
+  stopAllAudio,
 };
 
 export const api = {
@@ -1182,4 +1319,5 @@ export const api = {
   generateMusicBlob,
   prepareInitialAssets,
   playAudioBlob,
+  stopAllAudio,
 };

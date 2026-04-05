@@ -9,7 +9,7 @@ import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
-import { api } from '../api/client';
+import { api, NORMAL_MUSIC_LEVEL, SFX_DEFAULT_VOLUME } from '../api/client';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -187,6 +187,16 @@ export default function CountdownPage({
   }, [style]);
 
   const buildAgentNarrationContext = useCallback((tl: number, phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
+    const availableSeconds = (phase === 'opening' 
+      ? Math.max(3, totalSeconds - Math.floor(totalSeconds * 0.75))
+      : phase === 'quarter'
+      ? Math.max(3, Math.floor(totalSeconds * 0.75) - Math.floor(totalSeconds * 0.5))
+      : phase === 'middle'
+      ? Math.max(3, Math.floor(totalSeconds * 0.5) - 10)
+      : phase === 'final'
+      ? 10
+      : 8) - 1.0; // Strictly finish 1.0s BEFORE the countdown ends
+
     return {
       sessionId: sessionIdRef.current ?? undefined,
       style,
@@ -195,13 +205,21 @@ export default function CountdownPage({
       remainingTime: tl,
       phase,
       locale,
+      availableSeconds: Math.max(1, availableSeconds),
     };
   }, [style, dishName, totalSeconds, locale]);
 
 
 
+  const initializationRef = useRef(false);
   useEffect(() => {
     async function initSession() {
+      if (initializationRef.current) return;
+      initializationRef.current = true;
+      
+      // Stop all background sounds before starting show to ensure clean start
+      api.stopAllAudio();
+
       if (initialAssets) {
         console.log("[CountdownPage] Using pre-fetched assets for session:", initialAssets.session.sessionId);
         sessionIdRef.current = initialAssets.session.sessionId;
@@ -218,21 +236,22 @@ export default function CountdownPage({
         // Play initial audio immediately
         if (!isPausedRef.current && !isUnmountedRef.current) {
           console.log("[CountdownPage] Playing pre-fetched opening audio...");
-          const tasks: Promise<void>[] = [];
           
           if (initialAssets.musicAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true }));
+            void api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true, volume: NORMAL_MUSIC_LEVEL }).catch(console.warn);
           }
           if (initialAssets.sfxAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true }));
+            void api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true, volume: SFX_DEFAULT_VOLUME }).catch(console.warn);
           }
           
-          tasks.push(api.playAudioBlob(initialAssets.narrationAudio, { onStart: () => {
-             // In case narration text changed while waiting
-             setNarrationText(initialAssets.narrationText);
-          }}));
-          
-          await Promise.all(tasks).catch(console.error);
+          await api.playAudioBlob(initialAssets.narrationAudio, { 
+            onStart: () => setNarrationText(initialAssets.narrationText),
+            volume: 1.0
+          }).catch(err => {
+            const isInterrupted = err instanceof Error && (err.message.includes("stopped") || err.message.includes("interrupted") || err.message.includes("aborted"));
+            if (isInterrupted) return;
+            console.warn("[CountdownPage] Initial AI narration playback failed, skipping local fallback:", err);
+          });
         }
         return;
       }
@@ -312,23 +331,30 @@ export default function CountdownPage({
           if (preFetched) {
             console.log(`[CountdownPage] Using pre-fetched assets for ${phase}`);
             currentText = preFetched.narrationText;
-            playAudio = async (onReady) => {
-              const tasks: Promise<void>[] = [];
-              
-              if (preFetched.narrationAudio) {
-                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { onStart: onReady }));
-              }
-              if (preFetched.musicAudio) {
-                tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true }));
-              } else if (phase === 'done') {
-                api.stopMusic();
-              }
-              if (preFetched.sfxAudio) {
-                tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true }));
-              }
-              
-              await Promise.all(tasks);
-            };
+             playAudio = async (onReady) => {
+               const tasks: Promise<void>[] = [];
+               
+               if (preFetched.narrationAudio) {
+                 tasks.push(api.playAudioBlob(preFetched.narrationAudio, { onStart: onReady, volume: 1.0 }));
+               } else {
+                 console.log(`[CountdownPage] narrationAudio missing for ${phase}, falling back to local TTS`);
+                 tasks.push(api.playLocalNarration(currentText, locale, onReady));
+               }
+
+               if (preFetched.musicAudio) {
+                 tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.2 }));
+               } else if (phase === 'done') {
+                 api.stopMusic();
+               }
+
+               if (preFetched.sfxAudio) {
+                 tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true, volume: 0.4 }));
+               }
+               
+               await Promise.all(tasks).catch(err => {
+                 console.warn(`[CountdownPage] Audio task part failed for ${phase}:`, err);
+               });
+             };
           } else {
             console.log(`[CountdownPage] No pre-fetched assets for ${phase}, requesting now...`);
             const narration = await api.requestAgentNarration(context);
@@ -354,13 +380,41 @@ export default function CountdownPage({
           if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
             console.log(`[CountdownPage] Executing narration and effects for ${phase}...`);
             
-            // If we have pre-fetched music/sfx, we play them inside playAudio.
-            // If not (e.g. fallback or extra phases), we might need handlePhaseEffects.
             const effectTask = (!preFetched) ? handlePhaseEffects(phase) : Promise.resolve();
             
-            await playAudio(triggerTextSync);
+            try {
+              // Ensure we stop any pending local TTS before starting AI audio
+              window.speechSynthesis.cancel();
+              await playAudio(triggerTextSync);
+            } catch (err) {
+              const isInterrupted = err instanceof Error && (err.message.includes("stopped") || err.message.includes("interrupted") || err.message.includes("aborted"));
+              if (isInterrupted) return;
+              
+              // NEW: If we have an AI narration blob, DO NOT fallback to local TTS.
+              const assets = (initialAssets && initialAssets.allPhases) ? initialAssets.allPhases[phase] : undefined;
+              const hasAiBlob = !!(assets?.narrationAudio);
+              
+              if (hasAiBlob) {
+                console.warn(`[CountdownPage] AI playback failed for ${phase}, but skipping local fallback as requested.`);
+                return;
+              }
+
+              console.warn(`[CountdownPage] Main playback failed for ${phase}, falling back:`, err);
+              await api.playLocalNarration(currentText, locale, triggerTextSync).catch(console.error);
+            }
+
             triggerTextSync();
             await effectTask;
+
+            if (phase === 'done' && !isUnmountedRef.current) {
+              console.log("[CountdownPage] final narration finished, preparing result transition...");
+              setTimeout(() => {
+                if (!isUnmountedRef.current) {
+                  api.stopAllAudio();
+                  onFinish();
+                }
+              }, 2000);
+            }
           }
         } catch (err) {
           console.error(`[CountdownPage] Phase task failed for ${phase}:`, err);
@@ -380,7 +434,7 @@ export default function CountdownPage({
       .finally(() => {
         console.log(`[CountdownPage] Task for phase ${phase} completed/exited.`);
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets, onFinish]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -406,6 +460,7 @@ export default function CountdownPage({
           setIsFlashing(true);
           setShowConfetti(true);
           playAlarmTone();
+          api.stopAllAudio(); // Use stopAllAudio to ensure EVERYTHING stops at zero
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
@@ -417,7 +472,16 @@ export default function CountdownPage({
           }
 
           flashTimeoutRef.current = setTimeout(() => setIsFlashing(false), 600);
-          finishTimeoutRef.current = setTimeout(() => onFinish(), 4000);
+          
+          // Safety auto-transition: Go to result after a fixed delay even if narration is slow
+          if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
+          finishTimeoutRef.current = setTimeout(() => {
+            if (!isUnmountedRef.current) {
+              api.stopAllAudio();
+              onFinish();
+            }
+          }, 2500); // 2.5s is enough to show finish text+confetti before transition
+
           return 0;
         }
         if (sessionIdRef.current) {

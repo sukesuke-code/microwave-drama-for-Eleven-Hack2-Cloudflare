@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AppScreen, InitialAssets, Locale, Settings, ThemeMode } from './types';
 import TopPage from './pages/TopPage';
 
@@ -128,7 +128,7 @@ export default function App() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  const transitionTo = (newScreen: AppScreen) => {
+  const transitionTo = useCallback((newScreen: AppScreen) => {
     if (screen === newScreen) return;
     setIsTransitioning(true);
     const timer = setTimeout(() => {
@@ -136,24 +136,24 @@ export default function App() {
       setIsTransitioning(false);
     }, 150);
     return () => clearTimeout(timer);
-  };
+  }, [screen]);
 
-  const handleStartSettings = () => transitionTo('settings');
+  const handleStartSettings = useCallback(() => transitionTo('settings'), [transitionTo]);
 
-  const handleStartCountdown = (s: Settings, assets: InitialAssets) => {
+  const handleStartCountdown = useCallback((s: Settings, assets: InitialAssets) => {
     setSettings(s);
     setInitialAssets(assets);
     transitionTo('countdown');
-  };
+  }, [transitionTo]);
 
-  const handleFinish = () => transitionTo('result');
+  const handleFinish = useCallback(() => transitionTo('result'), [transitionTo]);
 
-  const handleReplay = () => {
+  const handleReplay = useCallback(() => {
     if (settings) transitionTo('countdown');
-  };
+  }, [settings, transitionTo]);
 
-  const handleHome = () => transitionTo('settings');
-  const handleTop = () => transitionTo('top');
+  const handleHome = useCallback(() => transitionTo('settings'), [transitionTo]);
+  const handleTop = useCallback(() => transitionTo('top'), [transitionTo]);
 
   const pageOpacity = isTransitioning ? 0 : 1;
   const pageTransitionClass = isTransitioning ? 'page-fade-out' : 'page-fade-in';
