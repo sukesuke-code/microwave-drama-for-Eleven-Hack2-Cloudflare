@@ -652,6 +652,48 @@ button:active {
     0 0 30px rgba(56, 189, 248, 0.2);
 }
 
+/* Circular Timer Utilities to avoid inline style lints */
+.timer-root {
+  width: var(--size);
+  height: var(--size);
+}
+
+.timer-aura {
+  width: calc(var(--size) + 36px);
+  height: calc(var(--size) + 36px);
+  background: radial-gradient(circle, var(--glow) 0%, transparent 68%);
+  filter: blur(8px);
+  opacity: 0.62;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.timer-root[data-finished="true"] .timer-aura {
+  filter: blur(10px);
+  opacity: 0.9;
+}
+
+.timer-circle-progress {
+  stroke: var(--stroke-url);
+  stroke-dashoffset: var(--offset);
+  transition: stroke-dashoffset 0.8s ease-in-out, stroke 0.3s ease;
+  filter: drop-shadow(0 0 10px var(--stroke)) drop-shadow(0 0 18px var(--glow)) drop-shadow(0 0 30px var(--glow));
+}
+
+.timer-root[data-finished="true"] .timer-circle-progress {
+  filter: drop-shadow(0 0 16px var(--stroke)) drop-shadow(0 0 30px var(--glow)) drop-shadow(0 0 50px var(--glow));
+}
+
+.timer-finished-label {
+  font-size: var(--label-size);
+  color: var(--stroke);
+  text-shadow: 0 0 18px var(--glow), 0 0 42px var(--glow);
+  filter: drop-shadow(0 0 14px var(--glow));
+}
+
+.timer-value-urgent {
+  text-shadow: 0 0 14px rgba(239,68,68,0.75), 0 0 32px rgba(239,68,68,0.6);
+}
+
 .dynamic-vignette {
   background: radial-gradient(ellipse at center, transparent 40%, var(--accent-color-15) 100%);
   animation: vignettePulse 0.5s ease-in-out infinite;

@@ -11,6 +11,52 @@ import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
 import { api } from '../api/client';
 
+/**
+ * Optimized helper to get prompts based on style and phase.
+ * Moved outside component to avoid re-creation and improve performance.
+ */
+function getPhasePrompts(style: string, phase: string) {
+  switch (style) {
+    case 'sports':
+      if (phase === 'opening') return { music: 'energetic stadium organ music, high tempo sports broadcast theme', sfx: 'stadium crowd cheering and whistling' };
+      if (phase === 'middle') return { sfx: 'referee whistle blow' };
+      if (phase === 'final') return { music: 'intense fast-paced percussion, sports countdown climax', sfx: 'crowd chanting' };
+      if (phase === 'done') return { music: null, sfx: 'sports game buzzer and massive crowd victory roar' };
+      break;
+    case 'horror':
+      if (phase === 'opening') return { music: 'creepy dissonant strings, horror movie ambient drones', sfx: 'creaky old wooden door opening' };
+      if (phase === 'middle') return { sfx: 'sudden high-pitched violin sting' };
+      if (phase === 'final') return { music: 'fast heartbeat rhythm, heavy low-end horror suspense', sfx: 'ghostly whisper' };
+      if (phase === 'done') return { music: null, sfx: 'blood-curdling cinematic impact and deep silence' };
+      break;
+    case 'documentary':
+      if (phase === 'opening') return { music: 'elegant minimal piano and cello, sophisticated documentary theme', sfx: 'old book pages turning' };
+      if (phase === 'middle') return { sfx: 'subtle technological notification chime' };
+      if (phase === 'final') return { music: 'grand cinematic orchestral build-up, epic discovery music', sfx: 'clock ticking' };
+      if (phase === 'done') return { music: null, sfx: 'professional orchestral final chord' };
+      break;
+    case 'anime':
+      if (phase === 'opening') return { music: 'upbeat high-energy j-pop synth theme, anime opening vibes', sfx: 'magical sparkling transition' };
+      if (phase === 'middle') return { sfx: 'anime power-up charging sound effect' };
+      if (phase === 'final') return { music: 'epic battle intense electronic rock, anime climax', sfx: 'shimmering sword clash' };
+      if (phase === 'done') return { music: null, sfx: 'anime victory jingle and cheerful sparkle' };
+      break;
+    case 'movie':
+      if (phase === 'opening') return { music: 'cinematic trailer underscore, tense strings and brass', sfx: 'deep cinematic bass drop' };
+      if (phase === 'middle') return { sfx: 'cinematic whoosh rise' };
+      if (phase === 'final') return { music: 'fast rhythmic action thriller percussion, trailer climax', sfx: 'metallic clattering tension' };
+      if (phase === 'done') return { music: null, sfx: 'cinematic ending impact hit, short trailer ending' };
+      break;
+    case 'nature':
+      if (phase === 'opening') return { music: 'calm nature ambience, soft wind and acoustic guitar', sfx: 'birds chirping in a forest' };
+      if (phase === 'middle') return { sfx: 'soft water splash and rippling sound' };
+      if (phase === 'final') return { music: 'airy ethereal pads, peaceful natural wonder music', sfx: 'gentle gust of wind' };
+      if (phase === 'done') return { music: null, sfx: 'soft forest chime, gentle resolution' };
+      break;
+  }
+  return null;
+}
+
 interface CountdownPageProps {
   locale: Locale;
   settings: Settings;
@@ -79,7 +125,7 @@ export default function CountdownPage({
     setIsCountdownActive(false);
   }, [settings.sessionId, totalSeconds, dishName, style, voiceLanguage]);
 
-  const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
+  const styleConfig = useMemo(() => getStyleConfigs(locale).find((s) => s.id === style)!, [locale, style]);
   const isDanger = timeLeft <= 10 && timeLeft > 0;
   const isLight = themeMode === 'light';
   const lightBgGradient = style === 'sports'
@@ -131,50 +177,7 @@ export default function CountdownPage({
   const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
     if (isPausedRef.current || isUnmountedRef.current) return;
 
-    // Helper to generate prompts based on style and move
-    const getPrompts = () => {
-      switch (style) {
-        case 'sports':
-          if (phase === 'opening') return { music: 'energetic stadium organ music, high tempo sports broadcast theme', sfx: 'stadium crowd cheering and whistling' };
-          if (phase === 'middle') return { sfx: 'referee whistle blow' };
-          if (phase === 'final') return { music: 'intense fast-paced percussion, sports countdown climax', sfx: 'crowd chanting' };
-          if (phase === 'done') return { music: null, sfx: 'sports game buzzer and massive crowd victory roar' };
-          break;
-        case 'horror':
-          if (phase === 'opening') return { music: 'creepy dissonant strings, horror movie ambient drones', sfx: 'creaky old wooden door opening' };
-          if (phase === 'middle') return { sfx: 'sudden high-pitched violin sting' };
-          if (phase === 'final') return { music: 'fast heartbeat rhythm, heavy low-end horror suspense', sfx: 'ghostly whisper' };
-          if (phase === 'done') return { music: null, sfx: 'blood-curdling cinematic impact and deep silence' };
-          break;
-        case 'documentary':
-          if (phase === 'opening') return { music: 'elegant minimal piano and cello, sophisticated documentary theme', sfx: 'old book pages turning' };
-          if (phase === 'middle') return { sfx: 'subtle technological notification chime' };
-          if (phase === 'final') return { music: 'grand cinematic orchestral build-up, epic discovery music', sfx: 'clock ticking' };
-          if (phase === 'done') return { music: null, sfx: 'professional orchestral final chord' };
-          break;
-        case 'anime':
-          if (phase === 'opening') return { music: 'upbeat high-energy j-pop synth theme, anime opening vibes', sfx: 'magical sparkling transition' };
-          if (phase === 'middle') return { sfx: 'anime power-up charging sound effect' };
-          if (phase === 'final') return { music: 'epic battle intense electronic rock, anime climax', sfx: 'shimmering sword clash' };
-          if (phase === 'done') return { music: null, sfx: 'anime victory jingle and cheerful sparkle' };
-          break;
-        case 'movie':
-          if (phase === 'opening') return { music: 'cinematic trailer underscore, tense strings and brass', sfx: 'deep cinematic bass drop' };
-          if (phase === 'middle') return { sfx: 'cinematic whoosh rise' };
-          if (phase === 'final') return { music: 'fast rhythmic action thriller percussion, trailer climax', sfx: 'metallic clattering tension' };
-          if (phase === 'done') return { music: null, sfx: 'cinematic ending impact hit, short trailer ending' };
-          break;
-        case 'nature':
-          if (phase === 'opening') return { music: 'calm nature ambience, soft wind and acoustic guitar', sfx: 'birds chirping in a forest' };
-          if (phase === 'middle') return { sfx: 'soft water splash and rippling sound' };
-          if (phase === 'final') return { music: 'airy ethereal pads, peaceful natural wonder music', sfx: 'gentle gust of wind' };
-          if (phase === 'done') return { music: null, sfx: 'soft forest chime, gentle resolution' };
-          break;
-      }
-      return null;
-    };
-
-    const prompts = getPrompts();
+    const prompts = getPhasePrompts(style, phase);
     if (!prompts) return;
 
     const tasks: Promise<void>[] = [];
