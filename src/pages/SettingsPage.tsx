@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed } from 'lucide-react';
-import { Locale, NarrationStyle, Settings, ThemeMode } from '../types';
+import { InitialAssets, Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
 
 
@@ -9,7 +9,7 @@ interface SettingsPageProps {
   themeMode: ThemeMode;
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onBack: () => void;
-  onStart: (settings: Settings) => void;
+  onStart: (settings: Settings, initialAssets: InitialAssets) => void;
 }
 
 const QUICK_PRESETS = [
@@ -62,6 +62,22 @@ const STYLE_CARDS: Array<{
     gradient: 'from-green-950/60 to-emerald-900/60',
     border: 'border-emerald-700',
   },
+  {
+    id: 'documentary',
+    emoji: '📜',
+    title: { ja: '歴史ドキュメンタリー', en: 'History' },
+    description: { ja: '過去から現代へ続く真実', en: 'The truth through ages' },
+    gradient: 'from-stone-800 to-stone-900',
+    border: 'border-stone-600',
+  },
+  {
+    id: 'anime',
+    emoji: '🔥',
+    title: { ja: '熱血アニメ', en: 'Hot-blooded Anime' },
+    description: { ja: '限界突破！友情と勇気の物語', en: 'Beyond limits! Friendship & Courage' },
+    gradient: 'from-rose-900 to-red-900',
+    border: 'border-rose-700',
+  },
 ];
 
 function clampDuration(value: number): number {
@@ -81,11 +97,11 @@ function readSettingsDraft(locale: Locale): { duration: number; dishName: string
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<{ duration: number; dishName: string; style: NarrationStyle }>;
     const style = parsed.style;
-    const isValidStyle = style === 'sports' || style === 'movie' || style === 'horror' || style === 'nature';
+    const isValidStyle = ['sports', 'movie', 'horror', 'nature', 'documentary', 'anime'].includes(style || '');
     return {
       duration: clampDuration(Number(parsed.duration ?? fallback.duration)),
       dishName: typeof parsed.dishName === 'string' ? parsed.dishName : fallback.dishName,
-      style: isValidStyle ? style : fallback.style,
+      style: isValidStyle ? style as NarrationStyle : fallback.style,
     };
   } catch {
     return fallback;
@@ -130,12 +146,16 @@ export default function SettingsPage({
     setIsLoading(true);
     setError(null);
 
-    const nextDishName = dishName.trim() || t.mysteryDish;
-
     try {
-      // Connect to Cloudflare backend to create the Durable Object session and run Workers AI
-      const { startMultiplayerSession } = await import('../api/session-sync');
-      const { sessionId, aiEnhancedInstruction } = await startMultiplayerSession(nextDishName, duration, style);
+      const nextDishName = dishName.trim() || t.mysteryDish;
+      
+      // 1. Prepare ALL initial assets (Session + Opening Narration + Audio Blobs)
+      const initialAssets = await api.prepareInitialAssets(
+        nextDishName,
+        duration,
+        style,
+        locale
+      );
 
       const settings: Settings = {
         totalSeconds: duration,
@@ -145,7 +165,10 @@ export default function SettingsPage({
         aiEnhancedInstruction,
       };
 
-      onStart(settings);
+      sessionStorage.setItem('sessionId', initialAssets.session.sessionId);
+      sessionStorage.setItem('sessionMode', initialAssets.session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote');
+      
+      onStart(settings, initialAssets);
     } catch (err) {
       const userMessage = locale === 'ja'
         ? 'サーバーに接続できませんでした。通信環境をご確認のうえ、もう一度お試しください。'
@@ -223,11 +246,14 @@ export default function SettingsPage({
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.minutes}</p>
                 <input
                   type="number"
+                  id="minutes-input"
+                  title="Minutes"
+                  placeholder="0"
                   min={0}
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className={`w-full bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
               <span className="text-2xl font-black sm:text-3xl text-orange-400">:</span>
@@ -235,11 +261,14 @@ export default function SettingsPage({
                 <p className={`mb-1 text-xs ${isLight ? 'text-gray-500' : 'text-gray-500'}`}>{t.seconds}</p>
                 <input
                   type="number"
+                  id="seconds-input"
+                  title="Seconds"
+                  placeholder="0"
                   min={0}
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
-                  className={`w-full appearance-none bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
+                  className={`w-full bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
             </div>
