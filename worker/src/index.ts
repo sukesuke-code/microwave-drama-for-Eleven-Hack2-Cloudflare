@@ -496,7 +496,7 @@ Maximum narration duration: ${maxDurationSeconds} seconds.
 ${memoryContext}
 ${historyContext}
 
-IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses.
+IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses. Do NOT use romanized Japanese (romaji) words such as "no", "ga", "wa", "desu", "nani", "sugoi" etc. Use standard English vocabulary only.
 Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
     : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。括弧内に翻訳や説明を追加しないでください。
 
@@ -508,7 +508,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 残り時間: ${remainingTime}/${totalTime}秒
 最大ナレーション時間: ${maxDurationSeconds}秒
 
-重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。括弧や記号で英語訳を付けないでください。
+重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。括弧や記号で英語訳を付けないでください。ローマ字（アルファベットによる日本語の転写）は絶対に使用しないでください。必ず漢字・ひらがな・カタカナのみで書いてください。
 簡潔にしてください - AI音声は${maxDurationSeconds}秒以内に話し終わる必要があります！`;
 
   let narrationText = "";
@@ -564,11 +564,22 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   if (isEnglish) {
     // Remove any remaining Japanese/CJK characters
     narrationText = narrationText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+/g, " ");
+    narrationText = narrationText.replace(/\s+/g, " ").trim();
+    // If no meaningful English words remain (e.g. all romaji was stripped), use fallback
+    const hasEnglishWords = /[a-zA-Z]{2,}/.test(narrationText);
+    if (!hasEnglishWords) {
+      narrationText = `${dishName} is cooking! Only ${remainingTime} seconds left!`;
+    }
   } else {
-    // Remove any remaining Latin/English word sequences
+    // Remove any remaining Latin/English word sequences (including romaji)
     narrationText = narrationText.replace(/[a-zA-Z][a-zA-Z0-9\s'!\-,.?]*/g, " ");
+    narrationText = narrationText.replace(/\s+/g, " ").trim();
+    // If no Japanese characters remain after filtering (e.g. output was entirely romaji), use fallback
+    const hasJapaneseChars = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(narrationText);
+    if (!hasJapaneseChars) {
+      narrationText = `${dishName}の調理が続く！残り${remainingTime}秒だ！`;
+    }
   }
-  narrationText = narrationText.replace(/\s+/g, " ").trim();
 
   narrationText = trimNarrationToDuration(
     sanitizeInput(narrationText, MAX_TEXT_LENGTH),
