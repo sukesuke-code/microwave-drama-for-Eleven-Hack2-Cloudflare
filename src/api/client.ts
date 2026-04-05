@@ -30,11 +30,17 @@ let localMusicNodes: Array<{ stop: () => void }> = [];
 const lastEffectRequestAt = new Map<string, number>();
 
 function normalizeTextInput(input: string, maxLen: number): string {
+  if (!input) return "";
+  // High-performance sanitization: filter out control characters using charCode for lint safety
   let output = "";
-  for (const char of input) {
-    const code = char.charCodeAt(0);
-    const isControl = code < 32 || code === 127;
-    output += isControl ? " " : char;
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i);
+    // Keep printable chars and standard space
+    if (code >= 32 && code !== 127) {
+      output += input[i];
+    } else {
+      output += " ";
+    }
   }
   return output.replace(/\s+/g, " ").trim().slice(0, maxLen);
 }
@@ -60,13 +66,23 @@ function fitNarrationWithinDuration(
   if (!normalized) return "";
 
   const durationLimit = Math.max(1, Math.floor(maxDurationSeconds));
-  if (estimateNarrationDurationSeconds(normalized, locale) <= durationLimit) {
+  const currentDuration = estimateNarrationDurationSeconds(normalized, locale);
+  
+  if (currentDuration <= durationLimit) {
     return normalized;
   }
 
+  const isEnglish = locale.startsWith("en");
+  
+  // High-performance sentence splitting
   const sentenceCandidates = normalized
-    .split(/(?<=[。！？.!?])/)
-    .map((segment) => segment.trim())
+    .split(/([。！？.!?])/)
+    .reduce((acc, part, i) => {
+      if (i % 2 === 0) acc.push(part);
+      else acc[acc.length - 1] += part;
+      return acc;
+    }, [] as string[])
+    .map(s => s.trim())
     .filter(Boolean);
 
   let candidate = "";
@@ -78,15 +94,15 @@ function fitNarrationWithinDuration(
 
   if (candidate) return candidate;
 
-  if (locale.startsWith("en")) {
+  // Fallback: character/word level truncation if single sentence is too long
+  if (isEnglish) {
     const words = normalized.split(/\s+/).filter(Boolean);
     const maxWords = Math.max(3, Math.floor(durationLimit * ENGLISH_WORDS_PER_SECOND));
     return words.slice(0, maxWords).join(" ").trim();
   }
 
-  const chars = Array.from(normalized.replace(/\s+/g, ""));
   const maxChars = Math.max(6, Math.floor(durationLimit * JAPANESE_CHARS_PER_SECOND));
-  return chars.slice(0, maxChars).join("").trim();
+  return Array.from(normalized).slice(0, maxChars).join("").trim();
 }
 
 function ensureSafeApiBase(): void {

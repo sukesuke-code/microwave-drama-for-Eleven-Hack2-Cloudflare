@@ -137,6 +137,9 @@ function trimNarrationToDuration(text: string, maxDurationSeconds: number, isEng
   return chars.slice(0, allowedChars).join("").trim();
 }
 
+const RATE_LIMIT_MAP = new Map<string, number>();
+const GLOBAL_RATE_LIMIT_MS = 250; // Minimal interval between DO requests per IP (lightweight DoS protection)
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === "OPTIONS") {
@@ -144,6 +147,20 @@ export default {
     }
 
     const url = new URL(request.url);
+    const ip = request.headers.get("cf-connecting-ip") || "unknown";
+    
+    // Global rate limiting (lightweight DoS/DoW protection)
+    const now = Date.now();
+    const lastRequestAt = RATE_LIMIT_MAP.get(ip) || 0;
+    if (now - lastRequestAt < GLOBAL_RATE_LIMIT_MS) {
+      return new Response(JSON.stringify({ ok: false, error: "RATE_LIMITED" }), {
+        status: 429,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+    RATE_LIMIT_MAP.set(ip, now);
+    // Cleanup old entries occasionally (simple prune)
+    if (RATE_LIMIT_MAP.size > 2000) RATE_LIMIT_MAP.clear();
 
     try {
       if (request.method === "POST" && url.pathname === "/api/agent/narration") {
@@ -172,7 +189,6 @@ export default {
           if (url.pathname === "/api/session/start") {
              const id = env.SESSION_STORAGE.newUniqueId();
              const obj = env.SESSION_STORAGE.get(id);
-             // Rewrite url to just /api/session for the DO to pick up as handleStart
              const newUrl = new URL(request.url);
              newUrl.pathname = "/api/session";
              return await obj.fetch(new Request(newUrl, request));
@@ -187,14 +203,11 @@ export default {
           try {
             const id = env.SESSION_STORAGE.idFromString(sessionId);
             const obj = env.SESSION_STORAGE.get(id);
-            
-            // Map GET /api/session to DO /api/session/state
             if (request.method === "GET") {
               const newUrl = new URL(request.url);
               newUrl.pathname = "/api/session/state";
               return await obj.fetch(new Request(newUrl, request));
             }
-            
             return await obj.fetch(request);
           } catch {
              return new Response(JSON.stringify({ ok: false, error: "Invalid sessionId format" }), { status: 400, headers: CORS_HEADERS });

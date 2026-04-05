@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo, useRef, useEffect } from 'react';
 import { Locale, NarrationStyle } from '../types';
 
 interface CircularTimerProps {
@@ -18,7 +18,7 @@ const STYLE_COLORS: Record<NarrationStyle, { stroke: string; track: string; glow
   anime: { stroke: '#f43f5e', track: '#4c0519', glow: 'rgba(244,63,94,0.6)' },
 };
 
-export default function CircularTimer({ remaining, total, size = 240, style, locale }: CircularTimerProps) {
+export default memo(function CircularTimer({ remaining, total, size = 240, style, locale }: CircularTimerProps) {
   const strokeWidth = 8;
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -37,22 +37,25 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
   const showMinutePrefix = remaining >= 60;
 
   const gradientId = useMemo(() => `timer-gradient-${style}`, [style]);
-  const auraOpacity = isFinished ? 0.9 : 0.62;
   const finishedLabelSize = Math.min(size * 0.22, 48);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.style.setProperty('--size', `${size}px`);
+      containerRef.current.style.setProperty('--stroke', colors.stroke);
+      containerRef.current.style.setProperty('--track', colors.track);
+      containerRef.current.style.setProperty('--glow', colors.glow);
+      containerRef.current.style.setProperty('--offset', `${strokeDashoffset}`);
+      containerRef.current.style.setProperty('--label-size', `${finishedLabelSize}px`);
+      containerRef.current.style.setProperty('--stroke-url', `url(#${gradientId})`);
+    }
+  }, [size, colors, strokeDashoffset, finishedLabelSize, gradientId]);
+
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <div
-        className="absolute rounded-full pointer-events-none"
-        style={{
-          width: size + 36,
-          height: size + 36,
-          background: `radial-gradient(circle, ${colors.glow} 0%, transparent 68%)`,
-          filter: isFinished ? 'blur(10px)' : 'blur(8px)',
-          opacity: auraOpacity,
-          transition: 'opacity 0.3s ease',
-        }}
-      />
+    <div ref={containerRef} className="relative inline-flex items-center justify-center timer-root" data-finished={isFinished}>
+      <div className="absolute rounded-full pointer-events-none timer-aura" />
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute top-0 left-0 -rotate-90 overflow-visible">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -75,60 +78,38 @@ export default function CircularTimer({ remaining, total, size = 240, style, loc
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={`url(#${gradientId})`}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          style={{
-            transition: 'stroke-dashoffset 0.8s ease-in-out, stroke 0.3s ease',
-            filter: isFinished
-              ? `drop-shadow(0 0 16px ${colors.stroke}) drop-shadow(0 0 30px ${colors.glow}) drop-shadow(0 0 50px ${colors.glow})`
-              : `drop-shadow(0 0 10px ${colors.stroke}) drop-shadow(0 0 18px ${colors.glow}) drop-shadow(0 0 30px ${colors.glow})`,
-          }}
+          className="timer-circle-progress"
         />
       </svg>
 
       <div className="z-10 flex flex-col items-center">
         {isFinished ? (
-          <span
-            className="font-display font-black leading-none"
-            style={{
-              fontSize: finishedLabelSize,
-              color: colors.stroke,
-              textShadow: `0 0 18px ${colors.glow}, 0 0 42px ${colors.glow}`,
-              filter: `drop-shadow(0 0 14px ${colors.glow})`,
-            }}
-          >
+          <span className="font-display font-black leading-none timer-finished-label">
             {locale === 'ja' ? 'チーン！' : 'DING!'}
           </span>
         ) : (
-          <span className="font-display font-black tracking-tight" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <span className="font-display font-black tracking-tight tabular-nums">
             {showMinutePrefix && (
-              <span style={{ fontSize: 52, color: '#ffffff' }}>
+              <span className="text-[52px] text-white">
                 {minuteStr}:
               </span>
             )}
             <span
-              className={isUrgent ? 'timer-urgent-pulse' : ''}
-              style={{
-                fontSize: showMinutePrefix ? 52 : 64,
-                color: isUrgent ? '#ef4444' : '#ffffff',
-                textShadow: isUrgent
-                  ? '0 0 14px rgba(239,68,68,0.75), 0 0 32px rgba(239,68,68,0.6)'
-                  : 'none',
-              }}
+              className={`${isUrgent ? 'timer-urgent-pulse timer-value-urgent' : ''} ${showMinutePrefix ? 'text-[52px]' : 'text-[64px]'} ${isUrgent ? 'text-[#ef4444]' : 'text-white'}`}
             >
               {secondStr}
             </span>
           </span>
         )}
         {!isFinished && (
-          <span className="mt-1 text-sm font-bold" style={{ color: '#94a3b8' }}>
+          <span className="mt-1 text-sm font-bold text-[#94a3b8]">
             {showMinutePrefix ? (locale === 'ja' ? '分:秒' : 'Min:Sec') : locale === 'ja' ? '秒' : 'Sec'}
           </span>
         )}
       </div>
     </div>
   );
-}
+});
