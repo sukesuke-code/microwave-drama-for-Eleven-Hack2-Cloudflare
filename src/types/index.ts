@@ -27,6 +27,8 @@ export interface Settings {
   totalSeconds: number;
   dishName: string;
   style: NarrationStyle;
+  sessionId?: string;
+  aiEnhancedInstruction?: string;
 }
 
 export interface PhaseAssets {

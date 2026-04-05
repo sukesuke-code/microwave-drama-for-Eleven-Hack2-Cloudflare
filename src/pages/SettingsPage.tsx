@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed } from 'lucide-react';
 import { InitialAssets, Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
-import { api } from '../api/client';
+
 
 interface SettingsPageProps {
   locale: Locale;
@@ -161,6 +161,8 @@ export default function SettingsPage({
         totalSeconds: duration,
         dishName: nextDishName,
         style,
+        sessionId,
+        aiEnhancedInstruction,
       };
 
       sessionStorage.setItem('sessionId', initialAssets.session.sessionId);
@@ -172,13 +174,7 @@ export default function SettingsPage({
         ? 'サーバーに接続できませんでした。通信環境をご確認のうえ、もう一度お試しください。'
         : 'Could not connect to the server. Please check your connection and try again.';
       setError(userMessage);
-
-      const developerMessage = err instanceof Error ? err.message : String(err);
-      console.error('Failed to start session (developer detail):', {
-        error: developerMessage,
-        duration,
-        style,
-      });
+      console.error('Session start failed:', err);
     } finally {
       setIsLoading(false);
     }
