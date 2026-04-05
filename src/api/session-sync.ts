@@ -1,4 +1,36 @@
 const API_BASE = import.meta.env.VITE_API_BASE || "";
+const WS_PROTOCOL_RE = /^wss?:$/i;
+
+function buildWsUrl(sessionId: string): string {
+  const trimmedSessionId = String(sessionId ?? "").trim();
+  if (!trimmedSessionId) {
+    throw new Error("Session ID is required.");
+  }
+
+  if (!API_BASE) {
+    if (typeof window === "undefined") {
+      throw new Error("VITE_API_BASE is required outside the browser.");
+    }
+    const fallback = new URL(`/api/session/ws/${encodeURIComponent(trimmedSessionId)}`, window.location.origin);
+    fallback.protocol = fallback.protocol === "https:" ? "wss:" : "ws:";
+    return fallback.toString();
+  }
+
+  const base = new URL(API_BASE);
+  if (!/^https?:$/i.test(base.protocol)) {
+    throw new Error("VITE_API_BASE must use http or https.");
+  }
+  base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
+  base.pathname = `/api/session/ws/${encodeURIComponent(trimmedSessionId)}`;
+  base.search = "";
+  base.hash = "";
+
+  if (!WS_PROTOCOL_RE.test(base.protocol)) {
+    throw new Error("Failed to construct websocket URL.");
+  }
+
+  return base.toString();
+}
 
 type SessionState = {
   dishName: string;
@@ -22,7 +54,7 @@ export class SessionSyncClient {
   }
 
   connect() {
-    const wsUrl = API_BASE.replace(/^http/, "ws") + `/api/session/ws/${this.sessionId}`;
+    const wsUrl = buildWsUrl(this.sessionId);
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onmessage = (event) => {
