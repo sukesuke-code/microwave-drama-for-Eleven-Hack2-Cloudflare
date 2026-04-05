@@ -1008,10 +1008,9 @@ async function requestAgentNarration(
     dishName: normalizeTextInput(request.dishName, MAX_DISH_NAME_LENGTH),
     totalTime: Math.max(1, Math.min(600, Math.floor(request.totalTime))),
     remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
-    maxDuration: Math.max(
-      1,
-      Math.min(600, Math.floor(maxDuration), maxAllowedByRemaining)
-    ),
+    maxDuration: request.phase === 'done'
+      ? Math.max(1, Math.min(600, Math.floor(maxDuration)))
+      : Math.max(1, Math.min(600, Math.floor(maxDuration), maxAllowedByRemaining)),
   };
 
   const cachedPhaseAsset = sanitizedRequest.sessionId

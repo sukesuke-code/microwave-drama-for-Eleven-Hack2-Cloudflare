@@ -101,6 +101,8 @@ export default function CountdownPage({
   const isFinishedRef = useRef(isFinished);
   const isUnmountedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const onFinishRef = useRef(onFinish);
+  const hasCalledFinishRef = useRef(false);
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -120,6 +122,10 @@ export default function CountdownPage({
   useEffect(() => {
     isFinishedRef.current = isFinished;
   }, [isFinished]);
+
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
 
   useEffect(() => {
     setIsCountdownActive(false);
@@ -204,6 +210,7 @@ export default function CountdownPage({
       remainingTime: tl,
       phase,
       locale: voiceLanguage,
+      ...(phase === 'done' && { maxDuration: 15 }),
     };
   }, [style, dishName, totalSeconds, voiceLanguage]);
 
@@ -361,7 +368,7 @@ export default function CountdownPage({
             console.log(`[CountdownPage] Using pre-fetched assets for ${phase}`);
             currentText = preFetched.narrationText;
             playAudio = async (onReady) => {
-              const phaseMaxNarrationMs = Math.max(1, timeLeft - 1) * 1000;
+              const phaseMaxNarrationMs = phase === 'done' ? 15000 : Math.max(1, timeLeft - 1) * 1000;
               const tasks: Promise<void>[] = [];
 
               if (preFetched.narrationAudio) {
@@ -416,6 +423,12 @@ export default function CountdownPage({
             await playAudio(triggerTextSync);
             triggerTextSync();
             await effectTask;
+
+            if (phase === 'done' && !hasCalledFinishRef.current) {
+              hasCalledFinishRef.current = true;
+              if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
+              onFinishRef.current();
+            }
           }
         } catch (err) {
           console.error(`[CountdownPage] Phase task failed for ${phase}:`, err);
@@ -427,9 +440,15 @@ export default function CountdownPage({
           await handlePhaseEffects(phase).catch(() => {});
 
           if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-            const fallbackMaxNarrationMs = Math.max(1, timeLeft - 1) * 1000;
+            const fallbackMaxNarrationMs = phase === 'done' ? 15000 : Math.max(1, timeLeft - 1) * 1000;
             await api.playLocalNarration(fallbackLine, voiceLanguage, undefined, fallbackMaxNarrationMs)
               .catch(e => console.error("Local fallback failed:", e));
+          }
+
+          if (phase === 'done' && !hasCalledFinishRef.current) {
+            hasCalledFinishRef.current = true;
+            if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
+            onFinishRef.current();
           }
         }
       })
@@ -473,7 +492,12 @@ export default function CountdownPage({
           }
 
           flashTimeoutRef.current = setTimeout(() => setIsFlashing(false), 600);
-          finishTimeoutRef.current = setTimeout(() => onFinish(), 4000);
+          finishTimeoutRef.current = setTimeout(() => {
+            if (!hasCalledFinishRef.current) {
+              hasCalledFinishRef.current = true;
+              onFinishRef.current();
+            }
+          }, 12000);
           return 0;
         }
         if (sessionIdRef.current) {
@@ -489,7 +513,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, voiceLanguage, playAlarmTone, isCountdownActive]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, voiceLanguage, playAlarmTone, isCountdownActive]);
 
   useEffect(() => () => {
     if (flashTimeoutRef.current) {
