@@ -5,6 +5,7 @@ const API_BASE =
 const DEFAULT_AUDIO_TIMEOUT_MS = 30000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
 const DEFAULT_RETRY_COUNT = 1;
+const DEFAULT_BINARY_RETRY_COUNT = 2;
 const AUDIO_METER_FPS = 30;
 const IS_DEV = import.meta.env.DEV;
 const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -111,13 +112,6 @@ function logDebug(...args: unknown[]): void {
   }
 }
 
-function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
-    return AbortSignal.timeout(timeoutMs);
-  }
-  return undefined;
-}
-
 async function requestJson<T>(
   path: string,
   init?: RequestInit
@@ -171,6 +165,57 @@ async function requestJson<T>(
   }
 
   throw lastError || new Error("REQUEST_FAILED");
+}
+
+async function requestBinary(
+  path: string,
+  init: RequestInit,
+  timeoutMs: number,
+  retryCount = DEFAULT_BINARY_RETRY_COUNT
+): Promise<Response> {
+  ensureSafeApiBase();
+  const url = `${API_BASE}${path}`;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    const controller = new AbortController();
+    const timerId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: init.signal ?? controller.signal,
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      const isRetryable = RETRYABLE_HTTP_STATUS.has(response.status);
+      if (isRetryable && attempt < retryCount) {
+        const backoffMs = 250 * (attempt + 1);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+
+      const body = await response.text().catch(() => "");
+      throw new Error(`HTTP_${response.status}:${body}`);
+    } catch (err) {
+      lastError = err;
+      const isAbort = (err as Error).name === "AbortError";
+      const isNetwork = (err as Error).message?.includes("fetch") || (err as Error).message?.includes("Network");
+      if ((isAbort || isNetwork) && attempt < retryCount) {
+        const backoffMs = 300 * (attempt + 1);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      break;
+    } finally {
+      clearTimeout(timerId);
+    }
+  }
+
+  throw lastError || new Error("BINARY_REQUEST_FAILED");
 }
 
 import { 
@@ -964,15 +1009,18 @@ async function requestAgentNarration(
       if (!narrationText) return;
 
       try {
-        const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
-            locale: sanitizedRequest.locale || "ja",
-          }),
-          signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-        });
+        const ttsRes = await requestBinary(
+          "/api/tts",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
+              locale: sanitizedRequest.locale || "ja",
+            }),
+          },
+          DEFAULT_AUDIO_TIMEOUT_MS
+        );
 
         if (ttsRes.ok) {
           const blob = await parseAudioBlob(ttsRes);
@@ -996,49 +1044,46 @@ async function requestAgentNarration(
 async function generateTtsBlob(text: string, locale: string = "ja"): Promise<Blob> {
   const normalizedLocale = locale.startsWith('en') ? 'en' : 'ja';
 
-  const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
-      locale: normalizedLocale,
-    }),
-    signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-  });
-
-  if (!ttsRes.ok) {
-    throw new Error(`TTS generation failed: ${ttsRes.status}`);
-  }
+  const ttsRes = await requestBinary(
+    "/api/tts",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
+        locale: normalizedLocale,
+      }),
+    },
+    DEFAULT_AUDIO_TIMEOUT_MS
+  );
 
   return parseAudioBlob(ttsRes);
 }
 
 async function generateSfxBlob(prompt: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`SFX generation failed: ${res.status}`);
-  }
+  const res = await requestBinary(
+    "/api/generate-sfx",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    },
+    DEFAULT_REQUEST_TIMEOUT_MS + 5000
+  );
 
   return parseAudioBlob(res);
 }
 
 async function generateMusicBlob(prompt: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/generate-music`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Music generation failed: ${res.status}`);
-  }
+  const res = await requestBinary(
+    "/api/generate-music",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+    },
+    DEFAULT_REQUEST_TIMEOUT_MS + 8000
+  );
 
   return parseAudioBlob(res);
 }
@@ -1255,12 +1300,15 @@ async function playSfx(prompt: string): Promise<void> {
   enforceEffectRateLimit("sfx");
 
   try {
-    const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-    });
+    const res = await requestBinary(
+      "/api/generate-sfx",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      },
+      DEFAULT_REQUEST_TIMEOUT_MS + 5000
+    );
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
@@ -1278,12 +1326,15 @@ async function playMusic(prompt: string): Promise<void> {
   enforceEffectRateLimit("music");
 
   try {
-    const res = await fetch(`${API_BASE}/api/generate-music`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
-    });
+    const res = await requestBinary(
+      "/api/generate-music",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
+      },
+      DEFAULT_REQUEST_TIMEOUT_MS + 8000
+    );
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);

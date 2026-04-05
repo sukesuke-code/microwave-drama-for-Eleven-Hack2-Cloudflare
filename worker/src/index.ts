@@ -14,9 +14,61 @@ const CORS_HEADERS = {
 
 const ENGLISH_WORDS_PER_SECOND = 2.4;
 const JAPANESE_CHARS_PER_SECOND = 5.2;
+const EXTERNAL_FETCH_TIMEOUT_MS = 12000;
+const EXTERNAL_FETCH_RETRIES = 2;
+const MAX_TEXT_LENGTH = 280;
+const MAX_DISH_NAME_LENGTH = 100;
+const MAX_STYLE_LENGTH = 24;
 
 function normalizeNarrationText(text: string): string {
   return text.replace(/[\r\n]+/g, " ").replace(/"/g, "").replace(/\s+/g, " ").trim();
+}
+
+function sanitizeInput(value: string, maxLength: number): string {
+  let normalized = "";
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    const isControl = code < 32 || code === 127;
+    normalized += isControl ? " " : char;
+  }
+  normalized = normalized.replace(/\s+/g, " ").trim();
+  return normalized.slice(0, maxLength);
+}
+
+async function fetchWithRetry(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= EXTERNAL_FETCH_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timerId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: init.signal ?? controller.signal,
+      });
+
+      if (response.ok) return response;
+
+      if ((response.status === 429 || response.status >= 500) && attempt < EXTERNAL_FETCH_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt < EXTERNAL_FETCH_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+        continue;
+      }
+      break;
+    } finally {
+      clearTimeout(timerId);
+    }
+  }
+
+  throw lastError ?? new Error("EXTERNAL_FETCH_FAILED");
 }
 
 function estimateNarrationDurationSeconds(text: string, isEnglish: boolean): number {
@@ -96,7 +148,13 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
     locale?: string;
     maxDuration?: number;
   };
-  const { dishName, style, phase, remainingTime, totalTime, locale, maxDuration } = body;
+  const dishName = sanitizeInput(body.dishName || "", MAX_DISH_NAME_LENGTH);
+  const style = sanitizeInput(body.style || "", MAX_STYLE_LENGTH);
+  const phase = sanitizeInput(body.phase || "opening", 24);
+  const locale = body.locale === "en" ? "en" : "ja";
+  const remainingTime = Number(body.remainingTime) || 0;
+  const totalTime = Number(body.totalTime) || 1;
+  const maxDuration = Number(body.maxDuration);
 
   const safeTotalTime = Math.max(1, Number(totalTime) || 1);
   const safeRemainingTime = Math.max(0, Number(remainingTime) || 0);
@@ -151,14 +209,14 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 
   if (env.GEMINI_API_KEY) {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
+      const res = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 60, temperature: 0.8 },
         }),
-      });
+      }, EXTERNAL_FETCH_TIMEOUT_MS);
       if (res.ok) {
         const json = await res.json() as {
           candidates?: Array<{
@@ -203,7 +261,11 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
     narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
   }
 
-  narrationText = trimNarrationToDuration(narrationText, maxDurationSeconds, isEnglish);
+  narrationText = trimNarrationToDuration(
+    sanitizeInput(narrationText, MAX_TEXT_LENGTH),
+    maxDurationSeconds,
+    isEnglish
+  );
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -217,12 +279,12 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body = await request.json() as { text: string; locale?: string };
-  const text = body.text;
+  const text = sanitizeInput(body.text || "", MAX_TEXT_LENGTH);
   const locale = body.locale || 'ja';
 
   const voiceId = locale === 'en' ? '5pPXnKrQTMV5dNWwILnl' : 'JBFqnCBsd6RMkjVDRZzb';
 
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+  const res = await fetchWithRetry(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -233,7 +295,7 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
       model_id: "eleven_multilingual_v2",
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
-  });
+  }, EXTERNAL_FETCH_TIMEOUT_MS + 6000);
 
   if (!res.ok) {
     const errorBody = await res.text().catch(() => "unknown");
@@ -256,9 +318,9 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body = await request.json() as { prompt: string };
-  const prompt = body.prompt;
+  const prompt = sanitizeInput(body.prompt || "", MAX_TEXT_LENGTH);
 
-  const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+  const res = await fetchWithRetry("https://api.elevenlabs.io/v1/sound-generation", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -269,7 +331,7 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
       duration_seconds: 4,
       prompt_influence: 0.3
     }),
-  });
+  }, EXTERNAL_FETCH_TIMEOUT_MS + 6000);
 
   if (!res.ok) {
     throw new Error(`ElevenLabs SFX HTTP Error: ${res.status}`);
@@ -287,9 +349,9 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
   const body = await request.json() as { prompt: string };
-  const prompt = body.prompt;
+  const prompt = sanitizeInput(body.prompt || "", MAX_TEXT_LENGTH);
 
-  const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+  const res = await fetchWithRetry("https://api.elevenlabs.io/v1/sound-generation", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -300,7 +362,7 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
       duration_seconds: 10,
       prompt_influence: 0.3
     }),
-  });
+  }, EXTERNAL_FETCH_TIMEOUT_MS + 6000);
 
   if (!res.ok) {
     throw new Error(`ElevenLabs Music HTTP Error: ${res.status}`);
