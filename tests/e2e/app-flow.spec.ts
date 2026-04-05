@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
 
+test.skip(
+  process.env.PLAYWRIGHT_SKIP_E2E === '1',
+  'Playwright browser binary is unavailable in this environment.'
+);
+
 test('main flow works from top to result and back', async ({ page }) => {
   await page.goto('/');
 
