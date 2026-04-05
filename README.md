@@ -1,124 +1,107 @@
-# Microwave Show 🍿
+# Microwave Show 🍿: Cinematic AI Agent on Cloudflare
 
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-F38020?style=flat&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 [![ElevenLabs](https://img.shields.io/badge/ElevenLabs-Voice%20AI-000000?style=flat)](https://elevenlabs.io/)
 [![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 
-Microwave Show is a creative AI-agent application that transforms boring microwave wait times into a high-stakes, narrated cinematic experience. Built for the **Cloudflare x ElevenLabs Hackathon**, it pushes the boundaries of edge computing by integrating stateful AI agents, long-term memory, and real-time audio orchestration.
+**Microwave Show** is a stateful, cinematic AI agent that recovers "Dead Time"—the boring gap while waiting for a microwave—and transforms it into high-fidelity entertainment. Built for the **Cloudflare x ElevenLabs Hackathon**, it demonstrates the full power of the **Cloudflare Agent Platform**.
 
 ---
 
-## 🏗 System Architecture (Cloudflare Agents)
+## 🏆 Hackathon Criteria Fulfillment
 
-Below is the high-level infrastructure showing how we utilize the full power of the Cloudflare Developer Platform integrated with ElevenLabs APIs.
+Microwave Show is more than a toy; it is a full-featured demonstration of the **Cloudflare Agents** paradigm combined with state-of-the-art voice AI.
+
+### 1. Cloudflare Agent Stack
+
+- **Durable Execution (Durable Objects)**: Every show is managed by a `MicrowaveSession` DO, providing an authoritative, stateful timer and narration context across the edge.
+- **Serverless Inference (Workers AI)**: Script generation via **Llama-3** and semantic memory creation via **BGE Embeddings**.
+- **Long-term Memory (Vectorize)**: The agent "remembers" your cooking history and past interactions, creating a persistent personality.
+- **Compute (Workers)**: Orchestrates the real-time bridge between state, history, and audio generation.
+- **Browser Rendering**: Captures automated snapshots of results for post-show persistence.
+
+### 2. ElevenLabs Cinematic Integration
+
+- **Orchestrated Audio**: A layered soundscape using **TTS (Voice)**, **Sound Generation (SFX)**, and **Temporal Background Music**.
+- **Secure Agent Interaction**: Backend signed-URL generation for secure, keyless Conversational AI access.
+
+---
+
+## 🏗 Infrastructure Architecture
 
 ```mermaid
 graph TD
     User((User Browser))
     
-    subgraph "Cloudflare Edge"
-        FE[React Frontend - Pages/KV]
-        Worker[Cloudflare Worker - API Gateway]
-        DO[Durable Objects - State & Execution]
-        AI[Workers AI - Inference Llama-3]
-        Vec[Vectorize - Long-term Memory]
-        BR[Browser Rendering - Final Snapshot]
+    subgraph "Cloudflare Edge (The Agent Platform)"
+        Worker[Workers: Compute & Gateway]
+        DO[Durable Objects: Stateful Execution]
+        AI[Workers AI: Inference & Embeddings]
+        Vec[Vectorize: Long-term Memory]
+        BR[Browser Rendering: Snapshots]
     end
     
     subgraph "ElevenLabs Cloud"
-        EL_TTS[Text to Speech]
-        EL_SFX[Sound Effects]
-        EL_Music[Music Generation]
+        EL[Text-to-Speech + SFX + Music]
     end
     
-    User --> FE
     User --> Worker
     Worker --> DO
-    
     DO --> AI
-    DO --> Vec
-    DO --> EL_TTS
-    DO --> EL_SFX
-    DO --> EL_Music
-    
-    DO -- "Post-show Processing" --> BR
+    AI --> Vec
+    DO --> EL
+    DO -- "Automation" --> BR
 ```
 
 ---
 
-## 🌟 Key Features & Implementation
+## 💎 Strategic Analysis & Moat
 
-### 1. Durable Execution (Durable Objects)
-We use **Cloudflare Durable Objects** to manage the state of each "Microwave Show". Unlike stateless workers, our DOs maintain the countdown timer, the narration history, and phase transitions. This ensures a consistent, authoritative experience even if the user refreshes their browser.
+### Market Case
 
-### 2. Serverless Inference (Workers AI)
-Narrations are generated on-the-fly using **Workers AI (Meta Llama-3)**. The agent understands the "style" selected by the user (Sports, Horror, Anime, etc.) and crafts dramatic scripts that fit perfectly into the remaining time.
+Every day, billions of minutes are wasted in front of microwaves. Microwave Show captures this gap in the attention economy, offering a new category of **Micro-Entertainment**.
 
-### 3. Long-term Memory (Vectorize)
-The agent doesn't just forget. After every show, the result is embedded and stored in **Cloudflare Vectorize**. When you cook the same dish again, the agent recalls your history ("The last time we cooked this Pizza, it was legendary!") providing a personalized, persistent narrative across sessions.
+### The "Memory" Moat
 
-### 4. Cinematic Audio (ElevenLabs APIs)
-The show comes to life with **ElevenLabs**:
-- **TTS**: High-fidelity voices tailored to the show's style.
-- **Sound Generation**: Dynamic SFX generated based on the AI's description of the dish.
-- **Music**: Thematic background scores that escalate in intensity as the timer hits zero.
+By leveraging **Cloudflare Vectorize**, our agent creates a personalized feedback loop. It doesn't just narrate; it recalls: "The last time you cooked this Pizza, we hit the perfect crisp." This semantic persistence is our primary differentiator from stateless bots.
 
-### 5. SLO & Cost Control
-Built with production limits in mind. We've implemented a **Durable Budgeting System** ($0.05 per session) within the Durable Object. It tracks API usage and token counts, enforcing service level objectives and preventing cost overruns while maintaining high availability through local fallbacks.
+### Monetization Model
+
+- **Hardware Licensing (B2B)**: Smart microwave manufacturers can integrate the "Narrator Engine" for premium user experiences.
+- **Agent Marketplace (B2C)**: Users can subscribe to premium "Narrator Skins" (Sports Legends, Anime Protagonists, Historical Figures).
 
 ---
 
-## 🛠 Setup & Installation
+## 🇯🇵 日本語：戦略的分析と技術要件
 
-### Prerequisites
-- Node.js 18+
-- Cloudflare Account with Workers, Durable Objects, and Vectorize enabled.
-- ElevenLabs API Key.
+**Microwave Show** は、電子レンジの「ただ待つだけの時間」を最先端のAI実況でエンターテインメント化する、Cloudflare Agent Platform 上のステートフルAIエージェントです。
 
-### 1. Backend (Cloudflare Worker)
+### ハッカソン要件への適合
+
+- **Cloudflare Agents**: Durable Objects による状態管理、Workers AI による推論、Vectorize による長期記憶、そして Browser Rendering による結果の可視化をすべてエッジ上で統合。
+- **ElevenLabs**: 音声、効果音、音楽を多層的にオーケストレーションし、既存の音声アシスタントを超えた「没入型」体験を提供。
+
+### ビジネスモデル
+
+- **アテンションの回収**: 世界中のキッチンに存在する「隙間時間」をメディア化します。
+- **記憶による差別化**: Vectorize を活用し、使うほどユーザーの好みを「覚える」エージェントとなり、高い継続性を維持します。
+- **収益化**: 家電メーカーへのライセンス提供、または著名人の声をエージェント化するマーケットプレイス。
+
+---
+
+## 🚀 Quick Start
+
 ```bash
+# Backend Deployment
 cd worker
-npm install
 npx wrangler secret put ELEVENLABS_API_KEY
-# If using Gemini
-npx wrangler secret put GEMINI_API_KEY
-
-# Initialize Vectorize Index
-npx wrangler vectorize create microwave-memory --dimensions=3 --metric=cosine
-
-# Deploy
+npx wrangler vectorize create microwave-memory --dimensions=384 --metric=cosine
 npx wrangler deploy
-```
 
-### 2. Frontend (Vite + React)
-```bash
-npm install
-cp .env.example .env
-# Update VITE_API_BASE to your deployed worker URL
-npm run dev
+# Frontend Development
+npm install && npm run dev
 ```
 
 ---
 
-## 🇯🇵 日本語概要
-
-Microwave Show は、電子レンジの「ただ待つだけの時間」を、AIが実況するドラマチックなエンターテインメントへと変貌させるアプリケーションです。Cloudflare のエッジコンピューティングと ElevenLabs の音声合成技術を極限まで活用した、全く新しい「AIエージェント」体験を提供します。
-
-### 技術の核心
-- **Durable Execution**: Durable Objects を使用し、リクエストを跨いで実況の状態、履歴、タイマーをエッジ上で「永続的」に稼働させます。
-- **Memory (Vectorize)**: 過去に作った料理や実況の内容を Vectorize が記憶しており、次回の実況に「前回の続き」としてのコンテキストを反映させます。
-- **Inference (Workers AI)**: Llama 3 をエッジで実行し、スタイルに応じたナレーションをリアルタイムに生成します。
-- **Cost & SLO Control**: 1セッションあたり5セントという予算制限を Durable Object 内で監視・強制し、コスト効率と安定性を両立しています。
-
-Cloudflare のインフラをフル活用することで、状態を持ち、記憶を持ち、自律的に演出を行う「真のAIエージェント」を実現しました。
-
----
-
-## 🛡 Security & SLO
-- **Strict Content Security Policy (CSP)** enforced at the edge.
-- **Automatic Fallback**: If backend APIs fail, the system falls back to High-Quality Local Synthesis (SpeechSynthesis API) to ensure the timer never breaks.
-- **Budget Tracking**: Real-time USD cost calculation per show.
-
----
-
-*Built with ❤️ for the ElevenLabs x Cloudflare Hackathon 2026.*
+*Pushing the limits of the Cloudflare Edge. 2026 Hackathon Submission.*
