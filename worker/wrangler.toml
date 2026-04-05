@@ -1,16 +1,21 @@
-name = "microwave-show-api-v2"
+name = "microwave-show-backend"
 main = "src/index.ts"
 compatibility_date = "2024-03-20"
 
+# AI Binding: Allows us to use Workers AI (like Llama) to enhance narrations
 [ai]
 binding = "AI"
 
-[vars]
-# You will set ELEVENLABS_API_KEY securely using:
-# npx wrangler secret put ELEVENLABS_API_KEY
-# (Optional) If you want to use Gemini instead of Cloudflare AI
-# npx wrangler secret put GEMINI_API_KEY
+# Durable Object: For real-time multiplayer synchronization
+[[durable_objects.bindings]]
+name = "MICROWAVE_SESSION"
+class_name = "MicrowaveSession"
 
+# Durable Object Migrations
 [[migrations]]
 tag = "v1"
-deleted_classes = ["MicrowaveSessionAgent", "TimerSession"]
+new_sqlite_classes = ["MicrowaveSession"]
+
+# ElevenLabs API Key should be set via `npx wrangler secret put ELEVENLABS_API_KEY`
+# Agent ID should be set via `npx wrangler secret put ELEVENLABS_AGENT_ID`
+# (Or in .dev.vars for local development)

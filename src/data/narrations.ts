@@ -42,26 +42,6 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     textShadowClass: 'text-emerald-400',
     boxNeonClass: 'box-neon-green',
   },
-  {
-    id: 'documentary',
-    label: '歴史ドキュメンタリー',
-    emoji: '📜',
-    accentColor: '#a8a29e',
-    glowClass: 'text-shadow-glow-stone',
-    bgGradient: 'from-stone-900 via-stone-950 to-stone-950',
-    textShadowClass: 'text-stone-300',
-    boxNeonClass: 'box-neon-stone',
-  },
-  {
-    id: 'anime',
-    label: '熱血アニメ',
-    emoji: '🔥',
-    accentColor: '#f43f5e',
-    glowClass: 'text-shadow-glow-rose',
-    bgGradient: 'from-rose-950/40 via-stone-950 to-stone-950',
-    textShadowClass: 'text-rose-400',
-    boxNeonClass: 'box-neon-rose',
-  },
 ];
 
 const STYLE_CONFIGS_CACHE: Record<Locale, ReadonlyArray<StyleConfig>> = {
@@ -99,62 +79,42 @@ export function getNarrationCues(
     switch (style) {
       case 'sports':
         result = [
-          { minPercent: 90, maxPercent: 100, lines: [`And we are live! ${d} enters the arena!`] },
-          { minPercent: 70, maxPercent: 90, lines: [`Strong opening pace. ${d} looks focused.`] },
-          { minPercent: 50, maxPercent: 70, lines: [`Halfway mark! Momentum is building.`] },
-          { minPercent: 25, maxPercent: 50, lines: [`Final quarter. The heat is rising fast!`] },
-          { minPercent: 10, maxPercent: 25, lines: [`Last sprint! This is championship territory.`] },
-          { minPercent: 0, maxPercent: 10, lines: [`Final countdown—hold your breath!`] },
+        { minPercent: 90, maxPercent: 100, lines: [`And we are live! ${d} enters the arena!`] },
+        { minPercent: 70, maxPercent: 90, lines: [`Strong opening pace. ${d} looks focused.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`Halfway mark! Momentum is building.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`Final quarter. The heat is rising fast!`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Last sprint! This is championship territory.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`Final countdown—hold your breath!`] },
         ];
         break;
       case 'movie':
         result = [
-          { minPercent: 90, maxPercent: 100, lines: [`This summer, one dish changes everything: "${d}"`] },
-          { minPercent: 70, maxPercent: 90, lines: [`The door is closed. Fate starts to move.`] },
-          { minPercent: 50, maxPercent: 70, lines: [`No turning back now. The plot thickens.`] },
-          { minPercent: 25, maxPercent: 50, lines: [`Time is running out. Climax incoming.`] },
-          { minPercent: 10, maxPercent: 25, lines: [`Almost there... everything converges.`] },
-          { minPercent: 0, maxPercent: 10, lines: [`In theaters soon. One final sound remains.`] },
+        { minPercent: 90, maxPercent: 100, lines: [`This summer, one dish changes everything: "${d}"`] },
+        { minPercent: 70, maxPercent: 90, lines: [`The door is closed. Fate starts to move.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`No turning back now. The plot thickens.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`Time is running out. Climax incoming.`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Almost there... everything converges.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`In theaters soon. One final sound remains.`] },
         ];
         break;
       case 'horror':
         result = [
-          { minPercent: 90, maxPercent: 100, lines: [`You put ${d} inside... and something woke up.`] },
-          { minPercent: 70, maxPercent: 90, lines: [`The light flickers. Something feels wrong.`] },
-          { minPercent: 50, maxPercent: 70, lines: [`Midpoint. Few have returned from here.`] },
-          { minPercent: 25, maxPercent: 50, lines: [`Run. Right now. If you still can.`] },
-          { minPercent: 10, maxPercent: 25, lines: [`Too late. The countdown has chosen you.`] },
-          { minPercent: 0, maxPercent: 10, lines: [`The ding draws near. No one is coming.`] },
+        { minPercent: 90, maxPercent: 100, lines: [`You put ${d} inside... and something woke up.`] },
+        { minPercent: 70, maxPercent: 90, lines: [`The light flickers. Something feels wrong.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`Midpoint. Few have returned from here.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`Run. Right now. If you still can.`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Too late. The countdown has chosen you.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`The ding draws near. No one is coming.`] },
         ];
         break;
       case 'nature':
         result = [
-          { minPercent: 90, maxPercent: 100, lines: [`In the microwave wilds, ${d}'s journey begins.`] },
-          { minPercent: 70, maxPercent: 90, lines: [`Microwaves stir each molecule with precision.`] },
-          { minPercent: 50, maxPercent: 70, lines: [`Transformation accelerates deep within.`] },
-          { minPercent: 25, maxPercent: 50, lines: [`A critical threshold is near.`] },
-          { minPercent: 10, maxPercent: 25, lines: [`Only moments remain in this thermal dance.`] },
-          { minPercent: 0, maxPercent: 10, lines: [`The journey reaches its natural climax.`] },
-        ];
-        break;
-      case 'documentary':
-        result = [
-          { minPercent: 90, maxPercent: 100, lines: [`The history of ${d} is about to be rewritten.`] },
-          { minPercent: 70, maxPercent: 90, lines: [`Modern technology meets ancient hunger.`] },
-          { minPercent: 50, maxPercent: 70, lines: [`A turning point in culinary evolution.`] },
-          { minPercent: 25, maxPercent: 50, lines: [`The final chapter draw near.`] },
-          { minPercent: 10, maxPercent: 25, lines: [`Moments from a historic achievement.`] },
-          { minPercent: 0, maxPercent: 10, lines: [`The countdown of legacy reaches its end.`] },
-        ];
-        break;
-      case 'anime':
-        result = [
-          { minPercent: 90, maxPercent: 100, lines: [`Let's go, ${d}! Beyond the limit!!`] },
-          { minPercent: 70, maxPercent: 90, lines: [`Don't give up! Your true power lies within!`] },
-          { minPercent: 50, maxPercent: 70, lines: [`This heat... it's a miracle of friendship!!`] },
-          { minPercent: 25, maxPercent: 50, lines: [`The transformation is reaching level 99!!`] },
-          { minPercent: 10, maxPercent: 25, lines: [`Final strike!! Show them what you're made of!`] },
-          { minPercent: 0, maxPercent: 10, lines: [`One second... one world!! Believe in yourself!`] },
+        { minPercent: 90, maxPercent: 100, lines: [`In the microwave wilds, ${d}'s journey begins.`] },
+        { minPercent: 70, maxPercent: 90, lines: [`Microwaves stir each molecule with precision.`] },
+        { minPercent: 50, maxPercent: 70, lines: [`Transformation accelerates deep within.`] },
+        { minPercent: 25, maxPercent: 50, lines: [`A critical threshold is near.`] },
+        { minPercent: 10, maxPercent: 25, lines: [`Only moments remain in this thermal dance.`] },
+        { minPercent: 0, maxPercent: 10, lines: [`The journey reaches its natural climax.`] },
         ];
         break;
     }
@@ -164,52 +124,204 @@ export function getNarrationCues(
 
   const cues: Record<NarrationStyle, NarrationCue[]> = {
     sports: [
-      { minPercent: 90, maxPercent: 100, lines: [`さあ！スタートの合図とともに、${d}が電子レンジに投入された！観衆が息をのむ！`, `本日のメインイベント！${d}vs電子レンジ、伝説の戦いが今始まる！！`] },
-      { minPercent: 70, maxPercent: 90, lines: [`序盤戦、${d}は順調なペースを刻んでいます！しかし油断は禁物！`, `まだ始まったばかり！しかし${d}のポテンシャルは計り知れない！！`] },
-      { minPercent: 50, maxPercent: 70, lines: [`折り返し地点を通過！${d}、ここから真の実力を見せろ！！`, `中盤！電波が${d}の深部に到達し始めた！これぞまさに正念場！`] },
-      { minPercent: 25, maxPercent: 50, lines: [`残り4分の1！${d}よ、諦めるな！観客は君を見ている！！`, `終盤戦に突入！熱量が最高潮に達しようとしている！！`] },
-      { minPercent: 10, maxPercent: 25, lines: [`もうすぐだ！${d}が全力疾走している！誰も止められない！！！`, `ラストスパート！歴史が今、まさに作られようとしている！！！`] },
-      { minPercent: 0, maxPercent: 10, lines: [`最終カウントダウン！！全てはこの瞬間のため！${d}よ、飛べ！！！`, `ゴールまであと数秒！！心臓が止まりそうだ！！！！`] },
+      {
+        minPercent: 90,
+        maxPercent: 100,
+        lines: [
+          `さあ！スタートの合図とともに、${d}が電子レンジに投入された！観衆が息をのむ！`,
+          `本日のメインイベント！${d}vs電子レンジ、伝説の戦いが今始まる！！`,
+        ],
+      },
+      {
+        minPercent: 70,
+        maxPercent: 90,
+        lines: [
+          `序盤戦、${d}は順調なペースを刻んでいます！しかし油断は禁物！`,
+          `まだ始まったばかり！しかし${d}のポテンシャルは計り知れない！！`,
+        ],
+      },
+      {
+        minPercent: 50,
+        maxPercent: 70,
+        lines: [
+          `折り返し地点を通過！${d}、ここから真の実力を見せろ！！`,
+          `中盤！電波が${d}の深部に到達し始めた！これぞまさに正念場！`,
+        ],
+      },
+      {
+        minPercent: 25,
+        maxPercent: 50,
+        lines: [
+          `残り4分の1！${d}よ、諦めるな！観客は君を見ている！！`,
+          `終盤戦に突入！熱量が最高潮に達しようとしている！！`,
+        ],
+      },
+      {
+        minPercent: 10,
+        maxPercent: 25,
+        lines: [
+          `もうすぐだ！${d}が全力疾走している！誰も止められない！！！`,
+          `ラストスパート！歴史が今、まさに作られようとしている！！！`,
+        ],
+      },
+      {
+        minPercent: 0,
+        maxPercent: 10,
+        lines: [
+          `最終カウントダウン！！全てはこの瞬間のため！${d}よ、飛べ！！！`,
+          `ゴールまであと数秒！！心臓が止まりそうだ！！！！`,
+        ],
+      },
     ],
     movie: [
-      { minPercent: 90, maxPercent: 100, lines: [`この夏、一つの料理が世界を変える…\n\n「${d}」`, `運命は、すでに動き始めていた…`] },
-      { minPercent: 70, maxPercent: 90, lines: [`「${d}…それは、ただの食事ではない」`, `電子レンジが唸りを上げる。扉の向こうで、何かが変わろうとしていた。`] },
-      { minPercent: 50, maxPercent: 70, lines: [`「もう引き返せない」\n\n熱が、全てを変えていく。`, `ドラマは、いつも日常の中に潜んでいる。`] },
-      { minPercent: 25, maxPercent: 50, lines: [`タイムリミットが迫る…\n\n「${d}、準備はいいか」`, `全ての伏線が、ここで回収される。`] },
-      { minPercent: 10, maxPercent: 25, lines: [`「もうすぐだ…全てが、終わる」\n\nそして、新たな始まりが訪れる。`, `クライマックスが近づいている。`] },
-      { minPercent: 0, maxPercent: 10, lines: [`全ての人間に、等しく与えられた\n運命の瞬間…`, `「${d}…ありがとう。」\n\n今秋、全国公開。`] },
+      {
+        minPercent: 90,
+        maxPercent: 100,
+        lines: [
+          `この夏、一つの料理が世界を変える…\n\n「${d}」`,
+          `運命は、すでに動き始めていた…`,
+        ],
+      },
+      {
+        minPercent: 70,
+        maxPercent: 90,
+        lines: [
+          `「${d}…それは、ただの食事ではない」`,
+          `電子レンジが唸りを上げる。扉の向こうで、何かが変わろうとしていた。`,
+        ],
+      },
+      {
+        minPercent: 50,
+        maxPercent: 70,
+        lines: [
+          `「もう引き返せない」\n\n熱が、全てを変えていく。`,
+          `ドラマは、いつも日常の中に潜んでいる。`,
+        ],
+      },
+      {
+        minPercent: 25,
+        maxPercent: 50,
+        lines: [
+          `タイムリミットが迫る…\n\n「${d}、準備はいいか」`,
+          `全ての伏線が、ここで回収される。`,
+        ],
+      },
+      {
+        minPercent: 10,
+        maxPercent: 25,
+        lines: [
+          `「もうすぐだ…全てが、終わる」\n\nそして、新たな始まりが訪れる。`,
+          `クライマックスが近づいている。`,
+        ],
+      },
+      {
+        minPercent: 0,
+        maxPercent: 10,
+        lines: [
+          `全ての人間に、等しく与えられた\n運命の瞬間…`,
+          `「${d}…ありがとう。」\n\n今秋、全国公開。`,
+        ],
+      },
     ],
     horror: [
-      { minPercent: 90, maxPercent: 100, lines: [`なぜ…なぜあなたはそれを中に入れてしまったのか…\n\n${d}が、目覚める。`, `扉が閉まった。\n\n逃げ場は、もうない。`] },
-      { minPercent: 70, maxPercent: 90, lines: [`電子レンジの光が、ゆっくりと${d}を照らす…\n\n何かが、おかしい。`, `「聞こえるか…？」\n\n${d}は、確かに動いた。`] },
-      { minPercent: 50, maxPercent: 70, lines: [`中間地点。\n\nここから先に戻った者はいない…`, `熱が、内側から${d}を侵食していく…\n\nじわり、じわりと。`] },
-      { minPercent: 25, maxPercent: 50, lines: [`逃げて。\n\n今すぐ逃げて。\n\nまだ間に合う…`, `${d}の変容が加速する。\n\n取り返しのつかない何かが、始まっていた。`] },
-      { minPercent: 10, maxPercent: 25, lines: [`もう…遅い。\n\n全ては決まっていた。`, `カウントダウンが、始まった。\n\n${d}の、最後の時間が。`] },
-      { minPercent: 0, maxPercent: 10, lines: [`…\n\n…聞こえるか？\n\n「チーン」の音が近づいてくる。`, `最後の数秒。\n\n誰も助けには来ない。`] },
+      {
+        minPercent: 90,
+        maxPercent: 100,
+        lines: [
+          `なぜ…なぜあなたはそれを中に入れてしまったのか…\n\n${d}が、目覚める。`,
+          `扉が閉まった。\n\n逃げ場は、もうない。`,
+        ],
+      },
+      {
+        minPercent: 70,
+        maxPercent: 90,
+        lines: [
+          `電子レンジの光が、ゆっくりと${d}を照らす…\n\n何かが、おかしい。`,
+          `「聞こえるか…？」\n\n${d}は、確かに動いた。`,
+        ],
+      },
+      {
+        minPercent: 50,
+        maxPercent: 70,
+        lines: [
+          `中間地点。\n\nここから先に戻った者はいない…`,
+          `熱が、内側から${d}を侵食していく…\n\nじわり、じわりと。`,
+        ],
+      },
+      {
+        minPercent: 25,
+        maxPercent: 50,
+        lines: [
+          `逃げて。\n\n今すぐ逃げて。\n\nまだ間に合う…`,
+          `${d}の変容が加速する。\n\n取り返しのつかない何かが、始まっていた。`,
+        ],
+      },
+      {
+        minPercent: 10,
+        maxPercent: 25,
+        lines: [
+          `もう…遅い。\n\n全ては決まっていた。`,
+          `カウントダウンが、始まった。\n\n${d}の、最後の時間が。`,
+        ],
+      },
+      {
+        minPercent: 0,
+        maxPercent: 10,
+        lines: [
+          `…\n\n…聞こえるか？\n\n「チーン」の音が近づいてくる。`,
+          `最後の数秒。\n\n誰も助けには来ない。`,
+        ],
+      },
     ],
     nature: [
-      { minPercent: 90, maxPercent: 100, lines: [`電子レンジの荒野に、${d}の旅が始まった。\n\nマイクロ波は沈黙の中で目覚める。`, `数十億年の進化が、この瞬間に集約されている。\n\n${d}もまた、その歴史の一部だ。`] },
-      { minPercent: 70, maxPercent: 90, lines: [`マイクロ波は静かに、しかし確実に、${d}の分子を揺さぶる。\n\nこれが、熱の誕生だ。`, `序盤の穏やかな時間。\n\nだが自然に「穏やか」などというものはない。全ては変化の予兆だ。`] },
-      { minPercent: 50, maxPercent: 70, lines: [`熱は内部から外部へと伝播する。\n\n生存とは、変化に適応することである。`, `${d}は今、最も劇的な変容の中にある。\n\nこれが食物連鎖の頂点だ。`] },
-      { minPercent: 25, maxPercent: 50, lines: [`変容の瞬間が近づいている。\n\n${d}は、もう後戻りできない境界線を越えた。`, `熱量が臨界点に達しつつある。\n\nこれぞ自然の摂理。`] },
-      { minPercent: 10, maxPercent: 25, lines: [`あと僅か。\n\n${d}の分子は今、最速のダンスを踊っている。`, `完成の瞬間が迫る。\n\n自然は、常に最適解へと向かう。`] },
-      { minPercent: 0, maxPercent: 10, lines: [`最後の秒が刻まれる。\n\n${d}の旅は、今まさにクライマックスを迎えようとしている。`, `全ての生命は、この瞬間のために存在する。\n\n準備は、できている。`] },
-    ],
-    documentary: [
-      { minPercent: 90, maxPercent: 100, lines: [`人類は長らく、${d}の真実に辿り着けずにいた。今、そのベールが剥がされようとしている。`, `${d}。それは歴史の特異点である。`] },
-      { minPercent: 70, maxPercent: 90, lines: [`電子波が${d}を貫く。1945年のレーダー技術の転用が、今ここに結実する。`, `静かなる熱の伝達。歴史の歯車が動き出した。`] },
-      { minPercent: 50, maxPercent: 70, lines: [`調理の半分が経過。考古学者たちは後に、これを「大転換期」と呼ぶだろう。`, `${d}の分子構造は、かつてない激動の時代を迎えている。`] },
-      { minPercent: 25, maxPercent: 50, lines: [`終焉へのカウントダウン。${d}が到達すべき高みは、すぐそこにある。`, `歴史の目撃者よ。刮目せよ。`] },
-      { minPercent: 10, maxPercent: 25, lines: [`もはや、後戻りはできない。${d}は運命の時を待っている。`, `全ての記録はこの一瞬のために。`] },
-      { minPercent: 0, maxPercent: 10, lines: [`そして今、一万年の眠りを経て…${d}が目覚める。`, `カウント、ゼロ。歴史が証明される。`] },
-    ],
-    anime: [
-      { minPercent: 90, maxPercent: 100, lines: [`行けっ、${d}！お前に限界なんてないはずだ！！目覚めろ、真の力！！`, `扉の向こう側に、俺たちの明日があるんだ！！`] },
-      { minPercent: 70, maxPercent: 90, lines: [`諦めるな！${d}！！お前の強さは、そんなもんじゃないはずだ！！`, `熱い…！この熱さこそが${d}の生き様だ！！`] },
-      { minPercent: 50, maxPercent: 70, lines: [`半分まで来たぞ！！ここからが本当の勝負だ！！`, `絆の力が、${d}をさらなる高みへ押し上げる！！`] },
-      { minPercent: 25, maxPercent: 50, lines: [`全開パワー！！電子レンジ、リミッター解除だああああ！！`, `負けるな！あと少しで奇跡が起きる！！`] },
-      { minPercent: 10, maxPercent: 25, lines: [`ファイナルアタック！！${d}、全力で駆け抜けろ！！`, `もう誰にも止められない！！${d}の想いが爆発する！`] },
-      { minPercent: 0, maxPercent: 10, lines: [`一秒…一瞬にすべてを懸けろ！！信じるんだ、自分を！！`, `見えたぞ！勝利の女神が微笑む瞬間が！！`] },
+      {
+        minPercent: 90,
+        maxPercent: 100,
+        lines: [
+          `電子レンジの荒野に、${d}の旅が始まった。\n\nマイクロ波は沈黙の中で目覚める。`,
+          `数十億年の進化が、この瞬間に集約されている。\n\n${d}もまた、その歴史の一部だ。`,
+        ],
+      },
+      {
+        minPercent: 70,
+        maxPercent: 90,
+        lines: [
+          `マイクロ波は静かに、しかし確実に、${d}の分子を揺さぶる。\n\nこれが、熱の誕生だ。`,
+          `序盤の穏やかな時間。\n\nだが自然に「穏やか」などというものはない。全ては変化の予兆だ。`,
+        ],
+      },
+      {
+        minPercent: 50,
+        maxPercent: 70,
+        lines: [
+          `熱は内部から外部へと伝播する。\n\n生存とは、変化に適応することである。`,
+          `${d}は今、最も劇的な変容の中にある。\n\nこれが食物連鎖の頂点だ。`,
+        ],
+      },
+      {
+        minPercent: 25,
+        maxPercent: 50,
+        lines: [
+          `変容の瞬間が近づいている。\n\n${d}は、もう後戻りできない境界線を越えた。`,
+          `熱量が臨界点に達しつつある。\n\nこれぞ自然の摂理。`,
+        ],
+      },
+      {
+        minPercent: 10,
+        maxPercent: 25,
+        lines: [
+          `あと僅か。\n\n${d}の分子は今、最速のダンスを踊っている。`,
+          `完成の瞬間が迫る。\n\n自然は、常に最適解へと向かう。`,
+        ],
+      },
+      {
+        minPercent: 0,
+        maxPercent: 10,
+        lines: [
+          `最後の秒が刻まれる。\n\n${d}の旅は、今まさにクライマックスを迎えようとしている。`,
+          `全ての生命は、この瞬間のために存在する。\n\n準備は、できている。`,
+        ],
+      },
     ],
   };
 
@@ -242,10 +354,6 @@ export const FINISH_LINES: Record<NarrationStyle, string> = {
     '…\n\nチーン。\n\n…\n\n逃げなさい。',
   nature:
     '「チーン」\n\n生命の循環は続く。\n\n${d}は今、その使命を全うした。',
-  documentary:
-    '「チーン。」\n\n歴史が、ここに完結した。\n\nこれが、後世に語り継がれる${d}の姿である。',
-  anime:
-    'チーン！！！\n\nやったぜ！！最高の${d}だ！！\n\n俺たちの冒険は、これからだ！',
 };
 
 const FINISH_LINES_EN: Record<NarrationStyle, string> = {
@@ -253,8 +361,6 @@ const FINISH_LINES_EN: Record<NarrationStyle, string> = {
   movie: '"Ding."\n\n— And the story goes on.',
   horror: '...\n\nDing.\n\n...\n\nRun.',
   nature: '"Ding"\n\nThe cycle continues.\n\n${d} fulfilled its role.',
-  documentary: '"Ding."\n\nHistory is written.\n\nBehold the legacy of ${d}.',
-  anime: 'DING!!!\n\nWe did it!! The ultimate ${d}!\n\nOur adventure has just begun!',
 };
 
 export function getFinishLine(style: NarrationStyle, dishName: string, locale: Locale = 'ja'): string {
