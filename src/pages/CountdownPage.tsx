@@ -572,34 +572,33 @@ export default function CountdownPage({
           </div>
         </div>
 
-        <div className="absolute right-12 top-4 z-30">
+
+        <div className="absolute right-4 top-3.5 z-30 flex items-center gap-2">
           {sessionMode === 'remote' && (
-            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
+            <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] sm:text-xs font-bold shadow-sm transition-all ${
               isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
             }`}>
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]"></div>
-              <span>AI Connected</span>
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]"></div>
+              <span className="hidden sm:inline">AI Connected</span>
             </div>
           )}
           {sessionMode === 'connecting' && (
-            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
+            <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] sm:text-xs font-bold shadow-sm transition-all ${
               isLight ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-sky-500/30 bg-sky-500/10 text-sky-400'
             }`}>
-              <div className="h-2 w-2 rounded-full bg-sky-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
-              <span>Connecting AI...</span>
+              <div className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+              <span className="hidden sm:inline">Connecting...</span>
             </div>
           )}
           {sessionMode === 'local-fallback' && (
-             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
+             <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] sm:text-xs font-bold shadow-sm transition-all ${
               isLight ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
             }`}>
-              <div className="h-2 w-2 rounded-full bg-amber-500"></div>
-              <span>Local Session</span>
+              <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div>
+              <span className="hidden sm:inline">Local</span>
             </div>
           )}
-        </div>
 
-        <div className="absolute right-4 top-4 z-30">
           <button
             onClick={() => onThemeModeChange(isLight ? 'dark' : 'light')}
             className={`flex items-center justify-center rounded-xl p-2 transition-colors ${

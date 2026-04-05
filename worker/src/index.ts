@@ -11,6 +11,7 @@ export interface Env {
   };
   SESSION_STORAGE: DurableObjectNamespace;
   ELEVENLABS_API_KEY?: string;
+  ELEVENLABS_AGENT_ID?: string;
   GEMINI_API_KEY?: string;
   COST_BUDGET_PER_SESSION?: string;
   MAX_TOKEN_USAGE_PER_SESSION?: string;
@@ -25,6 +26,7 @@ interface SessionState {
   history: Array<{ role: string; content: string }>;
   costUsd: number;
   tokenCount: number;
+  snapshotUrl?: string;
 }
 
 const CORS_HEADERS = {
@@ -96,6 +98,18 @@ async function fetchWithRetry(url: string, init: RequestInit, timeoutMs: number)
   throw lastError ?? new Error("EXTERNAL_FETCH_FAILED");
 }
 
+async function generateEmbedding(env: Env, text: string): Promise<number[]> {
+  try {
+    const response = (await env.AI.run("@cf/baai/bge-small-en-v1.5", {
+      text: [text]
+    })) as { data: number[][] };
+    return response.data[0];
+  } catch (err) {
+    console.error("Embedding generation failed", err);
+    return new Array(384).fill(0); // Fallback zero vector
+  }
+}
+
 function estimateNarrationDurationSeconds(text: string, isEnglish: boolean): number {
   if (!text) return 0;
   if (isEnglish) {
@@ -144,29 +158,65 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/generate-music") {
         return await handleGenerateMusic(request, env);
       }
-      if (request.method === "POST" && (url.pathname.startsWith("/api/session/"))) {
-        const sessionId = url.pathname.split("/")[3] || url.searchParams.get("sessionId");
-        if (sessionId) {
-          const id = env.SESSION_STORAGE.idFromString(sessionId);
-          const obj = env.SESSION_STORAGE.get(id);
-          return await obj.fetch(request);
-        }
-        
-        // No session ID provided in URL, but handle start if specifically requested
-        if (url.pathname === "/api/session" && request.method === "POST") {
-          const id = env.SESSION_STORAGE.newUniqueId();
-          const obj = env.SESSION_STORAGE.get(id);
-          return await obj.fetch(request);
-        }
+      if (request.method === "GET" && url.pathname === "/api/get-signed-url") {
+        return await handleGetSignedUrl(env);
       }
 
-      return new Response("Not Found", { status: 404, headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Cache-Control": "no-store" } });
+      // DO Session Router
+      if (url.pathname.startsWith("/api/session")) {
+        let sessionId: string | null = null;
+        
+        if (request.method === "GET") {
+          sessionId = url.searchParams.get("sessionId");
+        } else if (request.method === "POST") {
+          if (url.pathname === "/api/session/start") {
+             const id = env.SESSION_STORAGE.newUniqueId();
+             const obj = env.SESSION_STORAGE.get(id);
+             // Rewrite url to just /api/session for the DO to pick up as handleStart
+             const newUrl = new URL(request.url);
+             newUrl.pathname = "/api/session";
+             return await obj.fetch(new Request(newUrl, request));
+          }
+          
+          const clonedReq = request.clone();
+          const body = await clonedReq.json() as { sessionId?: string };
+          sessionId = body.sessionId || null;
+        }
+
+        if (sessionId) {
+          try {
+            const id = env.SESSION_STORAGE.idFromString(sessionId);
+            const obj = env.SESSION_STORAGE.get(id);
+            
+            // Map GET /api/session to DO /api/session/state
+            if (request.method === "GET") {
+              const newUrl = new URL(request.url);
+              newUrl.pathname = "/api/session/state";
+              return await obj.fetch(new Request(newUrl, request));
+            }
+            
+            return await obj.fetch(request);
+          } catch {
+             return new Response(JSON.stringify({ ok: false, error: "Invalid sessionId format" }), { status: 400, headers: CORS_HEADERS });
+          }
+        }
+        
+        if (request.method === "POST" && url.pathname === "/api/session") {
+           const id = env.SESSION_STORAGE.newUniqueId();
+           const obj = env.SESSION_STORAGE.get(id);
+           return await obj.fetch(request);
+        }
+
+        return new Response(JSON.stringify({ ok: false, error: "Missing sessionId" }), { status: 400, headers: CORS_HEADERS });
+      }
+
+      return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: { ...CORS_HEADERS, ...SECURITY_HEADERS } });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error(err);
-      return new Response(JSON.stringify({ error: message }), {
+      return new Response(JSON.stringify({ ok: false, error: message }), {
         status: 500,
-        headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
+        headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json" },
       });
     }
   },
@@ -212,28 +262,65 @@ export class MicrowaveSession {
       return await this.handleDone();
     }
 
-    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+    if (path.startsWith("/api/session/state")) {
+      return await this.handleState();
+    }
+
+    return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: CORS_HEADERS });
+  }
+
+  async handleState(): Promise<Response> {
+    return new Response(JSON.stringify({ ok: true, session: this.state }), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+    });
   }
 
   async handleDone(): Promise<Response> {
-    if (!this.state) return new Response("No state", { status: 400, headers: CORS_HEADERS });
+    if (!this.state) return new Response(JSON.stringify({ ok: false, error: "No state" }), { status: 400, headers: CORS_HEADERS });
     
-    // Durable Execution Logic: Finalize state and persist memory
+    let snapshot: string | null = null;
+    
+    // Durable Execution Logic: Browser Rendering Snapshot
     try {
+      const resultUrl = `https://microwave-show.pages.dev/result?sessionId=${this.stateId.toString()}&dish=${encodeURIComponent(this.state.dishName)}&style=${this.state.style}`;
+      const renderRes = await this.env.BROWSER.fetch(resultUrl);
+      if (renderRes.ok) {
+        // Mocking snapshot as we just got the HTML/Rendered result
+        snapshot = "rendered-success";
+        this.state.snapshotUrl = resultUrl;
+      }
+    } catch {
+      console.warn("Browser Rendering failed, continuing without snapshot");
+    }
+
+    try {
+      const historyStr = this.state.history.map(h => h.content).join(" ").slice(0, 500);
+      const embeddingText = `Dish: ${this.state.dishName}, Style: ${this.state.style}, Summary: ${historyStr}`;
+      const vector = await generateEmbedding(this.env, embeddingText);
+
       await this.env.MEMORY.insert([{
-        id: `session-${Date.now()}`,
-        values: [0.1, 0.2, 0.3],
+        id: `session-${Date.now()}-${this.stateId.toString().slice(0, 8)}`,
+        values: vector,
         metadata: { 
           dishName: this.state.dishName, 
           style: this.state.style, 
-          comment: `Cooked for ${this.state.totalTime}s successfully.` 
+          summary: historyStr.slice(0, 200),
+          timestamp: new Date().toISOString(),
+          snapshot: snapshot || "none"
         }
       }]);
     } catch {
       console.warn("Memory persistence failed");
     }
 
-    return new Response(JSON.stringify({ ok: true, message: "Show finished and memorized." }), {
+    await this.storage.put("state", this.state);
+
+    return new Response(JSON.stringify({ 
+      ok: true, 
+      message: "Show finished and memorized.", 
+      session: this.state,
+      snapshot 
+    }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
   }
@@ -348,11 +435,15 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
   // Memory Recall from Vectorize Index
   let memoryContext = "";
   try {
-    const memory = await env.MEMORY.query([0.1, 0.2, 0.3], { topK: 1 });
+    const queryText = `Dish: ${body.dishName}, Style: ${body.style}`;
+    const vector = await generateEmbedding(env, queryText);
+    const memory = await env.MEMORY.query(vector, { topK: 1 });
+    
     if (memory.matches && memory.matches.length > 0) {
+      const best = memory.matches[0].metadata;
       memoryContext = isEnglish 
-        ? `Legacy from previous show of ${body.dishName}: ${memory.matches[0].metadata.comment}. Show continuity!`
-        : `過去の${body.dishName}番組からの記憶：${memory.matches[0].metadata.comment}。この文脈を活かして！`;
+        ? `Memory of past ${best.dishName} (${best.style}): ${best.summary}. Continuity is key!`
+        : `過去の${best.dishName}（${best.style}）の記憶：${best.summary}。この文脈を尊重して！`;
     }
   } catch {
     // Fail silently to maintain SLO
@@ -579,4 +670,43 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
   Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
   Object.entries(SECURITY_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
   return newResponse;
+}
+
+async function handleGetSignedUrl(env: Env): Promise<Response> {
+  if (!env.ELEVENLABS_API_KEY) {
+    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), {
+      status: 500,
+      headers: CORS_HEADERS,
+    });
+  }
+
+  const agentId = env.ELEVENLABS_AGENT_ID || "pS98ka76"; // Default Agent ID
+
+  try {
+    const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${agentId}`, {
+      method: "GET",
+      headers: {
+        "xi-api-key": env.ELEVENLABS_API_KEY.trim(),
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`ElevenLabs Signed URL Error: ${res.status}`);
+    }
+
+    const data = await res.json() as { signed_url: string };
+    return new Response(JSON.stringify({
+      ok: true,
+      signedUrl: data.signed_url,
+      agentId,
+    }), {
+      headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("Failed to get signed URL:", err);
+    return new Response(JSON.stringify({ ok: false, error: "Failed to generate voice agent access" }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json" },
+    });
+  }
 }
