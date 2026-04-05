@@ -215,7 +215,6 @@ export default function CountdownPage({
         sessionStorage.setItem('sessionId', initialAssets.session.sessionId);
         sessionStorage.setItem('sessionMode', mode);
 
-        setNarrationText(initialAssets.narrationText);
         phaseRef.current = 'opening';
         lastQueuedNarrationRef.current = initialAssets.narrationText;
 
@@ -224,21 +223,36 @@ export default function CountdownPage({
           const maxNarrationMs = (totalSeconds - 1) * 1000;
           const tasks: Promise<void>[] = [];
           let countdownStarted = false;
+          let openingTextShown = false;
           const startCountdown = () => {
             if (countdownStarted) return;
             countdownStarted = true;
             setIsCountdownActive(true);
           };
+          const syncOpeningText = () => {
+            if (openingTextShown) return;
+            openingTextShown = true;
+            prevNarrationRef.current = initialAssets.narrationText;
+            setNarrationText(initialAssets.narrationText);
+          };
 
           if (initialAssets.narrationAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.narrationAudio, {
-              volume: 1,
-              maxDurationMs: maxNarrationMs,
-              onStart: () => {
-                console.log("[CountdownPage] Narration audio started playing");
-                startCountdown();
-              }
-            }));
+            tasks.push(
+              api.playAudioBlob(initialAssets.narrationAudio, {
+                volume: 1,
+                maxDurationMs: maxNarrationMs,
+                onStart: () => {
+                  console.log("[CountdownPage] Narration audio started playing");
+                  syncOpeningText();
+                  startCountdown();
+                }
+              }).catch(async () => {
+                await api.playLocalNarration(initialAssets.narrationText, voiceLanguage, () => {
+                  syncOpeningText();
+                  startCountdown();
+                }, maxNarrationMs);
+              })
+            );
           }
 
           if (initialAssets.musicAudio) {
@@ -249,6 +263,7 @@ export default function CountdownPage({
           }
 
           if (!initialAssets.narrationAudio) {
+            syncOpeningText();
             startCountdown();
           }
           await Promise.all(tasks).catch(console.error);
@@ -292,7 +307,7 @@ export default function CountdownPage({
       const text = buildNarrationLine(totalSeconds, totalSeconds);
       setNarrationText(text);
     }
-  }, [totalSeconds, style, dishName, locale, buildNarrationLine, initialAssets]);
+  }, [totalSeconds, style, dishName, locale, buildNarrationLine, initialAssets, voiceLanguage]);
 
   useEffect(() => {
     const sId = sessionStorage.getItem('sessionId');
@@ -345,7 +360,12 @@ export default function CountdownPage({
               const tasks: Promise<void>[] = [];
 
               if (preFetched.narrationAudio) {
-                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { volume: 1, maxDurationMs: phaseMaxNarrationMs, onStart: onReady }));
+                tasks.push(
+                  api.playAudioBlob(preFetched.narrationAudio, { volume: 1, maxDurationMs: phaseMaxNarrationMs, onStart: onReady })
+                    .catch(() => api.playLocalNarration(currentText, voiceLanguage, onReady, phaseMaxNarrationMs))
+                );
+              } else {
+                tasks.push(api.playLocalNarration(currentText, voiceLanguage, onReady, phaseMaxNarrationMs));
               }
               if (preFetched.musicAudio) {
                 tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.15 }));
@@ -399,14 +419,16 @@ export default function CountdownPage({
           await handlePhaseEffects(phase).catch(() => {});
 
           if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-            await api.playLocalNarration(fallbackLine, locale).catch(e => console.error("Local fallback failed:", e));
+            const fallbackMaxNarrationMs = Math.max(1, timeLeft - 1) * 1000;
+            await api.playLocalNarration(fallbackLine, voiceLanguage, undefined, fallbackMaxNarrationMs)
+              .catch(e => console.error("Local fallback failed:", e));
           }
         }
       })
       .finally(() => {
         console.log(`[CountdownPage] Task for phase ${phase} completed/exited.`);
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets, voiceLanguage]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
