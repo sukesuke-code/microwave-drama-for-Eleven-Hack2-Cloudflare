@@ -60,7 +60,7 @@ function enforceEffectRateLimit(effectKey: "sfx" | "music"): void {
 
 function logDebug(...args: unknown[]): void {
   if (IS_DEV) {
-    console.debug("[MicrowaveShow API]", ...args);
+    console.debug(...args);
   }
 }
 
@@ -68,72 +68,50 @@ function withTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
   if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
     return AbortSignal.timeout(timeoutMs);
   }
+
   return undefined;
 }
 
-async function requestJson<T>(
-  path: string,
-  init?: RequestInit
-): Promise<T> {
-  const url = `${API_BASE}${path}`;
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   ensureSafeApiBase();
-  logDebug(`Requesting ${url}`, init?.body);
-
-  let lastError: unknown = null;
+  let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
-    const controller = new AbortController();
-    const timeoutMs = init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000;
-    const timerId = setTimeout(() => controller.abort(), timeoutMs);
-
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${path}`, {
         ...init,
-        signal: init?.signal ?? controller.signal,
+        signal:
+          init?.signal ??
+          withTimeoutSignal(
+            init?.method === "GET" ? DEFAULT_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS + 3000
+          ),
       });
 
       if (!res.ok) {
-        const errText = await res.text().catch(() => "Unknown error");
-        const isRetryable = RETRYABLE_HTTP_STATUS.has(res.status);
-        console.error(`API Error [${res.status}] (Attempt ${attempt}): ${errText}`);
-
-        if (isRetryable && attempt < DEFAULT_RETRY_COUNT) {
-          const backoff = 300 * (attempt + 1);
-          await new Promise(r => setTimeout(r, backoff));
-          continue;
-        }
-        throw new Error(`API error ${res.status}: ${errText}`);
+        const shouldRetry = RETRYABLE_HTTP_STATUS.has(res.status);
+        throw new Error(`HTTP_${res.status}:${shouldRetry ? "RETRYABLE" : "FINAL"}`);
       }
 
-      const data = await res.json();
-      logDebug(`Response from ${path}:`, data);
-      return data as T;
-    } catch (err: unknown) {
-      lastError = err;
-      const isAbort = (err as Error).name === "AbortError";
-      const isNetwork = (err as Error).message?.includes("fetch") || (err as Error).message?.includes("Network");
-      
-      if ((isAbort || isNetwork) && attempt < DEFAULT_RETRY_COUNT) {
-        await new Promise(r => setTimeout(r, 400));
-        continue;
+      const data = (await res.json()) as T;
+      return data;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isRetryableHttp = /HTTP_\d+:RETRYABLE/.test(lastError.message);
+      const isAbortError = lastError.name === "AbortError";
+      const isNetworkLike = /Failed to fetch|NetworkError|Load failed/i.test(lastError.message);
+      const canRetry = isRetryableHttp || isAbortError || isNetworkLike;
+
+      if (attempt >= DEFAULT_RETRY_COUNT || !canRetry) {
+        break;
       }
-      break;
-    } finally {
-      clearTimeout(timerId);
+
+      const backoffMs = 250 * (attempt + 1);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
     }
   }
 
-  throw lastError || new Error("REQUEST_FAILED");
+  throw lastError ?? new Error("REQUEST_FAILED");
 }
-
-import { 
-  InitialAssets, 
-  NarrationStyle, 
-  Session, 
-  SessionPhase 
-} from '../types';
-
-export type { InitialAssets, NarrationStyle, Session, SessionPhase };
 
 type TtsLevelListener = (level: number) => void;
 
@@ -144,6 +122,33 @@ type TtsMeterSnapshot = {
 
 const ttsLevelListeners = new Set<TtsLevelListener>();
 const ttsMeterListeners = new Set<(snapshot: TtsMeterSnapshot) => void>();
+
+export type NarrationStyle =
+  | "sports"
+  | "horror"
+  | "documentary"
+  | "anime"
+  | "movie"
+  | "nature";
+
+export type SessionPhase =
+  | "opening"
+  | "quarter"
+  | "middle"
+  | "final"
+  | "done";
+
+export interface Session {
+  foodName: string;
+  totalTime: number;
+  remainingTime: number;
+  style: NarrationStyle;
+  phase: SessionPhase;
+  isRunning: boolean;
+  sessionId: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface StartSessionPayload {
   foodName: string;
@@ -173,7 +178,7 @@ export interface AgentNarrationRequest {
 
 export interface AgentNarrationResponse {
   text: string;
-  play: (onReady?: () => void) => Promise<void>;
+  play: () => Promise<void>;
 }
 
 function emitTtsLevel(level: number): void {
@@ -385,22 +390,16 @@ function stopMusic(): void {
   }
 }
 
-interface AudioJsonResponse {
-  audioBase64?: string;
-  audio?: string;
-  error?: string;
-}
-
 async function parseAudioBlob(res: Response): Promise<Blob> {
   const contentType = res.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
-    const json = (await res.json()) as AudioJsonResponse;
-    
-    if (json.error) {
-      throw new Error(json.error);
-    }
-    
+    const json = (await res.json()) as {
+      audioBase64?: string;
+      audio?: string;
+      error?: string;
+    };
+
     const base64Audio = json.audioBase64 || json.audio;
 
     if (!base64Audio) {
@@ -430,8 +429,6 @@ async function playAudioBlob(
     loop?: boolean;
     volume?: number;
     isMusic?: boolean;
-    isSfx?: boolean;
-    onStart?: () => void;
   }
 ): Promise<void> {
   if (!blob || blob.size === 0) {
@@ -501,6 +498,7 @@ async function playAudioBlob(
       activeTtsAudio.pause();
       activeTtsAudio.src = "";
     }
+  } else {
     if (activeObjectUrl) {
       const oldUrl = activeObjectUrl;
       setTimeout(() => URL.revokeObjectURL(oldUrl), 5000);
@@ -559,6 +557,7 @@ async function playAudioBlob(
     }
     throw err;
   }
+  await audio.play();
 
   if (loop) {
     return;
@@ -641,11 +640,19 @@ async function playAudioBlob(
     if (activeSfxAudio === audio) {
        activeSfxAudio = null;
     }
+    if (activeMusicAudio) {
+      activeMusicAudio.src = "";
+      activeMusicAudio.load();
+      activeMusicAudio = null;
+    }
   } else {
     if (activeObjectUrl === url) {
       activeObjectUrl = null;
     }
     if (activeTtsAudio === audio) {
+    if (activeTtsAudio) {
+      activeTtsAudio.src = "";
+      activeTtsAudio.load();
       activeTtsAudio = null;
     }
     if (activeMeterCleanup) {
@@ -716,17 +723,7 @@ async function startSession(
   logDebug("startSession response", data);
 
   if (!data.ok || !data.session?.sessionId) {
-    return {
-      foodName: sanitizedFoodName,
-      totalTime: normalizedTotalTime,
-      remainingTime: normalizedTotalTime,
-      style,
-      phase: "opening",
-      isRunning: true,
-      sessionId: `local-${Date.now()}`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+    throw new Error(data?.error || "Failed to start session");
   }
 
   return data.session;
@@ -778,7 +775,7 @@ async function tickSession(
   logDebug("tickSession response", data);
 
   if (!data.ok) {
-    logDebug("Failed to tick session, likely local fallback mode");
+    throw new Error(data?.error || "Failed to tick session");
   }
 }
 
@@ -802,7 +799,7 @@ async function saveNarration(sessionId: string, text: string): Promise<void> {
   logDebug("saveNarration response", data);
 
   if (!data.ok) {
-    logDebug("Failed to save narration, likely local fallback mode");
+    throw new Error(data?.error || "Failed to save narration");
   }
 }
 
@@ -873,208 +870,51 @@ async function requestAgentNarration(
     remainingTime: Math.max(0, Math.min(600, Math.floor(request.remainingTime))),
   };
 
-  let narrationText = "";
-
+  let data: {
+    ok?: boolean;
+    text?: string;
+    error?: string;
+  };
   try {
-    logDebug("Requesting narration for context:", sanitizedRequest);
-    const data = await requestJson<{
+    data = await requestJson<{
       ok?: boolean;
       text?: string;
       error?: string;
     }>("/api/agent/narration", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(sanitizedRequest),
     });
-
-    if (data.ok && data.text) {
-      narrationText = data.text;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/HTTP_5\d{2}|Failed to fetch|NetworkError|Load failed|AbortError/i.test(message)) {
+      throw new Error("AGENT_NARRATION_UNAVAILABLE");
     }
-  } catch (err) {
-    logDebug("Backend narration failed, using fallback:", err);
+    throw error;
   }
 
-  if (!narrationText) {
-    narrationText = buildNarrationCue({
-      foodName: sanitizedRequest.dishName,
-      style: sanitizedRequest.style,
-      phase: sanitizedRequest.phase,
-      totalTime: sanitizedRequest.totalTime,
-      remainingTime: sanitizedRequest.remainingTime,
-    });
+  logDebug("requestAgentNarration response", data);
+
+  if (!data.ok || !data.text) {
+    throw new Error(data.error || "AGENT_NARRATION_UNAVAILABLE");
   }
 
   return {
-    text: narrationText,
-    play: async (onReady?: () => void) => {
-      stopRequested = false;
-      if (!narrationText) return;
-
-      try {
-        const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: normalizeTextInput(narrationText, MAX_TEXT_PAYLOAD_LENGTH),
-            locale: sanitizedRequest.locale || "ja",
-          }),
-          signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-        });
-
-        if (ttsRes.ok) {
-          const blob = await parseAudioBlob(ttsRes);
-          await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false, onStart: onReady });
-          return;
-        } else {
-          try {
-            const errorText = await ttsRes.text();
-            console.error("Backend TTS returned an error status:", ttsRes.status, errorText);
-          } catch {
-            console.error("Backend TTS failed and body could not be read.");
-          }
-        }
-      } catch (ttsErr) {
-        logDebug("Backend TTS failed, falling back to local:", ttsErr);
-      }
-
-      if (stopRequested) return;
-      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja", onReady);
+    text: data.text,
+    play: async () => {
+      return;
     },
   };
 }
 
-async function generateTtsBlob(text: string, locale: string = "ja"): Promise<Blob> {
-  const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH),
-      locale,
-    }),
-    signal: withTimeoutSignal(DEFAULT_AUDIO_TIMEOUT_MS),
-  });
-
-  if (!ttsRes.ok) {
-    throw new Error(`TTS generation failed: ${ttsRes.status}`);
-  }
-
-  return parseAudioBlob(ttsRes);
-}
-
-async function generateSfxBlob(prompt: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/generate-sfx`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`SFX generation failed: ${res.status}`);
-  }
-
-  return parseAudioBlob(res);
-}
-
-async function generateMusicBlob(prompt: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/generate-music`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-    signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Music generation failed: ${res.status}`);
-  }
-
-  return parseAudioBlob(res);
-}
-
-
-async function prepareInitialAssets(
-  foodName: string,
-  totalTime: number,
-  style: NarrationStyle,
-  locale: string = "ja"
-): Promise<InitialAssets> {
-  // 1. Start Session
-  const session = await startSession(foodName, totalTime, style);
-
-  const phases: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
-  const allPhases = {} as Record<SessionPhase, import('../types').PhaseAssets>;
-
-  // 2. Concurrently prepare ALL phases
-  await Promise.all(
-    phases.map(async (phase) => {
-      let remainingTime = totalTime;
-      if (phase === "quarter") remainingTime = Math.floor(totalTime * 0.75);
-      if (phase === "middle") remainingTime = Math.floor(totalTime * 0.5);
-      if (phase === "final") remainingTime = Math.floor(totalTime * 0.25);
-      if (phase === "done") remainingTime = 0;
-
-      const narration = await requestAgentNarration({
-        sessionId: session.sessionId,
-        style,
-        dishName: foodName,
-        totalTime,
-        remainingTime,
-        phase,
-        locale,
-      });
-
-      // Provide dynamic music/sfx prompts
-      let musicPrompt: string | null = null;
-      let sfxPrompt: string | null = null;
-
-      if (phase === "opening") { musicPrompt = `opening tension music for ${style}`; sfxPrompt = `microwave start sound for ${style}`; }
-      if (phase === "quarter" || phase === "middle") { sfxPrompt = `subtle transition accent for ${style}`; }
-      if (phase === "final") { musicPrompt = `intense climax music for ${style}`; sfxPrompt = `tension build effect for ${style}`; }
-      if (phase === "done") { musicPrompt = null; sfxPrompt = `victory finish sound for ${style}`; }
-
-      const audioPromises = {
-        // Only opening narration strictly throws if TTS fails, others fallback to local TTS on client gracefully
-        narration: generateTtsBlob(narration.text, locale).catch(e => {
-          if (phase === "opening") throw e;
-          return undefined;
-        }),
-        music: musicPrompt ? generateMusicBlob(musicPrompt).catch(() => undefined) : Promise.resolve(undefined),
-        sfx: sfxPrompt ? generateSfxBlob(sfxPrompt).catch(() => undefined) : Promise.resolve(undefined),
-      };
-
-      const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
-        audioPromises.narration,
-        audioPromises.music,
-        audioPromises.sfx,
-      ]);
-
-      allPhases[phase] = {
-        narrationText: narration.text,
-        narrationAudio: narrationAudio as Blob | undefined,
-        musicAudio,
-        sfxAudio,
-      };
-    })
-  );
-
-  return {
-    session,
-    narrationText: allPhases["opening"].narrationText,
-    narrationAudio: allPhases["opening"].narrationAudio as Blob, // Guarenteed by the throw above
-    musicAudio: allPhases["opening"].musicAudio,
-    sfxAudio: allPhases["opening"].sfxAudio,
-    allPhases,
-  };
-}
-
-async function playLocalNarration(text: string, locale = "ja", onStart?: () => void): Promise<void> {
+async function playLocalNarration(text: string, locale = "ja"): Promise<void> {
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
-    if (onStart) onStart();
     return;
   }
 
   stopTtsPlayback();
-  stopRequested = false;
   const sanitizedText = normalizeTextInput(text, MAX_TEXT_PAYLOAD_LENGTH);
   const utterance = new SpeechSynthesisUtterance(sanitizedText);
   utterance.rate = locale.startsWith("ja") ? 1.02 : 1.0;
@@ -1102,9 +942,6 @@ async function playLocalNarration(text: string, locale = "ja", onStart?: () => v
     return Promise.resolve();
   }
   await new Promise<void>((resolve, reject) => {
-    utterance.onstart = () => {
-      if (onStart) onStart();
-    };
     utterance.onend = () => resolve();
     utterance.onerror = (e) => {
       if (e.error === 'interrupted' || e.error === 'canceled') {
@@ -1202,31 +1039,15 @@ async function playLocalMusic(prompt: string): Promise<void> {
   });
 }
 
-interface AgentSessionResponse {
-  sessionId: string;
-  sessionMode: "agent" | "local";
-}
-
-async function initSession(): Promise<{ sessionId: string; sessionMode: "agent" | "local" }> {
-  try {
-    const res = await fetch(`${API_BASE}/api/session`, { method: "POST" });
-    if (res.ok) {
-      const data = (await res.json()) as AgentSessionResponse;
-      return { sessionId: data.sessionId, sessionMode: data.sessionMode };
-    }
-  } catch (err) {
-    console.error("Session init failed:", err);
-  }
-  return { sessionId: "local-" + Date.now(), sessionMode: "local" };
-}
-
 async function playSfx(prompt: string): Promise<void> {
+  ensureSafeApiBase();
   enforceEffectRateLimit("sfx");
-
   try {
     const res = await fetch(`${API_BASE}/api/generate-sfx`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
       signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
     });
@@ -1234,36 +1055,54 @@ async function playSfx(prompt: string): Promise<void> {
     if (res.ok) {
       const blob = await parseAudioBlob(res);
       await playAudioBlob(blob, { loop: false, volume: 0.4, isSfx: true });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || "SFX generation failed");
+    }
+
+    const blob = await parseAudioBlob(res);
+    await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/Failed to fetch|NetworkError|Load failed|HTTP_5\d{2}|timeout/i.test(message)) {
+      await playLocalSfx(prompt);
       return;
     }
-  } catch (e) {
-    logDebug("Backend SFX failed, using local fallback:", e);
+    throw error;
   }
-
-  await playLocalSfx(prompt);
 }
 
 async function playMusic(prompt: string): Promise<void> {
+  ensureSafeApiBase();
   enforceEffectRateLimit("music");
-
   try {
     const res = await fetch(`${API_BASE}/api/generate-music`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ prompt: normalizeTextInput(prompt, MAX_TEXT_PAYLOAD_LENGTH) }),
-      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 8000),
+      signal: withTimeoutSignal(DEFAULT_REQUEST_TIMEOUT_MS + 5000),
     });
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
       await playAudioBlob(blob, { loop: true, volume: 0.2, isMusic: true });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || "Music generation failed");
+    }
+
+    const blob = await parseAudioBlob(res);
+    await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/Failed to fetch|NetworkError|Load failed|HTTP_5\d{2}|timeout/i.test(message)) {
+      await playLocalMusic(prompt);
       return;
     }
-  } catch (e) {
-    logDebug("Backend Music failed, using local fallback:", e);
+    throw error;
   }
-
-  await playLocalMusic(prompt);
 }
 
 async function playTtsFromBlob(blob: Blob): Promise<void> {

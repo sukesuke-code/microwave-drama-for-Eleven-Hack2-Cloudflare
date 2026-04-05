@@ -1,7 +1,8 @@
 export interface Env {
   AI: any;
-  ELEVENLABS_API_KEY?: string;
-  GEMINI_API_KEY?: string;
+  MICROWAVE_SESSION: DurableObjectNamespace;
+  ELEVENLABS_API_KEY: string;
+  ELEVENLABS_AGENT_ID: string;
 }
 
 const CORS_HEADERS = {
@@ -10,38 +11,41 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+export { MicrowaveSession } from "./MicrowaveSession";
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    const url = new URL(request.url);
-
     try {
-      if (request.method === "POST" && url.pathname === "/api/agent/narration") {
-        return await handleAgentNarration(request, env);
-      }
-      if (request.method === "POST" && url.pathname === "/api/tts") {
-        return await handleTts(request, env);
-      }
-      if (request.method === "POST" && url.pathname === "/api/generate-sfx") {
-        return await handleGenerateSfx(request, env);
-      }
-      if (request.method === "POST" && url.pathname === "/api/generate-music") {
-        return await handleGenerateMusic(request, env);
-      }
-      if (request.method === "POST" && url.pathname.startsWith("/api/session/")) {
-        // Mock session endpoints for compatibility
-        return new Response(JSON.stringify({ ok: true, session: { sessionId: `session-${Date.now()}` } }), {
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
-        });
+      if (url.pathname === "/api/get-signed-url" && request.method === "GET") {
+        return await handleGetSignedUrl(env);
       }
 
-      return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+      if (url.pathname === "/api/session/start" && request.method === "POST") {
+        return await handleStartSession(request, env);
+      }
+
+      if (url.pathname.startsWith("/api/session/ws/")) {
+        return await handleSessionWebSocket(request, env);
+      }
+
+      return new Response(JSON.stringify({ error: "Not Found", path: url.pathname }), {
+        status: 404,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
     } catch (err: any) {
       console.error(err);
-      return new Response(JSON.stringify({ error: err.message }), {
+      return new Response(JSON.stringify({ 
+        error: "Internal Server Error", 
+        message: err.message,
+        stack: err.stack 
+      }), {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
@@ -85,127 +89,95 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
     } catch (e) {
       console.error("Gemini errored", e);
     }
+async function handleGetSignedUrl(env: Env): Promise<Response> {
+  if (!env.ELEVENLABS_API_KEY || !env.ELEVENLABS_AGENT_ID) {
+    return new Response(JSON.stringify({ error: "Missing ElevenLabs credentials on server." }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
 
-  // Fallback to Cloudflare AI if Gemini fails or is not available
-  if (!narrationText && env.AI) {
-    try {
-      const aiResponse: any = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
-        messages: [{ role: "user", content: prompt }]
-      });
-      narrationText = aiResponse.response || "";
-    } catch (e) {
-      console.error("Workers AI errored", e);
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${env.ELEVENLABS_AGENT_ID}`,
+    {
+      method: "GET",
+      headers: {
+        "xi-api-key": env.ELEVENLABS_API_KEY,
+      },
     }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("ElevenLabs API error:", text);
+    return new Response(JSON.stringify({ error: "Failed to get signed URL from ElevenLabs" }), {
+      status: 502,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
 
-  if (!narrationText) {
-    narrationText = `おおっと！${dishName}の調理が白熱しているぞ！残り${remainingTime}秒だー！`;
-  }
-
-  // Clean up excessive newlines or quotes
-  narrationText = narrationText.replace(/[\r\n]+/g, " ").replace(/"/g, "").trim();
-
-  return new Response(JSON.stringify({ ok: true, text: narrationText }), {
+  const data = await res.json() as any;
+  // Make sure it returns { signedUrl: 'wss://...' } based on the frontend logic
+  return new Response(JSON.stringify({ ok: true, signedUrl: data.signed_url }), {
+    status: 200,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
 }
 
-async function handleTts(request: Request, env: Env): Promise<Response> {
-  if (!env.ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
+async function handleStartSession(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as any;
+  const { dishName, style, durationSeconds } = body;
+
+  // Enhance the narration instruction using Workers AI!
+  let aiEnhancedInstruction = "";
+  if (env.AI) {
+    try {
+      const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+        messages: [
+          { role: "system", content: "You are an assistant that creates very short (1 sentence) dramatic acting instructions for sports/movie commentators. Reply ONLY with the instruction." },
+          { role: "user", content: `I am microwaving ${dishName} for ${durationSeconds} seconds in a ${style} style. Give me a 1 sentence acting direction for the narrator.` }
+        ]
+      }) as any;
+      aiEnhancedInstruction = aiResponse.response || "";
+    } catch (e) {
+      console.error("Workers AI failed:", e);
+    }
   }
 
-  const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
-  const text = body.text;
-  const voiceId = "JBFqnCBsd6RMkjVDRZzb"; // Optional: make this dynamic
+  // Create or get a Durable Object for this session
+  // For simplicity and multiplayer demo, we can just create a random ID
+  const sessionId = crypto.randomUUID();
+  const id = env.MICROWAVE_SESSION.idFromName(sessionId);
+  const stub = env.MICROWAVE_SESSION.get(id);
 
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+  // Initialize the DO with the details
+  await stub.fetch(new Request("http://do/init", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      text: text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-    }),
-  });
+    body: JSON.stringify({ dishName, style, durationSeconds, aiEnhancedInstruction })
+  }));
 
-  if (!res.ok) {
-    const errorBody = await res.text().catch(() => "unknown");
-    throw new Error(`ElevenLabs TTS HTTP Error: ${res.status} - ${errorBody}`);
-  }
-
-  // Forward the audio binary directly to the frontend, along with CORS
-  const newResponse = new Response(res.body, res);
-  // Important: apply CORS headers to the audio response
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => {
-    newResponse.headers.set(k, v);
+  return new Response(JSON.stringify({ sessionId, aiEnhancedInstruction }), {
+    status: 200,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
-  return newResponse;
 }
 
-async function handleGenerateSfx(request: Request, env: Env): Promise<Response> {
-  if (!env.ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
+async function handleSessionWebSocket(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const sessionId = url.pathname.split("/").pop();
+  if (!sessionId) {
+    return new Response("Missing Session ID", { status: 400 });
   }
 
-  const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
-  const prompt = body.prompt;
-
-  const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      text: prompt,
-      duration_seconds: 4,
-      prompt_influence: 0.3
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`ElevenLabs SFX HTTP Error: ${res.status}`);
+  // Upgrade header check
+  const upgradeHeader = request.headers.get("Upgrade");
+  if (!upgradeHeader || upgradeHeader !== "websocket") {
+    return new Response("Expected Upgrade: websocket", { status: 426 });
   }
 
-  const newResponse = new Response(res.body, res);
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
-  return newResponse;
-}
+  // Forward to Durable Object
+  const id = env.MICROWAVE_SESSION.idFromName(sessionId);
+  const stub = env.MICROWAVE_SESSION.get(id);
 
-async function handleGenerateMusic(request: Request, env: Env): Promise<Response> {
-  if (!env.ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
-  }
-
-  const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
-  const prompt = body.prompt;
-
-  const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      text: prompt + ", cinematic background music loop, no voice",
-      duration_seconds: 10,
-      prompt_influence: 0.3
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`ElevenLabs Music HTTP Error: ${res.status}`);
-  }
-
-  const newResponse = new Response(res.body, res);
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
-  return newResponse;
+  return stub.fetch(request);
 }

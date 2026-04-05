@@ -1,27 +1,8 @@
-export type NarrationStyle = 'sports' | 'movie' | 'horror' | 'nature' | 'documentary' | 'anime';
+export type NarrationStyle = 'sports' | 'movie' | 'horror' | 'nature';
 export type Locale = 'ja' | 'en';
 export type ThemeMode = 'dark' | 'light';
 
 export type AppScreen = 'top' | 'settings' | 'countdown' | 'result';
-
-export type SessionPhase =
-  | "opening"
-  | "quarter"
-  | "middle"
-  | "final"
-  | "done";
-
-export interface Session {
-  foodName: string;
-  totalTime: number;
-  remainingTime: number;
-  style: NarrationStyle;
-  phase: SessionPhase;
-  isRunning: boolean;
-  sessionId: string;
-  createdAt: number;
-  updatedAt: number;
-}
 
 export interface Settings {
   totalSeconds: number;
@@ -29,25 +10,6 @@ export interface Settings {
   style: NarrationStyle;
   sessionId?: string;
   aiEnhancedInstruction?: string;
-}
-
-export interface PhaseAssets {
-  narrationText: string;
-  narrationAudio?: Blob;
-  musicAudio?: Blob;
-  sfxAudio?: Blob;
-}
-
-export interface InitialAssets {
-  session: Session;
-  // Opening assets for quick fallback
-  narrationText: string;
-  narrationAudio: Blob;
-  musicAudio?: Blob;
-  sfxAudio?: Blob;
-  
-  // All phase assets
-  allPhases?: Record<SessionPhase, PhaseAssets>;
 }
 
 export interface NarrationCue {

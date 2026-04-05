@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, Moon, Sun } from 'lucide-react';
-import { InitialAssets, Locale, Settings, ThemeMode } from '../types';
+import { Locale, Settings, ThemeMode } from '../types';
 import { getCurrentNarration, getFinishLine, getStyleConfigs } from '../data/narrations';
 import CircularTimer from '../components/CircularTimer';
 import NarrationText from '../components/NarrationText';
@@ -14,7 +14,6 @@ import { api, NORMAL_MUSIC_LEVEL, SFX_DEFAULT_VOLUME } from '../api/client';
 interface CountdownPageProps {
   locale: Locale;
   settings: Settings;
-  initialAssets: InitialAssets | null;
   themeMode: ThemeMode;
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onBack: () => void;
@@ -24,7 +23,6 @@ interface CountdownPageProps {
 export default function CountdownPage({
   locale,
   settings,
-  initialAssets,
   themeMode,
   onThemeModeChange,
   onBack,
@@ -40,38 +38,17 @@ export default function CountdownPage({
   const [isPaused, setIsPaused] = useState(false);
   const [waveBeat, setWaveBeat] = useState(0);
   const [ttsLevel, setTtsLevel] = useState(0);
-  const [sessionMode, setSessionMode] = useState<'remote' | 'local-fallback' | 'connecting'>('connecting');
   const [ttsSpectrum, setTtsSpectrum] = useState<number[]>([]);
+  const [agentStatus, setAgentStatus] = useState<string>('disconnected');
   const prevNarrationRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
-  const ttsQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const lastQueuedNarrationRef = useRef('');
-  const phaseRef = useRef<'opening' | 'quarter' | 'middle' | 'final' | 'done' | null>(null);
-  const isPausedRef = useRef(isPaused);
-  const isFinishedRef = useRef(isFinished);
-  const isUnmountedRef = useRef(false);
-
-  useEffect(() => {
-    isUnmountedRef.current = false;
-    return () => {
-      isUnmountedRef.current = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    isPausedRef.current = isPaused;
-    if (isPaused) {
-      api.stopTtsPlayback();
-      api.stopMusic();
-    }
-  }, [isPaused]);
-
-  useEffect(() => {
-    isFinishedRef.current = isFinished;
-  }, [isFinished]);
+  const phaseRef = useRef<SessionPhase | null>(null);
+  const agentConnectedRef = useRef(false);
+  const narrationRequestInFlightRef = useRef(false);
+  const timeLeftRef = useRef(totalSeconds);
+  const syncClientRef = useRef<any>(null);
 
   const styleConfig = getStyleConfigs(locale).find((s) => s.id === style)!;
   const isDanger = timeLeft <= 10 && timeLeft > 0;
@@ -252,51 +229,66 @@ export default function CountdownPage({
             if (isInterrupted) return;
             console.warn("[CountdownPage] Initial AI narration playback failed, skipping local fallback:", err);
           });
+  // Build the "current situation" message for the Agent
+  const buildSituationMessage = useCallback((tl: number, phase: SessionPhase): string => {
+    const elapsed = totalSeconds - tl;
+    const pct = totalSeconds > 0 ? Math.round((tl / totalSeconds) * 100) : 0;
+
+    return [
+      `--- Current Situation ---`,
+      `dish: ${dishName}`,
+      `style: ${style}`,
+      `phase: ${phase}`,
+      `totalTime: ${totalSeconds}s`,
+      `remainingTime: ${tl}s`,
+      `elapsed: ${elapsed}s`,
+      `progress: ${100 - pct}%`,
+      `locale: ${locale}`,
+      `ai_director_instruction: ${settings.aiEnhancedInstruction || 'none'}`,
+      ``,
+      `Create one short vivid narration line for this exact moment.`,
+      `Stay fully in character for the ${style} style.`,
+      `Match sound and energy to the ${phase} phase.`,
+    ].join('\n');
+  }, [dishName, style, totalSeconds, locale, settings.aiEnhancedInstruction]);
+
+  // Play local SFX/music effects per phase
+  const handlePhaseEffects = useCallback(async (phase: SessionPhase) => {
+    try {
+      if (style === 'movie') {
+        if (phase === 'done') {
+          api.stopMusic();
+          await api.playSfx('cinematic ending impact, short trailer hit');
+          return;
+        }
+        if (phase === 'opening') {
+          await api.playMusic('cinematic trailer underscore, tense and dramatic');
+        }
+        if (phase === 'middle' || phase === 'final') {
+          await api.playSfx('cinematic whoosh rise, short transition');
         }
         return;
       }
 
-      const existingSessionId = sessionStorage.getItem('sessionId');
-      const existingMode = sessionStorage.getItem('sessionMode') as 'remote' | 'local-fallback' | 'connecting' | null;
-
-      if (existingSessionId && sessionIdRef.current !== existingSessionId) {
-        console.log("[CountdownPage] Resuming existing AI session:", existingSessionId);
-        sessionIdRef.current = existingSessionId;
-        if (existingMode) setSessionMode(existingMode);
-        return;
+      if (style === 'nature') {
+        if (phase === 'done') {
+          api.stopMusic();
+          await api.playSfx('soft forest chime, gentle resolution');
+          return;
+        }
+        if (phase === 'opening') {
+          await api.playMusic('calm nature ambience, soft wind and birds');
+        }
+        if (phase === 'middle' || phase === 'final') {
+          await api.playSfx('light natural rustle and airy swell');
+        }
       }
-
-      console.log("[CountdownPage] Initializing NEW AI session...");
-      try {
-        const session = await api.startSession(dishName, totalSeconds, style);
-        console.log("[CountdownPage] AI session started:", session.sessionId);
-        sessionIdRef.current = session.sessionId;
-        sessionStorage.setItem('sessionId', session.sessionId);
-        const mode = session.sessionId.startsWith('local-') ? 'local-fallback' : 'remote';
-        setSessionMode(mode);
-        sessionStorage.setItem('sessionMode', mode);
-      } catch (err) {
-        console.warn('[CountdownPage] Failed to start remote session, using local defaults', err);
-        sessionIdRef.current = `local-${Date.now()}`;
-        sessionStorage.setItem('sessionId', sessionIdRef.current);
-        setSessionMode('local-fallback');
-        sessionStorage.setItem('sessionMode', 'local-fallback');
-      }
+    } catch (e) {
+      console.warn('Phase effects failed (non-critical):', e);
     }
+  }, [style]);
 
-    initSession();
-
-    const text = initialAssets?.narrationText || buildNarrationLine(totalSeconds, totalSeconds);
-    setNarrationText(text);
-  }, [totalSeconds, style, dishName, locale, buildNarrationLine, initialAssets]);
-
-  useEffect(() => {
-    const sId = sessionStorage.getItem('sessionId');
-    if (sId) sessionIdRef.current = sId;
-    const mode = sessionStorage.getItem('sessionMode') as 'remote' | 'local-fallback' | 'connecting' | null;
-    if (mode) setSessionMode(mode);
-  }, []);
-
+  // ---------- Agent connection ----------
   useEffect(() => {
     if (isPaused) return;
 
@@ -361,21 +353,64 @@ export default function CountdownPage({
             currentText = narration.text;
             playAudio = narration.play;
           }
+    const initial = getCurrentNarration(totalSeconds, totalSeconds, style, dishName, locale);
+    prevNarrationRef.current = initial;
+    setNarrationText(initial);
 
-          if (currentText === lastQueuedNarrationRef.current) return;
-          lastQueuedNarrationRef.current = currentText;
+    const dynamicVars: DynamicVars = {
+      dish_name: dishName,
+      style: style,
+      total_time: String(totalSeconds),
+      remaining_time: String(totalSeconds),
+      phase: 'opening',
+      locale: locale,
+      ai_instruction: settings.aiEnhancedInstruction || '',
+    };
 
-          let textSet = false;
-          const triggerTextSync = () => {
-            if (textSet || isPausedRef.current || isUnmountedRef.current) return;
-            textSet = true;
-            prevNarrationRef.current = currentText;
-            setNarrationText(currentText);
-          };
+    const callbacks: AgentCallbacks = {
+      onStatusChange: (status) => {
+        setAgentStatus(status);
+        agentConnectedRef.current = status === 'connected';
+      },
+      onAgentText: (text) => {
+        // Agent sent narration text → display it
+        if (text && text.trim()) {
+          prevNarrationRef.current = text;
+          setNarrationText(text);
+        }
+        narrationRequestInFlightRef.current = false;
+      },
+      onAgentAudioDone: () => {
+        narrationRequestInFlightRef.current = false;
+      },
+      onError: (err) => {
+        console.warn('ElevenLabs agent error:', err.message);
+        agentConnectedRef.current = false;
+      },
+    };
 
-          if (sessionIdRef.current && !isUnmountedRef.current) {
-            api.saveNarration(sessionIdRef.current, currentText).catch(console.warn);
+    connectAgent(dynamicVars, callbacks).catch((err) => {
+      console.warn('Agent connect failed, using local fallback:', err);
+      agentConnectedRef.current = false;
+    });
+
+    // Sub-routine: Connect to Durable Objects Backend if a Session ID exists
+    if (settings.sessionId) {
+      import('../api/session-sync').then(({ SessionSyncClient }) => {
+        const client = new SessionSyncClient(
+          settings.sessionId!,
+          (state) => {
+            setIsPaused(state.isPaused);
+          },
+          (tl) => {
+            setTimeLeft(tl);
+            timeLeftRef.current = tl;
           }
+        );
+        client.connect();
+        syncClientRef.current = client;
+      }).catch(e => console.error("Sync client import fail:", e));
+    }
 
           if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
             console.log(`[CountdownPage] Executing narration and effects for ${phase}...`);
@@ -435,6 +470,15 @@ export default function CountdownPage({
         console.log(`[CountdownPage] Task for phase ${phase} completed/exited.`);
       });
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets, onFinish]);
+    return () => {
+      disconnectAgent();
+      agentConnectedRef.current = false;
+      if (syncClientRef.current) {
+        syncClientRef.current.disconnect();
+        syncClientRef.current = null;
+      }
+    };
+  }, [totalSeconds, style, dishName, locale, settings.sessionId, settings.aiEnhancedInstruction]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -580,31 +624,17 @@ export default function CountdownPage({
           </div>
         </div>
 
-        <div className="absolute right-12 top-4 z-30">
-          {sessionMode === 'remote' && (
-            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
-              isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-            }`}>
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]"></div>
-              <span>AI Connected</span>
-            </div>
-          )}
-          {sessionMode === 'connecting' && (
-            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
-              isLight ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-sky-500/30 bg-sky-500/10 text-sky-400'
-            }`}>
-              <div className="h-2 w-2 rounded-full bg-sky-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
-              <span>Connecting AI...</span>
-            </div>
-          )}
-          {sessionMode === 'local-fallback' && (
-             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm transition-colors ${
-              isLight ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-            }`}>
-              <div className="h-2 w-2 rounded-full bg-amber-500"></div>
-              <span>Local Session</span>
-            </div>
-          )}
+        {/* Agent status indicator */}
+        <div className="mx-4 mt-2 text-center">
+          <span className={`inline-block rounded-full px-3 py-0.5 text-[10px] font-bold ${
+            agentStatus === 'connected'
+              ? isLight ? 'bg-green-100 text-green-700' : 'bg-green-900/30 text-green-300'
+              : agentStatus === 'connecting'
+              ? isLight ? 'bg-yellow-100 text-yellow-700' : 'bg-yellow-900/30 text-yellow-300'
+              : isLight ? 'bg-red-100 text-red-700' : 'bg-red-900/30 text-red-300'
+          }`}>
+            {statusLabel}
+          </span>
         </div>
 
         <div className="absolute right-4 top-4 z-30">
