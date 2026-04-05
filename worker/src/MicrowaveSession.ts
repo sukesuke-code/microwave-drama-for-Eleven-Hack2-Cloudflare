@@ -1,3 +1,14 @@
+interface StoredAppState {
+  dishName: string;
+  style: string;
+  durationSeconds: number;
+  timeLeft: number;
+  aiEnhancedInstruction: string;
+  isPaused: boolean;
+}
+
+type SessionControlMessage = { type: "pause" | "resume" };
+
 export class MicrowaveSession {
   state: DurableObjectState;
   sessions: Set<WebSocket>;
@@ -8,16 +19,16 @@ export class MicrowaveSession {
   durationSeconds: number = 0;
   timeLeft: number = 0;
   aiEnhancedInstruction: string = "";
-  timerInterval: number | null = null;
+  timerInterval: ReturnType<typeof setInterval> | null = null;
   isPaused: boolean = false;
 
-  constructor(state: DurableObjectState, env: any) {
+  constructor(state: DurableObjectState) {
     this.state = state;
     this.sessions = new Set();
 
     // Recover state if woke up from hibernation
     this.state.blockConcurrencyWhile(async () => {
-      const stored = await this.state.storage.get("appState") as any;
+      const stored = await this.state.storage.get<StoredAppState>("appState");
       if (stored) {
         this.dishName = stored.dishName;
         this.style = stored.style;
@@ -33,7 +44,7 @@ export class MicrowaveSession {
     const url = new URL(request.url);
 
     if (url.pathname === "/init") {
-      const body = await request.json() as any;
+      const body = await request.json() as StoredAppState;
       this.dishName = body.dishName;
       this.style = body.style;
       this.durationSeconds = body.durationSeconds;
@@ -93,9 +104,9 @@ export class MicrowaveSession {
       
       // Save state every few seconds to limit IO
       if (this.timeLeft % 5 === 0 || this.timeLeft <= 0) {
-        this.saveState();
+        void this.saveState();
       }
-    }, 1000) as any;
+    }, 1000);
   }
 
   stopTimer() {
@@ -105,10 +116,10 @@ export class MicrowaveSession {
     }
   }
 
-  async webSocketMessage(ws: WebSocket, msg: string | ArrayBuffer) {
+  async webSocketMessage(_ws: WebSocket, msg: string | ArrayBuffer) {
     if (typeof msg !== "string") return;
     try {
-      const data = JSON.parse(msg);
+      const data = JSON.parse(msg) as SessionControlMessage;
       
       if (data.type === "pause") {
         this.isPaused = true;
@@ -124,12 +135,12 @@ export class MicrowaveSession {
         await this.saveState();
       }
       
-    } catch (e) {
+    } catch {
       // ignore bad msg
     }
   }
 
-  webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
+  webSocketClose(ws: WebSocket) {
     this.sessions.delete(ws);
     // If everyone left, maybe pause the timer to save resources
     if (this.sessions.size === 0) {
@@ -137,7 +148,7 @@ export class MicrowaveSession {
     }
   }
 
-  webSocketError(ws: WebSocket, error: Error) {
+  webSocketError(ws: WebSocket) {
     this.sessions.delete(ws);
   }
 
@@ -156,14 +167,14 @@ export class MicrowaveSession {
     await this.state.storage.put("appState", this.getPublicState());
   }
 
-  broadcast(message: any) {
+  broadcast(message: unknown) {
     const msgString = JSON.stringify(message);
-    let disconnected: WebSocket[] = [];
+    const disconnected: WebSocket[] = [];
     
     this.sessions.forEach((session) => {
       try {
         session.send(msgString);
-      } catch (err) {
+      } catch {
         disconnected.push(session);
       }
     });
