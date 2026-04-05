@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AppScreen, InitialAssets, Locale, Settings, ThemeMode } from './types';
 import TopPage from './pages/TopPage';
 
@@ -8,6 +8,18 @@ const ResultPage = lazy(() => import('./pages/ResultPage'));
 
 const DEFAULT_LOCALE: Locale = 'en';
 const SUPPORTED_LOCALES: Locale[] = ['en', 'ja'];
+const MIN_TOTAL_SECONDS = 1;
+const MAX_TOTAL_SECONDS = 600;
+const MAX_DISH_NAME_LENGTH = 100;
+
+function clampTotalSeconds(value: number): number {
+  if (!Number.isFinite(value)) return 60;
+  return Math.max(MIN_TOTAL_SECONDS, Math.min(MAX_TOTAL_SECONDS, Math.floor(value)));
+}
+
+function sanitizeDishName(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().slice(0, MAX_DISH_NAME_LENGTH);
+}
 
 function readStorage(key: string): string | null {
   try {
@@ -73,8 +85,8 @@ function readSettings(): Settings | null {
       )
     ) {
       return {
-        totalSeconds: parsed.totalSeconds,
-        dishName: parsed.dishName,
+        totalSeconds: clampTotalSeconds(parsed.totalSeconds),
+        dishName: sanitizeDishName(parsed.dishName),
         style: parsed.style,
         voiceLanguage: parsed.voiceLanguage === 'en' ? 'en' : 'ja',
       };
@@ -88,6 +100,7 @@ function readSettings(): Settings | null {
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(() => readSettings());
   const [screen, setScreen] = useState<AppScreen>('top');
+  const transitionTimerRef = useRef<number | null>(null);
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [locale, setLocale] = useState<Locale>(() => readLocale());
@@ -136,14 +149,26 @@ export default function App() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current !== null) {
+        window.clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
+
   const transitionTo = (newScreen: AppScreen) => {
     if (screen === newScreen) return;
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
     setIsTransitioning(true);
-    const timer = setTimeout(() => {
+    transitionTimerRef.current = window.setTimeout(() => {
       setScreen(newScreen);
       setIsTransitioning(false);
+      transitionTimerRef.current = null;
     }, 150);
-    return () => clearTimeout(timer);
   };
 
   const handleStartSettings = () => transitionTo('settings');
