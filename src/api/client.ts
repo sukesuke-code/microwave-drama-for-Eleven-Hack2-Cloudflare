@@ -823,11 +823,8 @@ async function requestAgentNarration(
           }
         }
       } catch (ttsErr) {
-        logDebug("Backend TTS failed, falling back to local:", ttsErr);
+        logDebug("Backend TTS failed:", ttsErr);
       }
-
-      if (stopRequested) return;
-      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja", onReady, maxNarrationMs);
     },
   };
 }
