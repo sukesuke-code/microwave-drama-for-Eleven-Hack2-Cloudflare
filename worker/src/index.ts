@@ -2,18 +2,35 @@ export interface Env {
   AI: any;
   ELEVENLABS_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  ALLOWED_ORIGINS?: string;
 }
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+function buildCorsHeaders(request: Request, env: Env): Record<string, string> {
+  const requestOrigin = request.headers.get("Origin") ?? "";
+  const allowlist = env.ALLOWED_ORIGINS
+    ? env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
+    : [];
+  const allowOrigin = allowlist.length > 0
+    ? (allowlist.includes(requestOrigin) ? requestOrigin : "null")
+    : "*";
+
+  return {
+    ...BASE_CORS_HEADERS,
+    "Access-Control-Allow-Origin": allowOrigin,
+    Vary: "Origin",
+  };
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const corsHeaders = buildCorsHeaders(request, env);
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS_HEADERS });
+      return new Response(null, { headers: corsHeaders });
     }
 
     const url = new URL(request.url);
@@ -34,22 +51,23 @@ export default {
       if (request.method === "POST" && url.pathname.startsWith("/api/session/")) {
         // Mock session endpoints for compatibility
         return new Response(JSON.stringify({ ok: true, session: { sessionId: `session-${Date.now()}` } }), {
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
-      return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+      return new Response("Not Found", { status: 404, headers: corsHeaders });
     } catch (err: any) {
       console.error(err);
       return new Response(JSON.stringify({ error: err.message }), {
         status: 500,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
   },
 };
 
 async function handleAgentNarration(request: Request, env: Env): Promise<Response> {
+  const corsHeaders = buildCorsHeaders(request, env);
   const body: any = await request.json();
   const { dishName, style, phase, remainingTime, totalTime, locale } = body;
 
@@ -148,13 +166,14 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   narrationText = narrationText.replace(/\s+/g, " ").trim();
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
 async function handleTts(request: Request, env: Env): Promise<Response> {
+  const corsHeaders = buildCorsHeaders(request, env);
   if (!env.ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: corsHeaders });
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
@@ -185,15 +204,16 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   // Forward the audio binary directly to the frontend, along with CORS
   const newResponse = new Response(res.body, res);
   // Important: apply CORS headers to the audio response
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => {
+  Object.entries(corsHeaders).forEach(([k, v]) => {
     newResponse.headers.set(k, v);
   });
   return newResponse;
 }
 
 async function handleGenerateSfx(request: Request, env: Env): Promise<Response> {
+  const corsHeaders = buildCorsHeaders(request, env);
   if (!env.ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: corsHeaders });
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
@@ -218,13 +238,14 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
   }
 
   const newResponse = new Response(res.body, res);
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
+  Object.entries(corsHeaders).forEach(([k, v]) => newResponse.headers.set(k, v));
   return newResponse;
 }
 
 async function handleGenerateMusic(request: Request, env: Env): Promise<Response> {
+  const corsHeaders = buildCorsHeaders(request, env);
   if (!env.ELEVENLABS_API_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: false, error: "ELEVENLABS_API_KEY is not set" }), { status: 500, headers: corsHeaders });
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
@@ -249,6 +270,6 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
   }
 
   const newResponse = new Response(res.body, res);
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => newResponse.headers.set(k, v));
+  Object.entries(corsHeaders).forEach(([k, v]) => newResponse.headers.set(k, v));
   return newResponse;
 }

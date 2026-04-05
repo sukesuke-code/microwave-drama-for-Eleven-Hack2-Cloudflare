@@ -337,7 +337,7 @@ export async function connectAgent(
       }
     };
 
-    socket.onerror = (e) => {
+    socket.onerror = () => {
       // Handshake failures usually don't provide event details to JS for security
       setStatus("error");
       const err = new Error("WebSocket connection error. Check if your ElevenLabs Agent is set to 'Public' and 'localhost:5173' is in Authorized Origins.");

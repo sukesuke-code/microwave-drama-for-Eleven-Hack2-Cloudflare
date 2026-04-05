@@ -63,7 +63,14 @@ function readSettings(): Settings | null {
     if (
       typeof parsed.totalSeconds === 'number' &&
       typeof parsed.dishName === 'string' &&
-      (parsed.style === 'sports' || parsed.style === 'movie' || parsed.style === 'horror' || parsed.style === 'nature')
+      (
+        parsed.style === 'sports' ||
+        parsed.style === 'movie' ||
+        parsed.style === 'horror' ||
+        parsed.style === 'nature' ||
+        parsed.style === 'documentary' ||
+        parsed.style === 'anime'
+      )
     ) {
       return {
         totalSeconds: parsed.totalSeconds,
