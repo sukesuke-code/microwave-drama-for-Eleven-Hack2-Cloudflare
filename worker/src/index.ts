@@ -568,14 +568,16 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
     narrationText = narrationText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+/g, " ");
     narrationText = narrationText.replace(/\s+/g, " ").trim();
 
-    // Detect romaji: macron vowels only appear in romanized Japanese, never in native English
-    const hasMacrons = /[āīūēōĀĪŪĒŌ]/.test(narrationText);
-    // Detect romaji word clusters: ≥2 high-frequency Japanese romaji words = likely romaji output
-    const ROMAJI_WORDS = /\b(kono|sono|ano|kore|sore|are|nani|naze|doko|dare|ittai|yosh|ikuze|ikuyo|sugoi|yabai|kawaii|suki|desu|masu|dayo|nda|kedo|wa|ga|wo|ni|de|to|ka|mo)\b/gi;
+    // Detect romaji via Unicode escapes (encoding-safe).
+    // Macron vowels: ā ī ū ē ō — these ONLY appear in romanized Japanese, never in native English.
+    const hasMacrons = /[\u0101\u012B\u016B\u0113\u014D\u0100\u012A\u016A\u0112\u014C]/.test(narrationText);
+    // Uniquely-Japanese romaji words — excludes common English words (wa/ga/ni/de/to/ka/mo removed).
+    // Even 1 match is strong evidence of romaji output.
+    const ROMAJI_WORDS = /\b(kono|sono|ano|kore|sore|nani|naze|doko|dare|ittai|ikuze|ikuyo|sugoi|yabai|kawaii|desu|masu|dayo|nda|kedo|hajimaru|shimau|taberu|ryori|itadaki|gochiso|kimochi|kokoro|chikara|unmei|akuma|shunkan|kessen)\b/gi;
     const romajiCount = (narrationText.match(ROMAJI_WORDS) ?? []).length;
     const hasEnglishWords = /[a-zA-Z]{2,}/.test(narrationText);
 
-    if (hasMacrons || romajiCount >= 2 || !hasEnglishWords) {
+    if (hasMacrons || romajiCount >= 1 || !hasEnglishWords) {
       const enFallbacks: Record<string, string> = {
         opening: `${dishName} is in the microwave — the countdown has BEGUN!`,
         quarter:  `Quarter down! The heat inside is rising fast for ${dishName}!`,

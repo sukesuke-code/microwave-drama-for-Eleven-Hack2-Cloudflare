@@ -862,6 +862,36 @@ async function getSignedUrl(): Promise<string> {
   return data.signedUrl;
 }
 
+// Macron vowels (Unicode escapes, encoding-safe): ā ī ū ē ō — only in romanized Japanese.
+const ROMAJI_MACRONS = /[\u0101\u012B\u016B\u0113\u014D\u0100\u012A\u016A\u0112\u014C]/;
+// Uniquely-Japanese romaji words. Excludes common English words (wa/ga/ni/de/to etc.).
+const ROMAJI_WORDS_RE = /\b(kono|sono|ano|kore|sore|nani|naze|doko|dare|ittai|ikuze|ikuyo|sugoi|yabai|kawaii|desu|masu|dayo|nda|kedo|hajimaru|shimau|taberu|ryori|itadaki|gochiso|kimochi|kokoro|chikara|unmei|akuma|shunkan|kessen)\b/gi;
+
+/** Detects romaji (romanized Japanese) and replaces with a clean fallback. No-ops for Japanese mode. */
+function stripRomajiIfNeeded(
+  text: string,
+  locale: string,
+  dishName: string,
+  style: NarrationStyle,
+  phase: SessionPhase,
+  remainingTime: number
+): string {
+  if (!locale.startsWith("en")) {
+    // Japanese mode: strip any remaining Latin sequences and validate
+    const stripped = text.replace(/[a-zA-Z][a-zA-Z0-9\s'!\-,.?]*/g, " ").replace(/\s+/g, " ").trim();
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(stripped);
+    if (!hasJapanese) return getLocalFallbackNarration(dishName, style, phase, remainingTime, locale);
+    return stripped;
+  }
+  // English mode: detect macrons or uniquely-Japanese romaji words
+  const hasMacrons = ROMAJI_MACRONS.test(text);
+  const romajiCount = (text.match(ROMAJI_WORDS_RE) ?? []).length;
+  if (hasMacrons || romajiCount >= 1) {
+    return getLocalFallbackNarration(dishName, style, phase, remainingTime, locale);
+  }
+  return text;
+}
+
 /** Returns a ready-to-speak local fallback narration line in the configured language. */
 function getLocalFallbackNarration(
   dishName: string,
@@ -1019,11 +1049,23 @@ async function requestAgentNarration(
     });
 
     if (data.ok && data.text) {
-      narrationText = fitNarrationWithinDuration(
+      const reqLocale = sanitizedRequest.locale || "ja";
+      let text = fitNarrationWithinDuration(
         data.text,
         sanitizedRequest.maxDuration ?? maxAllowedByRemaining,
-        sanitizedRequest.locale || "ja"
+        reqLocale
       );
+      // Client-side romaji guard — second defence layer in case the worker
+      // hasn't been redeployed or the macron filter has an encoding edge-case.
+      text = stripRomajiIfNeeded(
+        text,
+        reqLocale,
+        sanitizedRequest.dishName,
+        sanitizedRequest.style,
+        sanitizedRequest.phase,
+        sanitizedRequest.remainingTime
+      );
+      narrationText = text;
     }
   } catch (err) {
     logDebug("Backend narration failed, using fallback:", err);
