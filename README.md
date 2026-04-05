@@ -182,7 +182,9 @@ npx wrangler dev
 npm run lint
 npm run typecheck
 npm run build
-# optional e2e (requires playwright browser binaries)
+# optional e2e bootstrap (tries primary+mirror, skips gracefully if blocked)
+npm run e2e:install
+# optional e2e
 npm run e2e
 ```
 
@@ -386,6 +388,7 @@ npx wrangler dev
 npm run lint
 npm run typecheck
 npm run build
+npm run e2e:install
 npm run e2e
 ```
 
@@ -410,4 +413,3 @@ npm run e2e
 - 個人情報
 - 脆弱性を悪用しやすくする詳細
 - 未完成機能の内部仕様の過剰公開
-
