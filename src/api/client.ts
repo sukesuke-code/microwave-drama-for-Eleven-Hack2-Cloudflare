@@ -1101,7 +1101,7 @@ async function playSfx(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: false, volume: 0.55, isSfx: true });
+      await playAudioBlob(blob, { loop: false, volume: 0.25, isSfx: true });
       return;
     }
   } catch (e) {
@@ -1124,7 +1124,7 @@ async function playMusic(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+      await playAudioBlob(blob, { loop: true, volume: 0.15, isMusic: true });
       return;
     }
   } catch (e) {

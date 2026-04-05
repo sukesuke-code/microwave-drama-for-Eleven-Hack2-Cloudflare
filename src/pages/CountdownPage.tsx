@@ -220,6 +220,7 @@ export default function CountdownPage({
 
           if (initialAssets.narrationAudio) {
             tasks.push(api.playAudioBlob(initialAssets.narrationAudio, {
+              volume: 1,
               onStart: () => {
                 console.log("[CountdownPage] Narration audio started playing");
               }
@@ -227,10 +228,10 @@ export default function CountdownPage({
           }
 
           if (initialAssets.musicAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true }));
+            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true, volume: 0.15 }));
           }
           if (initialAssets.sfxAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true }));
+            tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true, volume: 0.25 }));
           }
 
           await Promise.all(tasks).catch(console.error);
@@ -324,15 +325,15 @@ export default function CountdownPage({
               const tasks: Promise<void>[] = [];
 
               if (preFetched.narrationAudio) {
-                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { onStart: onReady }));
+                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { volume: 1, onStart: onReady }));
               }
               if (preFetched.musicAudio) {
-                tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true }));
+                tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.15 }));
               } else if (phase === 'done') {
                 api.stopMusic();
               }
               if (preFetched.sfxAudio) {
-                tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true }));
+                tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true, volume: 0.25 }));
               }
 
               await Promise.all(tasks);
