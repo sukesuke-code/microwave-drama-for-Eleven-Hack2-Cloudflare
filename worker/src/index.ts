@@ -1,5 +1,7 @@
 export interface Env {
-  AI: any;
+  AI: {
+    run: (model: string, input: { messages: Array<{ role: string; content: string }> }) => Promise<{ response?: string }>;
+  };
   ELEVENLABS_API_KEY?: string;
   GEMINI_API_KEY?: string;
 }
@@ -73,9 +75,10 @@ export default {
       }
 
       return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       console.error(err);
-      return new Response(JSON.stringify({ error: err.message }), {
+      return new Response(JSON.stringify({ error: message }), {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
@@ -84,7 +87,15 @@ export default {
 };
 
 async function handleAgentNarration(request: Request, env: Env): Promise<Response> {
-  const body: any = await request.json();
+  const body = await request.json() as {
+    dishName: string;
+    style: string;
+    phase: string;
+    remainingTime: number;
+    totalTime: number;
+    locale?: string;
+    maxDuration?: number;
+  };
   const { dishName, style, phase, remainingTime, totalTime, locale, maxDuration } = body;
 
   const safeTotalTime = Math.max(1, Number(totalTime) || 1);
@@ -149,7 +160,11 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
         }),
       });
       if (res.ok) {
-        const json: any = await res.json();
+        const json = await res.json() as {
+          candidates?: Array<{
+            content?: { parts?: Array<{ text?: string }> };
+          }>;
+        };
         narrationText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
       }
     } catch (e) {
@@ -160,7 +175,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   // Fallback to Cloudflare AI if Gemini fails or is not available
   if (!narrationText && env.AI) {
     try {
-      const aiResponse: any = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
         messages: [{ role: "user", content: prompt }]
       });
       narrationText = aiResponse.response || "";
@@ -180,12 +195,12 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   // Remove any parenthetical translations or dual language content
   if (isEnglish) {
     // Remove Japanese text in parentheses or brackets
-    narrationText = narrationText.replace(/[\(（][^)）]*[）\)]/g, " ");
-    narrationText = narrationText.replace(/[\[［][^)\]]*[\]］]/g, " ");
+    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
+    narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
   } else {
     // Remove English text in parentheses or brackets
-    narrationText = narrationText.replace(/[\(（][^)）]*[）\)]/g, " ");
-    narrationText = narrationText.replace(/[\[［][^)\]]*[\]］]/g, " ");
+    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
+    narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
   }
 
   narrationText = trimNarrationToDuration(narrationText, maxDurationSeconds, isEnglish);
@@ -201,7 +216,7 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
+  const body = await request.json() as { text: string; locale?: string };
   const text = body.text;
   const locale = body.locale || 'ja';
 
@@ -240,7 +255,7 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
+  const body = await request.json() as { prompt: string };
   const prompt = body.prompt;
 
   const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
@@ -271,7 +286,7 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
+  const body = await request.json() as { prompt: string };
   const prompt = body.prompt;
 
   const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
