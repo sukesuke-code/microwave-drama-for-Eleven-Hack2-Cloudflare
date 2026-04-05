@@ -29,12 +29,23 @@ export interface Settings {
   style: NarrationStyle;
 }
 
+export interface PhaseAssets {
+  narrationText: string;
+  narrationAudio?: Blob;
+  musicAudio?: Blob;
+  sfxAudio?: Blob;
+}
+
 export interface InitialAssets {
   session: Session;
+  // Opening assets for quick fallback
   narrationText: string;
   narrationAudio: Blob;
   musicAudio?: Blob;
   sfxAudio?: Blob;
+  
+  // All phase assets
+  allPhases?: Record<SessionPhase, PhaseAssets>;
 }
 
 export interface NarrationCue {

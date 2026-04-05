@@ -851,41 +851,70 @@ async function prepareInitialAssets(
 ): Promise<InitialAssets> {
   // 1. Start Session
   const session = await startSession(foodName, totalTime, style);
-  
-  // 2. Request first narration text
-  const narration = await requestAgentNarration({
-    sessionId: session.sessionId,
-    style,
-    dishName: foodName,
-    totalTime,
-    remainingTime: totalTime,
-    phase: "opening",
-    locale,
-  });
 
-  // 3. Concurrent generation of audio assets
-  const audioPromises: {
-    narration: Promise<Blob>;
-    music: Promise<Blob | undefined>;
-    sfx: Promise<Blob | undefined>;
-  } = {
-    narration: generateTtsBlob(narration.text, locale),
-    music: generateMusicBlob(`opening tension music for ${style} style narration`).catch(() => undefined),
-    sfx: generateSfxBlob(`microwave start sound for ${style} style`).catch(() => undefined),
-  };
+  const phases: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
+  const allPhases: Record<SessionPhase, import('../types').PhaseAssets> = {} as any;
 
-  const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
-    audioPromises.narration,
-    audioPromises.music,
-    audioPromises.sfx,
-  ]);
+  // 2. Concurrently prepare ALL phases
+  await Promise.all(
+    phases.map(async (phase) => {
+      let remainingTime = totalTime;
+      if (phase === "quarter") remainingTime = Math.floor(totalTime * 0.75);
+      if (phase === "middle") remainingTime = Math.floor(totalTime * 0.5);
+      if (phase === "final") remainingTime = Math.floor(totalTime * 0.25);
+      if (phase === "done") remainingTime = 0;
+
+      const narration = await requestAgentNarration({
+        sessionId: session.sessionId,
+        style,
+        dishName: foodName,
+        totalTime,
+        remainingTime,
+        phase,
+        locale,
+      });
+
+      // Provide dynamic music/sfx prompts
+      let musicPrompt: string | null = null;
+      let sfxPrompt: string | null = null;
+
+      if (phase === "opening") { musicPrompt = `opening tension music for ${style}`; sfxPrompt = `microwave start sound for ${style}`; }
+      if (phase === "quarter" || phase === "middle") { sfxPrompt = `subtle transition accent for ${style}`; }
+      if (phase === "final") { musicPrompt = `intense climax music for ${style}`; sfxPrompt = `tension build effect for ${style}`; }
+      if (phase === "done") { musicPrompt = null; sfxPrompt = `victory finish sound for ${style}`; }
+
+      const audioPromises = {
+        // Only opening narration strictly throws if TTS fails, others fallback to local TTS on client gracefully
+        narration: generateTtsBlob(narration.text, locale).catch(e => {
+          if (phase === "opening") throw e;
+          return undefined;
+        }),
+        music: musicPrompt ? generateMusicBlob(musicPrompt).catch(() => undefined) : Promise.resolve(undefined),
+        sfx: sfxPrompt ? generateSfxBlob(sfxPrompt).catch(() => undefined) : Promise.resolve(undefined),
+      };
+
+      const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
+        audioPromises.narration,
+        audioPromises.music,
+        audioPromises.sfx,
+      ]);
+
+      allPhases[phase] = {
+        narrationText: narration.text,
+        narrationAudio: narrationAudio as Blob | undefined,
+        musicAudio,
+        sfxAudio,
+      };
+    })
+  );
 
   return {
     session,
-    narrationText: narration.text,
-    narrationAudio,
-    musicAudio,
-    sfxAudio,
+    narrationText: allPhases["opening"].narrationText,
+    narrationAudio: allPhases["opening"].narrationAudio as Blob, // Guarenteed by the throw above
+    musicAudio: allPhases["opening"].musicAudio,
+    sfxAudio: allPhases["opening"].sfxAudio,
+    allPhases,
   };
 }
 
