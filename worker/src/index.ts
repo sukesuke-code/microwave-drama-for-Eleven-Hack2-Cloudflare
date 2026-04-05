@@ -1,5 +1,7 @@
 export interface Env {
-  AI: any;
+  AI: {
+    run: (model: string, input: { messages: Array<{ role: string; content: string }> }) => Promise<{ response?: string }>;
+  };
   ELEVENLABS_API_KEY?: string;
   GEMINI_API_KEY?: string;
 }
@@ -9,6 +11,40 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+const ENGLISH_WORDS_PER_SECOND = 2.4;
+const JAPANESE_CHARS_PER_SECOND = 5.2;
+
+function normalizeNarrationText(text: string): string {
+  return text.replace(/[\r\n]+/g, " ").replace(/"/g, "").replace(/\s+/g, " ").trim();
+}
+
+function estimateNarrationDurationSeconds(text: string, isEnglish: boolean): number {
+  if (!text) return 0;
+  if (isEnglish) {
+    const words = text.split(/\s+/).filter(Boolean).length;
+    return words / ENGLISH_WORDS_PER_SECOND;
+  }
+  return text.replace(/\s+/g, "").length / JAPANESE_CHARS_PER_SECOND;
+}
+
+function trimNarrationToDuration(text: string, maxDurationSeconds: number, isEnglish: boolean): string {
+  const normalized = normalizeNarrationText(text);
+  const maxSeconds = Math.max(1, Math.floor(maxDurationSeconds));
+  if (estimateNarrationDurationSeconds(normalized, isEnglish) <= maxSeconds) {
+    return normalized;
+  }
+
+  if (isEnglish) {
+    const words = normalized.split(/\s+/).filter(Boolean);
+    const allowedWords = Math.max(3, Math.floor(maxSeconds * ENGLISH_WORDS_PER_SECOND));
+    return words.slice(0, allowedWords).join(" ").trim();
+  }
+
+  const chars = Array.from(normalized.replace(/\s+/g, ""));
+  const allowedChars = Math.max(6, Math.floor(maxSeconds * JAPANESE_CHARS_PER_SECOND));
+  return chars.slice(0, allowedChars).join("").trim();
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -39,9 +75,10 @@ export default {
       }
 
       return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       console.error(err);
-      return new Response(JSON.stringify({ error: err.message }), {
+      return new Response(JSON.stringify({ error: message }), {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
@@ -50,10 +87,27 @@ export default {
 };
 
 async function handleAgentNarration(request: Request, env: Env): Promise<Response> {
-  const body: any = await request.json();
-  const { dishName, style, phase, remainingTime, totalTime, locale } = body;
+  const body = await request.json() as {
+    dishName: string;
+    style: string;
+    phase: string;
+    remainingTime: number;
+    totalTime: number;
+    locale?: string;
+    maxDuration?: number;
+  };
+  const { dishName, style, phase, remainingTime, totalTime, locale, maxDuration } = body;
 
-  const maxDurationSeconds = totalTime - 1;
+  const safeTotalTime = Math.max(1, Number(totalTime) || 1);
+  const safeRemainingTime = Math.max(0, Number(remainingTime) || 0);
+  const maxDurationSeconds = Math.max(
+    1,
+    Math.min(
+      safeTotalTime - 1,
+      safeRemainingTime - 1,
+      Number(maxDuration) || safeRemainingTime - 1
+    )
+  );
   const isEnglish = locale === 'en';
 
   const styleDescriptions: Record<string, { en: string; ja: string }> = {
@@ -106,7 +160,11 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
         }),
       });
       if (res.ok) {
-        const json: any = await res.json();
+        const json = await res.json() as {
+          candidates?: Array<{
+            content?: { parts?: Array<{ text?: string }> };
+          }>;
+        };
         narrationText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
       }
     } catch (e) {
@@ -117,7 +175,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   // Fallback to Cloudflare AI if Gemini fails or is not available
   if (!narrationText && env.AI) {
     try {
-      const aiResponse: any = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
         messages: [{ role: "user", content: prompt }]
       });
       narrationText = aiResponse.response || "";
@@ -132,20 +190,20 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
       : `おおっと！${dishName}の調理が白熱しているぞ！残り${remainingTime}秒だー！`;
   }
 
-  narrationText = narrationText.replace(/[\r\n]+/g, " ").replace(/"/g, "").trim();
+  narrationText = normalizeNarrationText(narrationText);
 
   // Remove any parenthetical translations or dual language content
   if (isEnglish) {
     // Remove Japanese text in parentheses or brackets
-    narrationText = narrationText.replace(/[\(（][^)）]*[）\)]/g, " ");
-    narrationText = narrationText.replace(/[\[［][^)\]]*[\]］]/g, " ");
+    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
+    narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
   } else {
     // Remove English text in parentheses or brackets
-    narrationText = narrationText.replace(/[\(（][^)）]*[）\)]/g, " ");
-    narrationText = narrationText.replace(/[\[［][^)\]]*[\]］]/g, " ");
+    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
+    narrationText = narrationText.replace(/[[［][^)\]]*[\]］]/g, " ");
   }
 
-  narrationText = narrationText.replace(/\s+/g, " ").trim();
+  narrationText = trimNarrationToDuration(narrationText, maxDurationSeconds, isEnglish);
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -158,7 +216,7 @@ async function handleTts(request: Request, env: Env): Promise<Response> {
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
+  const body = await request.json() as { text: string; locale?: string };
   const text = body.text;
   const locale = body.locale || 'ja';
 
@@ -197,7 +255,7 @@ async function handleGenerateSfx(request: Request, env: Env): Promise<Response> 
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
+  const body = await request.json() as { prompt: string };
   const prompt = body.prompt;
 
   const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
@@ -228,7 +286,7 @@ async function handleGenerateMusic(request: Request, env: Env): Promise<Response
   }
 
   const apiKey = env.ELEVENLABS_API_KEY.trim();
-  const body: any = await request.json();
+  const body = await request.json() as { prompt: string };
   const prompt = body.prompt;
 
   const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
