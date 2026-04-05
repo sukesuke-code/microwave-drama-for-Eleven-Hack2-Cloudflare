@@ -54,6 +54,7 @@ export default function CountdownPage({
   const isPausedRef = useRef(isPaused);
   const isFinishedRef = useRef(isFinished);
   const isUnmountedRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -246,7 +247,8 @@ export default function CountdownPage({
                   syncOpeningText();
                   startCountdown();
                 }
-              }).catch(async () => {
+              }).catch(async (err) => {
+                if (err instanceof Error && err.name === 'AbortError') return;
                 await api.playLocalNarration(initialAssets.narrationText, voiceLanguage, () => {
                   syncOpeningText();
                   startCountdown();
@@ -362,7 +364,10 @@ export default function CountdownPage({
               if (preFetched.narrationAudio) {
                 tasks.push(
                   api.playAudioBlob(preFetched.narrationAudio, { volume: 1, maxDurationMs: phaseMaxNarrationMs, onStart: onReady })
-                    .catch(() => api.playLocalNarration(currentText, voiceLanguage, onReady, phaseMaxNarrationMs))
+                    .catch(async (err) => {
+                      if (err instanceof Error && err.name === 'AbortError') return;
+                      await api.playLocalNarration(currentText, voiceLanguage, onReady, phaseMaxNarrationMs);
+                    })
                 );
               } else {
                 tasks.push(api.playLocalNarration(currentText, voiceLanguage, onReady, phaseMaxNarrationMs));
@@ -494,6 +499,17 @@ export default function CountdownPage({
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
 
+  useEffect(() => {
+    if (containerRef.current) {
+      const el = containerRef.current;
+      el.style.setProperty('--accent-color', styleConfig.accentColor);
+      el.style.setProperty('--accent-color-15', `${styleConfig.accentColor}15`);
+      el.style.setProperty('--accent-color-80', `${styleConfig.accentColor}80`);
+      el.style.setProperty('--accent-color-60', `${styleConfig.accentColor}60`);
+      el.style.setProperty('--progress-percent', `${progressPercent}%`);
+    }
+  }, [styleConfig.accentColor, progressPercent]);
+
   const narrationSeed = useMemo(() => narrationText
     .split('')
     .reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0), [narrationText]);
@@ -526,6 +542,7 @@ export default function CountdownPage({
 
   return (
       <div
+      ref={containerRef}
       className={`h-[100dvh] flex flex-col relative overflow-hidden bg-gradient-to-b ${isLight ? lightBgGradient : styleConfig.bgGradient} page-container`}
     >
       <BackgroundEffect style={style} isDanger={isDanger} themeMode={themeMode} />
@@ -533,13 +550,7 @@ export default function CountdownPage({
       {showConfetti && <Confetti />}
 
       {isDanger && !isFinished && (
-        <div
-          className="absolute inset-0 pointer-events-none z-10"
-          style={{
-            background: `radial-gradient(ellipse at center, transparent 40%, ${styleConfig.accentColor}15 100%)`,
-            animation: 'vignettePulse 0.5s ease-in-out infinite',
-          }}
-        />
+        <div className="absolute inset-0 pointer-events-none z-10 dynamic-vignette" />
       )}
 
       <div className="relative z-20 flex h-full flex-col">
@@ -555,10 +566,7 @@ export default function CountdownPage({
             <span className={`text-xs uppercase tracking-widest font-bold ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               {styleConfig.emoji} {styleConfig.label}
             </span>
-            <span
-              className="text-sm font-bold mt-0.5"
-              style={{ color: styleConfig.accentColor }}
-            >
+            <span className="text-sm font-bold mt-0.5 dynamic-text-color">
               {dishName}
             </span>
           </div>
@@ -617,14 +625,7 @@ export default function CountdownPage({
 
             <div className="w-full max-w-xs mt-3">
               <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
-                <div
-                  className="h-full rounded-full transition-all duration-1000"
-                  style={{
-                    width: `${progressPercent}%`,
-                    background: `linear-gradient(90deg, ${styleConfig.accentColor}80, ${styleConfig.accentColor})`,
-                    boxShadow: `0 0 8px ${styleConfig.accentColor}60`,
-                  }}
-                />
+                <div className="h-full rounded-full transition-all duration-1000 dynamic-progress-bar" />
               </div>
             </div>
           </div>
@@ -649,11 +650,7 @@ export default function CountdownPage({
 
           {isDanger && !isFinished && (
             <div
-              className={`mt-2 translate-y-8 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
-              style={{
-                animation: 'dangerPulse 0.5s ease-in-out infinite',
-                textShadow: `0 0 15px ${styleConfig.accentColor}`,
-              }}
+              className={`mt-2 translate-y-8 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass} dynamic-danger-text`}
             >
               {t.almostDone}
             </div>
