@@ -582,14 +582,21 @@ async function playAudioBlob(
   }
 
   try {
+    // Safety check: if src was cleared (e.g. by stopTtsPlayback) before we reach play(), just exit gracefully
+    if (!audio.src || audio.src === "" || audio.src === window.location.href) {
+      logDebug("Audio play aborted early: src was cleared");
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      return;
+    }
+    
     await audio.play();
     if (onStart) onStart();
   } catch (err) {
-    const isAbort = err instanceof Error && err.name === "AbortError";
+    const isAbort = err instanceof Error && (err.name === "AbortError" || err.message.includes("Empty src attribute") || err.message.includes("src attribute is empty"));
     if (!isAbort) {
       console.warn("Audio play failed:", err);
     } else {
-      logDebug("Audio play interrupted (expected during rapid transitions)");
+      logDebug("Audio play interrupted or empty src (expected during rapid transitions)");
     }
     
     // Revoke URL but with a small delay to avoid ERR_FILE_NOT_FOUND
@@ -1212,9 +1219,15 @@ async function playLocalNarration(text: string, locale = "ja", onStart?: () => v
       if (maxDurationTimeoutId) clearTimeout(maxDurationTimeoutId);
       resolve();
     };
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
       if (maxDurationTimeoutId) clearTimeout(maxDurationTimeoutId);
-      reject(new Error("LOCAL_TTS_FAILED"));
+      // 'canceled' or 'interrupted' are expected when we switch phases
+      if (e.error === 'canceled' || e.error === 'interrupted') {
+        logDebug(`Local narration was ${e.error}`);
+        resolve();
+      } else {
+        reject(new Error("LOCAL_TTS_FAILED"));
+      }
     };
     window.speechSynthesis.speak(utterance);
   }).finally(() => {

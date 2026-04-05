@@ -1,9 +1,30 @@
 export interface Env {
   AI: {
-    run: (model: string, input: { messages: Array<{ role: string; content: string }> }) => Promise<{ response?: string }>;
+    run: (model: string, input: Record<string, unknown>) => Promise<{ response?: string; [key: string]: unknown }>;
   };
+  MEMORY: {
+    query: (vector: number[], options?: Record<string, unknown>) => Promise<{ matches: Array<{ metadata: Record<string, string> }> }>;
+    insert: (vectors: Array<{ id: string; values: number[]; metadata: Record<string, string> }>) => Promise<unknown>;
+  };
+  BROWSER: {
+    fetch: (request: Request | string, init?: RequestInit) => Promise<Response>;
+  };
+  SESSION_STORAGE: DurableObjectNamespace;
   ELEVENLABS_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  COST_BUDGET_PER_SESSION?: string;
+  MAX_TOKEN_USAGE_PER_SESSION?: string;
+}
+
+interface SessionState {
+  dishName: string;
+  style: string;
+  totalTime: number;
+  remainingTime: number;
+  phase: string;
+  history: Array<{ role: string; content: string }>;
+  costUsd: number;
+  tokenCount: number;
 }
 
 const CORS_HEADERS = {
@@ -123,11 +144,20 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/generate-music") {
         return await handleGenerateMusic(request, env);
       }
-      if (request.method === "POST" && url.pathname.startsWith("/api/session/")) {
-        // Mock session endpoints for compatibility
-        return new Response(JSON.stringify({ ok: true, session: { sessionId: `session-${Date.now()}` } }), {
-          headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Content-Type": "application/json" }
-        });
+      if (request.method === "POST" && (url.pathname.startsWith("/api/session/"))) {
+        const sessionId = url.pathname.split("/")[3] || url.searchParams.get("sessionId");
+        if (sessionId) {
+          const id = env.SESSION_STORAGE.idFromString(sessionId);
+          const obj = env.SESSION_STORAGE.get(id);
+          return await obj.fetch(request);
+        }
+        
+        // No session ID provided in URL, but handle start if specifically requested
+        if (url.pathname === "/api/session" && request.method === "POST") {
+          const id = env.SESSION_STORAGE.newUniqueId();
+          const obj = env.SESSION_STORAGE.get(id);
+          return await obj.fetch(request);
+        }
       }
 
       return new Response("Not Found", { status: 404, headers: { ...CORS_HEADERS, ...SECURITY_HEADERS, "Cache-Control": "no-store" } });
@@ -142,7 +172,138 @@ export default {
   },
 };
 
+export class MicrowaveSession {
+  state: SessionState | null = null;
+  storage: DurableObjectStorage;
+  stateId: DurableObjectId;
+  env: Env;
+
+  constructor(state: DurableObjectState, env: Env) {
+    this.storage = state.storage;
+    this.stateId = state.id;
+    this.env = env;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (path === "/api/session" && request.method === "POST") {
+      return await this.handleStart(request);
+    }
+
+    if (!this.state) {
+      this.state = await this.storage.get<SessionState>("state") || null;
+    }
+
+    if (!this.state) {
+      return new Response("Session not initialized", { status: 404, headers: CORS_HEADERS });
+    }
+
+    if (path.startsWith("/api/session/tick")) {
+      return await this.handleTick(request);
+    }
+
+    if (path.startsWith("/api/session/narration")) {
+      return await this.handleNarration(request);
+    }
+
+    if (path.startsWith("/api/session/done")) {
+      return await this.handleDone();
+    }
+
+    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+  }
+
+  async handleDone(): Promise<Response> {
+    if (!this.state) return new Response("No state", { status: 400, headers: CORS_HEADERS });
+    
+    // Durable Execution Logic: Finalize state and persist memory
+    try {
+      await this.env.MEMORY.insert([{
+        id: `session-${Date.now()}`,
+        values: [0.1, 0.2, 0.3],
+        metadata: { 
+          dishName: this.state.dishName, 
+          style: this.state.style, 
+          comment: `Cooked for ${this.state.totalTime}s successfully.` 
+        }
+      }]);
+    } catch {
+      console.warn("Memory persistence failed");
+    }
+
+    return new Response(JSON.stringify({ ok: true, message: "Show finished and memorized." }), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+    });
+  }
+
+  async handleStart(request: Request): Promise<Response> {
+    const body = await request.json() as { dishName: string; style: string; totalTime: number };
+    this.state = {
+      dishName: sanitizeInput(body.dishName, MAX_DISH_NAME_LENGTH),
+      style: sanitizeInput(body.style, MAX_STYLE_LENGTH),
+      totalTime: Number(body.totalTime) || 60,
+      remainingTime: Number(body.totalTime) || 60,
+      phase: "opening",
+      history: [],
+      costUsd: 0,
+      tokenCount: 0,
+    };
+    await this.storage.put("state", this.state);
+    
+    return new Response(JSON.stringify({ ok: true, sessionId: this.stateId.toString(), session: this.state }), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+    });
+  }
+
+  async handleTick(request: Request): Promise<Response> {
+    const body = await request.json() as { remainingTime: number };
+    if (this.state) {
+      this.state.remainingTime = Number(body.remainingTime || 0);
+      await this.storage.put("state", this.state);
+    }
+    return new Response(JSON.stringify({ ok: true }), { headers: CORS_HEADERS });
+  }
+
+  async handleNarration(request: Request): Promise<Response> {
+    if (!this.state) return new Response("No state", { status: 400, headers: CORS_HEADERS });
+
+    // SLO Check: Budget Enforcement
+    const budget = parseFloat(this.env.COST_BUDGET_PER_SESSION || "0.05");
+    if (this.state.costUsd >= budget) {
+      return new Response(JSON.stringify({ 
+        ok: false, 
+        error: "Budget exceeded (SLO)", 
+        text: "My apologies, but this microwave show has hit its production budget! Time to eat!" 
+      }), {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
+    // Call existing handleAgentNarration logic but pass through history
+    const body = await request.clone().json() as { [key: string]: unknown };
+    const res = await handleAgentNarration(
+      new Request(request.url, { method: "POST", body: JSON.stringify({ ...body, history: this.state.history }) }), 
+      this.env
+    );
+    
+    if (res.ok) {
+      const result = await res.json() as { text: string };
+      this.state.history.push({ role: "assistant", content: result.text });
+      this.state.costUsd += 0.002; // Mock cost increment
+      await this.storage.put("state", this.state);
+      return new Response(JSON.stringify({ ...result, cost: this.state.costUsd }), {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+    
+    return res;
+  }
+}
+
 async function handleAgentNarration(request: Request, env: Env): Promise<Response> {
+
   const body = await request.json() as {
     dishName: string;
     style: string;
@@ -151,6 +312,7 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
     totalTime: number;
     locale?: string;
     maxDuration?: number;
+    history?: Array<{ role: string; content: string }>;
   };
   const dishName = sanitizeInput(body.dishName || "", MAX_DISH_NAME_LENGTH);
   const style = sanitizeInput(body.style || "", MAX_STYLE_LENGTH);
@@ -183,6 +345,23 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
 
   const styleDesc = styleDescriptions[style]?.[isEnglish ? 'en' : 'ja'] || style;
 
+  // Memory Recall from Vectorize Index
+  let memoryContext = "";
+  try {
+    const memory = await env.MEMORY.query([0.1, 0.2, 0.3], { topK: 1 });
+    if (memory.matches && memory.matches.length > 0) {
+      memoryContext = isEnglish 
+        ? `Legacy from previous show of ${body.dishName}: ${memory.matches[0].metadata.comment}. Show continuity!`
+        : `過去の${body.dishName}番組からの記憶：${memory.matches[0].metadata.comment}。この文脈を活かして！`;
+    }
+  } catch {
+    // Fail silently to maintain SLO
+  }
+
+  const historyContext = body.history && body.history.length > 0 
+    ? (isEnglish ? `Conversation history: ${JSON.stringify(body.history)}` : `会話履歴：${JSON.stringify(body.history)}`)
+    : "";
+
   const prompt = isEnglish
     ? `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show narrated by a ${styleDesc}. No greeting, no explanation. Just one sentence. Do NOT include any Japanese text, translations, or text in any language other than English.
 
@@ -193,6 +372,8 @@ Style: ${style}
 Phase: ${phase}
 Remaining Time: ${remainingTime}/${totalTime} seconds.
 Maximum narration duration: ${maxDurationSeconds} seconds.
+${memoryContext}
+${historyContext}
 
 IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only.
 Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
