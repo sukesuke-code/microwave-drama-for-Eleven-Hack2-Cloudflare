@@ -13,6 +13,8 @@ const STYLE_COLORS: Record<NarrationStyle, string> = {
   movie: '#f59e0b',
   horror: '#dc2626',
   nature: '#10b981',
+  documentary: '#a8a29e',
+  anime: '#f43f5e',
 };
 
 function getEnergyScore(text: string): number {

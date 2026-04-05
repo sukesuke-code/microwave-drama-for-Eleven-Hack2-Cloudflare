@@ -29,6 +29,8 @@ export default function BackgroundEffect({ style, isDanger, themeMode }: Backgro
       movie: { color: isLight ? '#f97316' : '#f59e0b', count: 20, speed: 0.5 },
       horror: { color: isLight ? '#ef4444' : '#dc2626', count: 25, speed: 0.8 },
       nature: { color: isLight ? '#10b981' : '#10b981', count: 35, speed: 0.7 },
+      documentary: { color: isLight ? '#71717a' : '#a1a1aa', count: 15, speed: 0.3 },
+      anime: { color: isLight ? '#f43f5e' : '#fb7185', count: 40, speed: 2.2 },
     };
 
     const config = configs[style];

@@ -20,6 +20,8 @@ let speechMeterIntervalId: ReturnType<typeof setInterval> | null = null;
 
 let activeMusicAudio: HTMLAudioElement | null = null;
 let activeMusicObjectUrl: string | null = null;
+let activeSfxAudio: HTMLAudioElement | null = null;
+let activeSfxObjectUrl: string | null = null;
 let localMusicContext: AudioContext | null = null;
 let localMusicNodes: Array<{ stop: () => void }> = [];
 const lastEffectRequestAt = new Map<string, number>();
@@ -439,10 +441,15 @@ async function playAudioBlob(
     activeMusicAudio = audio;
     activeMusicObjectUrl = url;
   } else if (isSfx) {
-    // SFX doesn't use the audio meter and doesn't stop TTS or Music
-    // We just play it independently
+    // SFX Slot
+    if (activeSfxObjectUrl) {
+      URL.revokeObjectURL(activeSfxObjectUrl);
+      activeSfxObjectUrl = null;
+    }
+    activeSfxAudio = audio;
+    activeSfxObjectUrl = url;
   } else {
-    // This is TTS/Narration - managed exclusively to avoid overlapping voices
+    // Narration Slot
     if (activeObjectUrl) {
       URL.revokeObjectURL(activeObjectUrl);
       activeObjectUrl = null;
@@ -523,21 +530,27 @@ async function playAudioBlob(
       URL.revokeObjectURL(url);
       activeMusicObjectUrl = null;
     }
-    if (activeMusicAudio === audio) {
+    if (activeMusicAudio) {
       activeMusicAudio.src = "";
       activeMusicAudio.load();
       activeMusicAudio = null;
     }
   } else if (isSfx) {
-    URL.revokeObjectURL(url);
-    audio.src = "";
-    audio.load();
+    if (activeSfxObjectUrl === url) {
+      URL.revokeObjectURL(url);
+      activeSfxObjectUrl = null;
+    }
+    if (activeSfxAudio) {
+      activeSfxAudio.src = "";
+      activeSfxAudio.load();
+      activeSfxAudio = null;
+    }
   } else {
     if (activeObjectUrl === url) {
       URL.revokeObjectURL(url);
       activeObjectUrl = null;
     }
-    if (activeTtsAudio === audio) {
+    if (activeTtsAudio) {
       activeTtsAudio.src = "";
       activeTtsAudio.load();
       activeTtsAudio = null;
@@ -1084,7 +1097,7 @@ async function playSfx(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: false, volume: 0.4, isMusic: false, isSfx: true });
+      await playAudioBlob(blob, { loop: false, volume: 0.55, isSfx: true });
       return;
     }
   } catch (e) {
@@ -1107,7 +1120,7 @@ async function playMusic(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: true, volume: 0.25, isMusic: true });
+      await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
       return;
     }
   } catch (e) {

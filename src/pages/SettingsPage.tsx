@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clapperboard, Moon, PlayCircle, Sun, Timer, UtensilsCrossed } from 'lucide-react';
 import { InitialAssets, Locale, NarrationStyle, Settings, ThemeMode } from '../types';
 import { UI_TEXT } from '../i18n';
+import { api } from '../api/client';
 
 
 interface SettingsPageProps {
@@ -161,8 +162,7 @@ export default function SettingsPage({
         totalSeconds: duration,
         dishName: nextDishName,
         style,
-        sessionId,
-        aiEnhancedInstruction,
+        sessionId: initialAssets.session.sessionId,
       };
 
       sessionStorage.setItem('sessionId', initialAssets.session.sessionId);

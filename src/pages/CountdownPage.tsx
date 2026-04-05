@@ -9,17 +9,7 @@ import BackgroundEffect from '../components/BackgroundEffect';
 import FlashOverlay from '../components/FlashOverlay';
 import Confetti from '../components/Confetti';
 import { UI_TEXT } from '../i18n';
-import {
-  connectAgent,
-  disconnectAgent,
-  sendUserMessage,
-  subscribeAgentMeter,
-  isAgentConnected,
-} from '../api/elevenlabs-agent';
-import type { AgentCallbacks, DynamicVars } from '../api/elevenlabs-agent';
 import { api } from '../api/client';
-
-type SessionPhase = 'opening' | 'quarter' | 'middle' | 'final' | 'done';
 
 interface CountdownPageProps {
   locale: Locale;
@@ -109,12 +99,14 @@ export default function CountdownPage({
       osc.stop(ctx.currentTime + offset + duration + 0.02);
     };
 
+    // Microwave-like "ding-dong" chime.
     scheduleTone(0, 1320, 0.22, 0.22);
     scheduleTone(0.25, 980, 0.28, 0.18);
+
     window.setTimeout(() => void ctx.close(), 900);
   }, []);
 
-  const getPhase = useCallback((tl: number, tt: number): SessionPhase => {
+  const getPhase = useCallback((tl: number, tt: number): 'opening' | 'quarter' | 'middle' | 'final' | 'done' => {
     if (tl <= 0) return 'done';
     const percent = tt > 0 ? (tl / tt) * 100 : 0;
     if (percent > 75) return 'opening';
@@ -229,10 +221,10 @@ export default function CountdownPage({
           const tasks: Promise<void>[] = [];
           
           if (initialAssets.musicAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true, volume: 0.25 }));
+            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true }));
           }
           if (initialAssets.sfxAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true, volume: 0.4 }));
+            tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true }));
           }
           
           tasks.push(api.playAudioBlob(initialAssets.narrationAudio, { onStart: () => {
@@ -327,12 +319,12 @@ export default function CountdownPage({
                 tasks.push(api.playAudioBlob(preFetched.narrationAudio, { onStart: onReady }));
               }
               if (preFetched.musicAudio) {
-                tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.25 }));
+                tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true }));
               } else if (phase === 'done') {
                 api.stopMusic();
               }
               if (preFetched.sfxAudio) {
-                tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true, volume: 0.4 }));
+                tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true }));
               }
               
               await Promise.all(tasks);
@@ -390,92 +382,48 @@ export default function CountdownPage({
       });
   }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets]);
 
-  // ---------- Agent meter → visualizer ----------
   useEffect(() => {
-    const unsub = subscribeAgentMeter(({ level, spectrum }) => {
+    const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
       setTtsLevel(level);
       setTtsSpectrum(spectrum);
     });
     return () => {
-      unsub();
+      unsubscribe();
+      api.stopTtsPlayback();
+      api.stopMusic();
     };
   }, []);
 
-  // ---------- Phase-based narration triggers ----------
-  const handleTogglePause = () => {
-    if (isFinished) return;
-    setIsPaused((p) => {
-      const next = !p;
-      if (syncClientRef.current) {
-        if (next) syncClientRef.current.pause();
-        else syncClientRef.current.resume();
-      }
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (isPaused) return;
-
-    const phase = getPhase(timeLeft, totalSeconds);
-    if (phaseRef.current === phase) return;
-    phaseRef.current = phase;
-
-    // If agent is connected, send situation
-    if (agentConnectedRef.current && isAgentConnected()) {
-      if (!narrationRequestInFlightRef.current) {
-        narrationRequestInFlightRef.current = true;
-        const situationMsg = buildSituationMessage(timeLeft, phase);
-        sendUserMessage(situationMsg);
-      }
-    } else {
-      // Fallback: local narration
-      const fallbackLine = timeLeft <= 0
-        ? getFinishLine(style, dishName, locale)
-        : getCurrentNarration(timeLeft, totalSeconds, style, dishName, locale);
-      prevNarrationRef.current = fallbackLine;
-      setNarrationText(fallbackLine);
-
-      api.playLocalNarration(fallbackLine, locale).catch((e) => {
-        console.warn('Local TTS fallback failed:', e);
-      });
-    }
-
-    // SFX/music effects regardless
-    void handlePhaseEffects(phase);
-  }, [isPaused, timeLeft, totalSeconds, getPhase, buildSituationMessage, handlePhaseEffects, style, dishName, locale]);
-
-  // ---------- Countdown timer ----------
   useEffect(() => {
     if (isPaused || isFinished) return;
 
     intervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         const next = prev - 1;
-        timeLeftRef.current = next;
-
         if (next <= 0) {
           clearInterval(intervalRef.current!);
           setIsFinished(true);
           setIsFlashing(true);
           setShowConfetti(true);
           playAlarmTone();
-
           const finishText = getFinishLine(style, dishName, locale);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
 
-          // Tell the agent too
-          if (agentConnectedRef.current && isAgentConnected()) {
-            sendUserMessage(buildSituationMessage(0, 'done'));
+          if (sessionIdRef.current) {
+            api.tickSession(sessionIdRef.current, 0).catch((err) => {
+              console.error('Failed to tick session on finish:', err);
+            });
           }
 
           flashTimeoutRef.current = setTimeout(() => setIsFlashing(false), 600);
-          finishTimeoutRef.current = setTimeout(() => {
-            disconnectAgent();
-            onFinish();
-          }, 4000);
+          finishTimeoutRef.current = setTimeout(() => onFinish(), 4000);
           return 0;
+        }
+        if (sessionIdRef.current) {
+          api.tickSession(sessionIdRef.current, next).catch((err) => {
+            console.error('Failed to tick session:', err);
+          });
         }
 
         return next;
@@ -485,12 +433,15 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone, buildSituationMessage]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone]);
 
-  // ---------- Cleanup ----------
   useEffect(() => () => {
-    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
-    if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
+    if (flashTimeoutRef.current) {
+      clearTimeout(flashTimeoutRef.current);
+    }
+    if (finishTimeoutRef.current) {
+      clearTimeout(finishTimeoutRef.current);
+    }
   }, []);
 
   const progressPercent = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
@@ -524,13 +475,6 @@ export default function CountdownPage({
 
     return () => clearInterval(beatTimer);
   }, [isPaused, isFinished, narrationText, waveIntensity]);
-
-  // Agent status badge
-  const statusLabel = agentStatus === 'connected'
-    ? (locale === 'ja' ? '🟢 AI接続中' : '🟢 AI Connected')
-    : agentStatus === 'connecting'
-    ? (locale === 'ja' ? '🟡 AI接続中...' : '🟡 Connecting...')
-    : (locale === 'ja' ? '🔴 ローカルモード' : '🔴 Local Mode');
 
   return (
       <div

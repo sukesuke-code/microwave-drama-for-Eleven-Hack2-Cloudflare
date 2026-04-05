@@ -12,6 +12,8 @@ const STYLE_BORDER_COLORS: Record<NarrationStyle, string> = {
   movie: 'border-yellow-500/30',
   horror: 'border-red-500/30',
   nature: 'border-emerald-500/30',
+  documentary: 'border-stone-500/30',
+  anime: 'border-rose-500/30',
 };
 
 const STYLE_BG: Record<NarrationStyle, string> = {
@@ -19,6 +21,8 @@ const STYLE_BG: Record<NarrationStyle, string> = {
   movie: 'bg-yellow-950/20',
   horror: 'bg-red-950/20',
   nature: 'bg-emerald-950/20',
+  documentary: 'bg-stone-950/20',
+  anime: 'bg-rose-950/20',
 };
 
 export default function NarrationText({ text, style, themeMode }: NarrationTextProps) {

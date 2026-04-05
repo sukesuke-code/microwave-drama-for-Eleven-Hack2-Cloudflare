@@ -14,6 +14,8 @@ const STYLE_COLORS: Record<NarrationStyle, { stroke: string; track: string; glow
   movie: { stroke: '#fbbf24', track: '#451a03', glow: 'rgba(251,191,36,0.6)' },
   horror: { stroke: '#ef4444', track: '#450a0a', glow: 'rgba(239,68,68,0.6)' },
   nature: { stroke: '#34d399', track: '#064e3b', glow: 'rgba(52,211,153,0.6)' },
+  documentary: { stroke: '#a8a29e', track: '#292524', glow: 'rgba(168,162,158,0.6)' },
+  anime: { stroke: '#f43f5e', track: '#4c0519', glow: 'rgba(244,63,94,0.6)' },
 };
 
 export default function CircularTimer({ remaining, total, size = 240, style, locale }: CircularTimerProps) {
