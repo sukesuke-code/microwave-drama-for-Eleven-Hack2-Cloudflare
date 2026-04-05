@@ -7,6 +7,7 @@ import { api } from '../api/client';
 
 interface SettingsPageProps {
   locale: Locale;
+  initialVoiceLanguage?: 'ja' | 'en';
   themeMode: ThemeMode;
   onThemeModeChange: (themeMode: ThemeMode) => void;
   onBack: () => void;
@@ -111,6 +112,7 @@ function readSettingsDraft(locale: Locale): { duration: number; dishName: string
 
 export default function SettingsPage({
   locale,
+  initialVoiceLanguage,
   themeMode,
   onThemeModeChange,
   onBack,
@@ -120,7 +122,7 @@ export default function SettingsPage({
   const [duration, setDuration] = useState(draft.duration);
   const [dishName, setDishName] = useState(draft.dishName);
   const [style, setStyle] = useState<NarrationStyle>(draft.style);
-  const [voiceLanguage, setVoiceLanguage] = useState<'ja' | 'en'>('ja');
+  const [voiceLanguage, setVoiceLanguage] = useState<'ja' | 'en'>(initialVoiceLanguage ?? locale);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

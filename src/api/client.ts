@@ -277,15 +277,6 @@ export interface StartSessionPayload {
   style: NarrationStyle;
 }
 
-export interface BuildNarrationCueInput {
-  foodName: string;
-  style: NarrationStyle;
-  phase: SessionPhase;
-  totalTime: number;
-  remainingTime: number;
-  exampleTone?: string;
-}
-
 export interface AgentNarrationRequest {
   sessionId?: string;
   style: NarrationStyle;
@@ -871,38 +862,28 @@ async function getSignedUrl(): Promise<string> {
   return data.signedUrl;
 }
 
-function buildNarrationCue(input: BuildNarrationCueInput): string {
-  const {
-    foodName,
-    style,
-    phase,
-    totalTime,
-    remainingTime,
-    exampleTone = "short vivid narration",
-  } = input;
+/** Returns a ready-to-speak local fallback narration line in the configured language. */
+function getLocalFallbackNarration(
+  dishName: string,
+  style: NarrationStyle,
+  phase: SessionPhase,
+  remainingTime: number,
+  locale: string
+): string {
+  const isEn = locale.startsWith("en");
+  const d = dishName || (isEn ? "mystery dish" : "謎の食べ物");
 
-  return `Create exactly one short live narration line for the current moment.
+  if (isEn) {
+    if (phase === "done") return `${d} is ready! Incredible!`;
+    if (phase === "final") return `${d} is almost done! Only ${remainingTime} seconds left!`;
+    if (phase === "middle") return `${d} is cooking beautifully — halfway there!`;
+    return `And we're off! ${d} enters the microwave!`;
+  }
 
-foodName: ${foodName}
-style: ${style}
-phase: ${phase}
-totalTime: ${totalTime}
-remainingTime: ${remainingTime}
-exampleTone: ${exampleTone}
-
-Constraints:
-- Output only one short narration line
-- No greeting
-- No questions
-- No explanations
-- Stay fully in character
-- Match style and phase strongly
-- Make it suitable for both subtitle and voice
-
-Sound direction:
-- Always assume this moment requires background music
-- Always assume this moment requires a sound effect accent
-- Match sound design to style and phase`;
+  if (phase === "done") return `${d}の完成だー！信じられない！`;
+  if (phase === "final") return `${d}、残り${remainingTime}秒！`;
+  if (phase === "middle") return `${d}、絶好調で調理中！折り返し地点だ！`;
+  return `さあ！${d}が電子レンジに投入された！`;
 }
 
 function getPhaseRemainingTime(totalTime: number, phase: SessionPhase): number {
@@ -1049,13 +1030,18 @@ async function requestAgentNarration(
   }
 
   if (!narrationText) {
-    narrationText = fitNarrationWithinDuration(buildNarrationCue({
-      foodName: sanitizedRequest.dishName,
-      style: sanitizedRequest.style,
-      phase: sanitizedRequest.phase,
-      totalTime: sanitizedRequest.totalTime,
-      remainingTime: sanitizedRequest.remainingTime,
-    }), sanitizedRequest.maxDuration ?? maxAllowedByRemaining, sanitizedRequest.locale || "ja");
+    const fallbackLocale = sanitizedRequest.locale || "ja";
+    narrationText = fitNarrationWithinDuration(
+      getLocalFallbackNarration(
+        sanitizedRequest.dishName,
+        sanitizedRequest.style,
+        sanitizedRequest.phase,
+        sanitizedRequest.remainingTime,
+        fallbackLocale
+      ),
+      sanitizedRequest.maxDuration ?? maxAllowedByRemaining,
+      fallbackLocale
+    );
   }
 
   const maxNarrationMs = (sanitizedRequest.maxDuration ?? maxAllowedByRemaining) * 1000;
@@ -1427,7 +1413,6 @@ export {
   tickSession,
   saveNarration,
   getSignedUrl,
-  buildNarrationCue,
   requestAgentNarration,
   playSfx,
   playMusic,
@@ -1452,7 +1437,6 @@ export const api = {
   tickSession,
   saveNarration,
   getSignedUrl,
-  buildNarrationCue,
   requestAgentNarration,
   playSfx,
   playMusic,

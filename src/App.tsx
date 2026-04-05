@@ -183,6 +183,7 @@ export default function App() {
           {screen === 'settings' && (
             <SettingsPage
               locale={locale}
+              initialVoiceLanguage={settings?.voiceLanguage ?? locale}
               themeMode={themeMode}
               onThemeModeChange={setThemeMode}
               onBack={() => transitionTo('top')}
