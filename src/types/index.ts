@@ -47,8 +47,8 @@ export interface InitialAssets {
   musicAudio?: Blob;
   sfxAudio?: Blob;
   
-  // All phase assets
-  allPhases?: Record<SessionPhase, PhaseAssets>;
+  // Phase assets may be progressively hydrated in the background.
+  allPhases?: Partial<Record<SessionPhase, PhaseAssets>>;
 }
 
 export interface NarrationCue {

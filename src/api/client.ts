@@ -176,11 +176,15 @@ async function requestJson<T>(
 import { 
   InitialAssets, 
   NarrationStyle, 
+  PhaseAssets,
   Session, 
   SessionPhase 
 } from '../types';
 
 export type { InitialAssets, NarrationStyle, Session, SessionPhase };
+
+const PHASE_ORDER: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
+const phaseAssetCache = new Map<string, Partial<Record<SessionPhase, PhaseAssets>>>();
 
 type TtsLevelListener = (level: number) => void;
 
@@ -798,6 +802,78 @@ Sound direction:
 - Match sound design to style and phase`;
 }
 
+function getPhaseRemainingTime(totalTime: number, phase: SessionPhase): number {
+  if (phase === "quarter") return Math.floor(totalTime * 0.75);
+  if (phase === "middle") return Math.floor(totalTime * 0.5);
+  if (phase === "final") return Math.floor(totalTime * 0.25);
+  if (phase === "done") return 0;
+  return totalTime;
+}
+
+function getPhaseEffectPrompts(style: NarrationStyle, phase: SessionPhase): { musicPrompt: string | null; sfxPrompt: string | null } {
+  if (phase === "opening") {
+    return {
+      musicPrompt: `opening tension music for ${style}`,
+      sfxPrompt: `microwave start sound for ${style}`,
+    };
+  }
+  if (phase === "quarter" || phase === "middle") {
+    return {
+      musicPrompt: null,
+      sfxPrompt: `subtle transition accent for ${style}`,
+    };
+  }
+  if (phase === "final") {
+    return {
+      musicPrompt: `intense climax music for ${style}`,
+      sfxPrompt: `tension build effect for ${style}`,
+    };
+  }
+  return {
+    musicPrompt: null,
+    sfxPrompt: `victory finish sound for ${style}`,
+  };
+}
+
+async function buildPhaseAssets(input: {
+  sessionId: string;
+  foodName: string;
+  totalTime: number;
+  style: NarrationStyle;
+  locale: string;
+  phase: SessionPhase;
+}): Promise<PhaseAssets> {
+  const { sessionId, foodName, totalTime, style, locale, phase } = input;
+  const remainingTime = getPhaseRemainingTime(totalTime, phase);
+  const maxDuration = Math.max(1, remainingTime - 1);
+
+  const narration = await requestAgentNarration({
+    sessionId,
+    style,
+    dishName: foodName,
+    totalTime,
+    remainingTime,
+    phase,
+    locale,
+    maxDuration,
+  });
+
+  const { musicPrompt, sfxPrompt } = getPhaseEffectPrompts(style, phase);
+
+  const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
+    generateTtsBlob(narration.text, locale),
+    musicPrompt ? generateMusicBlob(musicPrompt) : Promise.resolve(undefined),
+    sfxPrompt ? generateSfxBlob(sfxPrompt) : Promise.resolve(undefined),
+  ]);
+
+  return {
+    narrationText: narration.text,
+    narrationAudio,
+    musicAudio,
+    sfxAudio,
+  };
+}
+
 async function requestAgentNarration(
   request: AgentNarrationRequest
 ): Promise<AgentNarrationResponse> {
@@ -815,6 +891,34 @@ async function requestAgentNarration(
       Math.min(600, Math.floor(maxDuration), maxAllowedByRemaining)
     ),
   };
+
+  const cachedPhaseAsset = sanitizedRequest.sessionId
+    ? phaseAssetCache.get(sanitizedRequest.sessionId)?.[sanitizedRequest.phase]
+    : undefined;
+
+  if (cachedPhaseAsset?.narrationText) {
+    return {
+      text: cachedPhaseAsset.narrationText,
+      play: async (onReady?: () => void) => {
+        if (cachedPhaseAsset.narrationAudio) {
+          await playAudioBlob(cachedPhaseAsset.narrationAudio, {
+            loop: false,
+            volume: 1,
+            isMusic: false,
+            maxDurationMs: (sanitizedRequest.maxDuration ?? maxAllowedByRemaining) * 1000,
+            onStart: onReady,
+          });
+          return;
+        }
+        await playLocalNarration(
+          cachedPhaseAsset.narrationText,
+          sanitizedRequest.locale || "ja",
+          onReady,
+          (sanitizedRequest.maxDuration ?? maxAllowedByRemaining) * 1000
+        );
+      },
+    };
+  }
 
   let narrationText = "";
 
@@ -946,73 +1050,44 @@ async function prepareInitialAssets(
   style: NarrationStyle,
   locale: string = "ja"
 ): Promise<InitialAssets> {
-  // 1. Start Session
   const session = await startSession(foodName, totalTime, style);
+  const allPhases: Partial<Record<SessionPhase, PhaseAssets>> = {};
 
-  const phases: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
-  const allPhases = {} as Record<SessionPhase, import('../types').PhaseAssets>;
+  // Prioritize opening phase for quick app start.
+  allPhases.opening = await buildPhaseAssets({
+    sessionId: session.sessionId,
+    foodName,
+    totalTime,
+    style,
+    locale,
+    phase: "opening",
+  });
+  phaseAssetCache.set(session.sessionId, allPhases);
 
-  // 2. Concurrently prepare ALL phases
-  await Promise.all(
-    phases.map(async (phase) => {
-      let remainingTime = totalTime;
-      if (phase === "quarter") remainingTime = Math.floor(totalTime * 0.75);
-      if (phase === "middle") remainingTime = Math.floor(totalTime * 0.5);
-      if (phase === "final") remainingTime = Math.floor(totalTime * 0.25);
-      if (phase === "done") remainingTime = 0;
-      const maxDuration = Math.max(1, remainingTime - 1);
-
-      const narration = await requestAgentNarration({
+  // Background prefetch for remaining phases to keep later transitions smooth.
+  const deferredPhases = PHASE_ORDER.filter((phase) => phase !== "opening");
+  void Promise.allSettled(
+    deferredPhases.map(async (phase) => {
+      const assets = await buildPhaseAssets({
         sessionId: session.sessionId,
-        style,
-        dishName: foodName,
+        foodName,
         totalTime,
-        remainingTime,
-        phase,
+        style,
         locale,
-        maxDuration,
+        phase,
       });
-
-      // Provide dynamic music/sfx prompts
-      let musicPrompt: string | null = null;
-      let sfxPrompt: string | null = null;
-
-      if (phase === "opening") { musicPrompt = `opening tension music for ${style}`; sfxPrompt = `microwave start sound for ${style}`; }
-      if (phase === "quarter" || phase === "middle") { sfxPrompt = `subtle transition accent for ${style}`; }
-      if (phase === "final") { musicPrompt = `intense climax music for ${style}`; sfxPrompt = `tension build effect for ${style}`; }
-      if (phase === "done") { musicPrompt = null; sfxPrompt = `victory finish sound for ${style}`; }
-
-      const audioPromises = {
-        narration: generateTtsBlob(narration.text, locale),
-        music: musicPrompt ? generateMusicBlob(musicPrompt) : Promise.resolve(undefined),
-        sfx: sfxPrompt ? generateSfxBlob(sfxPrompt) : Promise.resolve(undefined),
-      };
-
-      const [narrationAudio, musicAudio, sfxAudio] = await Promise.all([
-        audioPromises.narration,
-        audioPromises.music,
-        audioPromises.sfx,
-      ]);
-
-      allPhases[phase] = {
-        narrationText: narration.text,
-        narrationAudio: narrationAudio as Blob,
-        musicAudio,
-        sfxAudio,
-      };
+      allPhases[phase] = assets;
     })
-  );
-
-  if (!allPhases.opening.narrationText || !allPhases.opening.narrationAudio || !allPhases.opening.musicAudio || !allPhases.opening.sfxAudio) {
-    throw new Error("OPENING_ASSETS_NOT_READY");
-  }
+  ).then(() => {
+    phaseAssetCache.set(session.sessionId, allPhases);
+  });
 
   return {
     session,
-    narrationText: allPhases["opening"].narrationText,
-    narrationAudio: allPhases["opening"].narrationAudio as Blob,
-    musicAudio: allPhases["opening"].musicAudio,
-    sfxAudio: allPhases["opening"].sfxAudio,
+    narrationText: allPhases.opening.narrationText,
+    narrationAudio: allPhases.opening.narrationAudio as Blob,
+    musicAudio: allPhases.opening.musicAudio,
+    sfxAudio: allPhases.opening.sfxAudio,
     allPhases,
   };
 }
