@@ -169,10 +169,10 @@ export default function CountdownPage({
 
   const buildNarrationLine = useCallback((tl: number, tt: number) => {
     if (tl <= 0) {
-      return getFinishLine(style, dishName, locale);
+      return getFinishLine(style, dishName, voiceLanguage);
     }
-    return getCurrentNarration(tl, tt, style, dishName, locale);
-  }, [style, dishName, locale]);
+    return getCurrentNarration(tl, tt, style, dishName, voiceLanguage);
+  }, [style, dishName, voiceLanguage]);
 
   const handlePhaseEffects = useCallback(async (phase: 'opening' | 'quarter' | 'middle' | 'final' | 'done') => {
     if (isPausedRef.current || isUnmountedRef.current) return;
@@ -312,7 +312,7 @@ export default function CountdownPage({
       const text = buildNarrationLine(totalSeconds, totalSeconds);
       setNarrationText(text);
     }
-  }, [totalSeconds, style, dishName, locale, buildNarrationLine, initialAssets, voiceLanguage]);
+  }, [totalSeconds, style, dishName, buildNarrationLine, initialAssets, voiceLanguage]);
 
   useEffect(() => {
     const sId = sessionStorage.getItem('sessionId');
@@ -436,7 +436,7 @@ export default function CountdownPage({
       .finally(() => {
         console.log(`[CountdownPage] Task for phase ${phase} completed/exited.`);
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets, voiceLanguage]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, initialAssets, voiceLanguage]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {
@@ -462,7 +462,7 @@ export default function CountdownPage({
           setIsFlashing(true);
           setShowConfetti(true);
           playAlarmTone();
-          const finishText = getFinishLine(style, dishName, locale);
+          const finishText = getFinishLine(style, dishName, voiceLanguage);
           prevNarrationRef.current = finishText;
           setNarrationText(finishText);
 
@@ -489,7 +489,7 @@ export default function CountdownPage({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, locale, playAlarmTone, isCountdownActive]);
+  }, [isPaused, isFinished, style, dishName, totalSeconds, onFinish, voiceLanguage, playAlarmTone, isCountdownActive]);
 
   useEffect(() => () => {
     if (flashTimeoutRef.current) {

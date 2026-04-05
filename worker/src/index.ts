@@ -496,9 +496,11 @@ Maximum narration duration: ${maxDurationSeconds} seconds.
 ${memoryContext}
 ${historyContext}
 
-IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only.
+IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses.
+❌ WRONG (do NOT output): "Kono ryōri no shunkan!" or "Kessen no hi ga kita!" or any romanized Japanese.
+✅ RIGHT: "The moment of truth has arrived for this dish!" — real English words only.
 Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
-    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。
+    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。括弧内に翻訳や説明を追加しないでください。
 
 重要：ナレーションは通常の話すペース（約${Math.floor(maxDurationSeconds * 2.5)}語の最大値）で朗読する場合、${maxDurationSeconds}秒以内の長さである必要があります。
 
@@ -508,7 +510,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 残り時間: ${remainingTime}/${totalTime}秒
 最大ナレーション時間: ${maxDurationSeconds}秒
 
-重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。
+重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。括弧や記号で英語訳を付けないでください。ローマ字（アルファベットによる日本語の転写）は絶対に使用しないでください。必ず漢字・ひらがな・カタカナのみで書いてください。
 簡潔にしてください - AI音声は${maxDurationSeconds}秒以内に話し終わる必要があります！`;
 
   let narrationText = "";
@@ -557,14 +559,50 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
   narrationText = normalizeNarrationText(narrationText);
 
   // Remove any parenthetical translations or dual language content
+  // Handle both closed and unclosed parentheses (unclosed can occur when output is truncated by maxOutputTokens)
+  narrationText = narrationText.replace(/[(（][^)）]*[)）]?/g, " ");
+  narrationText = narrationText.replace(/[[［][^\]］]*[\]］]?/g, " ");
+
   if (isEnglish) {
-    // Remove Japanese text in parentheses or brackets
-    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
-    narrationText = narrationText.replace(/[[［][^\]］]*[\]］]/g, " ");
+    // Remove any remaining Japanese/CJK characters
+    narrationText = narrationText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+/g, " ");
+    narrationText = narrationText.replace(/\s+/g, " ").trim();
+
+    // Detect romaji via Unicode escapes (encoding-safe).
+    // Macron vowels: ā ī ū ē ō — these ONLY appear in romanized Japanese, never in native English.
+    const hasMacrons = /[\u0101\u012B\u016B\u0113\u014D\u0100\u012A\u016A\u0112\u014C]/.test(narrationText);
+    // Uniquely-Japanese romaji words — excludes common English words (wa/ga/ni/de/to/ka/mo removed).
+    // Even 1 match is strong evidence of romaji output.
+    const ROMAJI_WORDS = /\b(kono|sono|ano|kore|sore|nani|naze|doko|dare|ittai|ikuze|ikuyo|sugoi|yabai|kawaii|desu|masu|dayo|nda|kedo|hajimaru|shimau|taberu|ryori|itadaki|gochiso|kimochi|kokoro|chikara|unmei|akuma|shunkan|kessen)\b/gi;
+    const romajiCount = (narrationText.match(ROMAJI_WORDS) ?? []).length;
+    const hasEnglishWords = /[a-zA-Z]{2,}/.test(narrationText);
+
+    if (hasMacrons || romajiCount >= 1 || !hasEnglishWords) {
+      const enFallbacks: Record<string, string> = {
+        opening: `${dishName} is in the microwave — the countdown has BEGUN!`,
+        quarter:  `Quarter down! The heat inside is rising fast for ${dishName}!`,
+        middle:   `Halfway through! ${dishName} is transforming beautifully in there!`,
+        final:    `FINAL ${remainingTime} SECONDS! ${dishName} is SO close to perfection!`,
+        done:     `DING! ${dishName} is DONE! An absolute masterpiece achieved!`,
+      };
+      narrationText = enFallbacks[phase] ?? `${dishName} — ${remainingTime} seconds of pure drama!`;
+    }
   } else {
-    // Remove English text in parentheses or brackets
-    narrationText = narrationText.replace(/[(（][^)）]*[）)]/g, " ");
-    narrationText = narrationText.replace(/[[［][^\]］]*[\]］]/g, " ");
+    // Remove any remaining Latin/English word sequences (including romaji)
+    narrationText = narrationText.replace(/[a-zA-Z][a-zA-Z0-9\s'!\-,.?]*/g, " ");
+    narrationText = narrationText.replace(/\s+/g, " ").trim();
+    // If no Japanese characters remain after filtering (e.g. output was entirely romaji), use fallback
+    const hasJapaneseChars = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(narrationText);
+    if (!hasJapaneseChars) {
+      const jaFallbacks: Record<string, string> = {
+        opening: `${dishName}が電子レンジに投入された！さあ、戦いの幕が上がるぞ！`,
+        quarter:  `${dishName}、まだまだこれからだ！`,
+        middle:   `折り返し地点！${dishName}の調理が白熱してきたぞ！`,
+        final:    `残り${remainingTime}秒！${dishName}、もうすぐ完成だー！`,
+        done:     `チーン！${dishName}の完成だー！素晴らしい！`,
+      };
+      narrationText = jaFallbacks[phase] ?? `${dishName}の調理が続く！残り${remainingTime}秒だ！`;
+    }
   }
 
   narrationText = trimNarrationToDuration(
