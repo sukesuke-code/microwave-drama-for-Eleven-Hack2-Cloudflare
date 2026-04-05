@@ -221,10 +221,10 @@ export default function CountdownPage({
           const tasks: Promise<void>[] = [];
           
           if (initialAssets.musicAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true }));
+            tasks.push(api.playAudioBlob(initialAssets.musicAudio, { isMusic: true, loop: true, volume: 0.25 }));
           }
           if (initialAssets.sfxAudio) {
-            tasks.push(api.playAudioBlob(initialAssets.sfxAudio));
+            tasks.push(api.playAudioBlob(initialAssets.sfxAudio, { isSfx: true, volume: 0.4 }));
           }
           
           tasks.push(api.playAudioBlob(initialAssets.narrationAudio, { onStart: () => {
@@ -288,9 +288,7 @@ export default function CountdownPage({
     phaseRef.current = phase;
 
     const fallbackLine = buildNarrationLine(timeLeft, totalSeconds);
-    if (fallbackLine === lastQueuedNarrationRef.current) return;
-    lastQueuedNarrationRef.current = fallbackLine;
-
+    
     const context = buildAgentNarrationContext(timeLeft, phase);
     console.log(`[CountdownPage] Queueing narration for phase: ${phase}`);
 
@@ -302,65 +300,79 @@ export default function CountdownPage({
         
         console.log(`[CountdownPage] Task starting for ${phase}. States: unmounted=${isUm}, paused=${isPs}, finished=${isFn}`);
 
-        if (isUm) {
-          console.log(`[CountdownPage] Skipping ${phase} - Component unmounted`);
-          return;
-        }
-        if (isPs) {
-          console.log(`[CountdownPage] Skipping ${phase} - Session paused`);
-          return;
-        }
-        if (isFn && phase !== 'done') {
-          console.log(`[CountdownPage] Skipping ${phase} - Session finished`);
-          return;
-        }
+        if (isUm || isPs) return;
+        if (isFn && phase !== 'done') return;
 
         try {
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("NARRATION_TASK_TIMEOUT")), 35000)
-          );
+          const preFetched = initialAssets?.allPhases?.[phase];
+          
+          let currentText = '';
+          let playAudio: (onReady?: () => void) => Promise<void>;
 
-          const taskPromise = (async () => {
-             console.log(`[CountdownPage] Calling requestAgentNarration for ${phase}...`);
-             const narration = await api.requestAgentNarration(context);
-             console.log(`[CountdownPage] Received narration for ${phase}: "${narration.text}"`);
-             
-             let textSet = false;
-             const triggerTextSync = () => {
-               if (textSet || isPausedRef.current || isUnmountedRef.current) return;
-               textSet = true;
-               prevNarrationRef.current = narration.text;
-               setNarrationText(narration.text);
-             };
+          if (preFetched) {
+            console.log(`[CountdownPage] Using pre-fetched assets for ${phase}`);
+            currentText = preFetched.narrationText;
+            playAudio = async (onReady) => {
+              const tasks: Promise<void>[] = [];
+              
+              if (preFetched.narrationAudio) {
+                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { onStart: onReady }));
+              }
+              if (preFetched.musicAudio) {
+                tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.25 }));
+              } else if (phase === 'done') {
+                api.stopMusic();
+              }
+              if (preFetched.sfxAudio) {
+                tasks.push(api.playAudioBlob(preFetched.sfxAudio, { isSfx: true, volume: 0.4 }));
+              }
+              
+              await Promise.all(tasks);
+            };
+          } else {
+            console.log(`[CountdownPage] No pre-fetched assets for ${phase}, requesting now...`);
+            const narration = await api.requestAgentNarration(context);
+            currentText = narration.text;
+            playAudio = narration.play;
+          }
 
-             if (sessionIdRef.current && !isUnmountedRef.current) {
-               api.saveNarration(sessionIdRef.current, narration.text).catch(console.warn);
-             }
+          if (currentText === lastQueuedNarrationRef.current) return;
+          lastQueuedNarrationRef.current = currentText;
 
-             if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-               console.log(`[CountdownPage] Playing narration and effects concurrently...`);
-               const effectPromise = handlePhaseEffects(phase).catch(console.error);
-               await narration.play(triggerTextSync);
-               triggerTextSync();
-               await effectPromise;
-               console.log(`[CountdownPage] Finished playing narration and effects.`);
-             }
-          })();
+          let textSet = false;
+          const triggerTextSync = () => {
+            if (textSet || isPausedRef.current || isUnmountedRef.current) return;
+            textSet = true;
+            prevNarrationRef.current = currentText;
+            setNarrationText(currentText);
+          };
 
-          await Promise.race([taskPromise, timeoutPromise]);
+          if (sessionIdRef.current && !isUnmountedRef.current) {
+            api.saveNarration(sessionIdRef.current, currentText).catch(console.warn);
+          }
+
+          if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
+            console.log(`[CountdownPage] Executing narration and effects for ${phase}...`);
+            
+            // If we have pre-fetched music/sfx, we play them inside playAudio.
+            // If not (e.g. fallback or extra phases), we might need handlePhaseEffects.
+            const effectTask = (!preFetched) ? handlePhaseEffects(phase) : Promise.resolve();
+            
+            await playAudio(triggerTextSync);
+            triggerTextSync();
+            await effectTask;
+          }
         } catch (err) {
-          console.error(`[CountdownPage] Narration task failed for phase ${phase}:`, err);
+          console.error(`[CountdownPage] Phase task failed for ${phase}:`, err);
           if (isUnmountedRef.current || isPausedRef.current) return;
 
           // Local Fallback
           prevNarrationRef.current = fallbackLine;
           setNarrationText(fallbackLine);
-          if (sessionIdRef.current) api.saveNarration(sessionIdRef.current, fallbackLine).catch(() => {});
           
           await handlePhaseEffects(phase).catch(() => {});
           
           if (!isPausedRef.current && !isUnmountedRef.current && (!isFinishedRef.current || phase === 'done')) {
-            console.log(`[CountdownPage] Playing local fallback narration: "${fallbackLine}"`);
             await api.playLocalNarration(fallbackLine, locale).catch(e => console.error("Local fallback failed:", e));
           }
         }
@@ -368,7 +380,7 @@ export default function CountdownPage({
       .finally(() => {
         console.log(`[CountdownPage] Task for phase ${phase} completed/exited.`);
       });
-  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale]);
+  }, [isPaused, timeLeft, totalSeconds, buildNarrationLine, getPhase, handlePhaseEffects, buildAgentNarrationContext, locale, initialAssets]);
 
   useEffect(() => {
     const unsubscribe = api.subscribeTtsMeter(({ level, spectrum }) => {

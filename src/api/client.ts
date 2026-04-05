@@ -412,12 +412,14 @@ async function playAudioBlob(
     loop?: boolean;
     volume?: number;
     isMusic?: boolean;
+    isSfx?: boolean;
     onStart?: () => void;
   }
 ): Promise<void> {
   const loop = options?.loop ?? false;
   const volume = options?.volume ?? 1;
   const isMusic = options?.isMusic ?? false;
+  const isSfx = options?.isSfx ?? false;
   const onStart = options?.onStart;
 
   stopRequested = false;
@@ -436,7 +438,11 @@ async function playAudioBlob(
     stopMusic();
     activeMusicAudio = audio;
     activeMusicObjectUrl = url;
+  } else if (isSfx) {
+    // SFX doesn't use the audio meter and doesn't stop TTS or Music
+    // We just play it independently
   } else {
+    // This is TTS/Narration - managed exclusively to avoid overlapping voices
     if (activeObjectUrl) {
       URL.revokeObjectURL(activeObjectUrl);
       activeObjectUrl = null;
@@ -517,17 +523,21 @@ async function playAudioBlob(
       URL.revokeObjectURL(url);
       activeMusicObjectUrl = null;
     }
-    if (activeMusicAudio) {
+    if (activeMusicAudio === audio) {
       activeMusicAudio.src = "";
       activeMusicAudio.load();
       activeMusicAudio = null;
     }
+  } else if (isSfx) {
+    URL.revokeObjectURL(url);
+    audio.src = "";
+    audio.load();
   } else {
     if (activeObjectUrl === url) {
       URL.revokeObjectURL(url);
       activeObjectUrl = null;
     }
-    if (activeTtsAudio) {
+    if (activeTtsAudio === audio) {
       activeTtsAudio.src = "";
       activeTtsAudio.load();
       activeTtsAudio = null;
@@ -853,7 +863,7 @@ async function prepareInitialAssets(
   const session = await startSession(foodName, totalTime, style);
 
   const phases: SessionPhase[] = ["opening", "quarter", "middle", "final", "done"];
-  const allPhases: Record<SessionPhase, import('../types').PhaseAssets> = {} as any;
+  const allPhases = {} as Record<SessionPhase, import('../types').PhaseAssets>;
 
   // 2. Concurrently prepare ALL phases
   await Promise.all(
@@ -1074,7 +1084,7 @@ async function playSfx(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: false, volume: 0.55, isMusic: false });
+      await playAudioBlob(blob, { loop: false, volume: 0.4, isMusic: false, isSfx: true });
       return;
     }
   } catch (e) {
@@ -1097,7 +1107,7 @@ async function playMusic(prompt: string): Promise<void> {
 
     if (res.ok) {
       const blob = await parseAudioBlob(res);
-      await playAudioBlob(blob, { loop: true, volume: 0.3, isMusic: true });
+      await playAudioBlob(blob, { loop: true, volume: 0.25, isMusic: true });
       return;
     }
   } catch (e) {
