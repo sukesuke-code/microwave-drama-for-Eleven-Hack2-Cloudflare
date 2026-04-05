@@ -216,11 +216,13 @@ export default function CountdownPage({
 
         if (!isPausedRef.current && !isUnmountedRef.current) {
           console.log("[CountdownPage] Playing pre-fetched opening audio immediately...");
+          const maxNarrationMs = (totalSeconds - 1) * 1000;
           const tasks: Promise<void>[] = [];
 
           if (initialAssets.narrationAudio) {
             tasks.push(api.playAudioBlob(initialAssets.narrationAudio, {
               volume: 1,
+              maxDurationMs: maxNarrationMs,
               onStart: () => {
                 console.log("[CountdownPage] Narration audio started playing");
               }
@@ -322,10 +324,11 @@ export default function CountdownPage({
             console.log(`[CountdownPage] Using pre-fetched assets for ${phase}`);
             currentText = preFetched.narrationText;
             playAudio = async (onReady) => {
+              const maxNarrationMs = (totalSeconds - 1) * 1000;
               const tasks: Promise<void>[] = [];
 
               if (preFetched.narrationAudio) {
-                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { volume: 1, onStart: onReady }));
+                tasks.push(api.playAudioBlob(preFetched.narrationAudio, { volume: 1, maxDurationMs: maxNarrationMs, onStart: onReady }));
               }
               if (preFetched.musicAudio) {
                 tasks.push(api.playAudioBlob(preFetched.musicAudio, { isMusic: true, loop: true, volume: 0.15 }));

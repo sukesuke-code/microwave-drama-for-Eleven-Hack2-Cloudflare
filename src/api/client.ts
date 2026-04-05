@@ -417,6 +417,7 @@ async function playAudioBlob(
     isMusic?: boolean;
     isSfx?: boolean;
     onStart?: () => void;
+    maxDurationMs?: number;
   }
 ): Promise<void> {
   const loop = options?.loop ?? false;
@@ -424,6 +425,7 @@ async function playAudioBlob(
   const isMusic = options?.isMusic ?? false;
   const isSfx = options?.isSfx ?? false;
   const onStart = options?.onStart;
+  const maxDurationMs = options?.maxDurationMs;
 
   stopRequested = false;
 
@@ -476,12 +478,19 @@ async function playAudioBlob(
 
   await new Promise<void>((resolve, reject) => {
     let completed = false;
+    const timeoutDuration = maxDurationMs ?? DEFAULT_AUDIO_TIMEOUT_MS;
     let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       if (completed) return;
       completed = true;
       cleanup();
-      reject(new Error("Audio playback timed out"));
-    }, DEFAULT_AUDIO_TIMEOUT_MS);
+      audio.pause();
+      if (maxDurationMs) {
+        logDebug(`Narration playback stopped at ${maxDurationMs}ms deadline`);
+        resolve();
+      } else {
+        reject(new Error("Audio playback timed out"));
+      }
+    }, timeoutDuration);
 
     const cleanup = () => {
       audio.onended = null;
@@ -782,6 +791,8 @@ async function requestAgentNarration(
     });
   }
 
+  const maxNarrationMs = (sanitizedRequest.totalTime - 1) * 1000;
+
   return {
     text: narrationText,
     play: async (onReady?: () => void) => {
@@ -801,7 +812,7 @@ async function requestAgentNarration(
 
         if (ttsRes.ok) {
           const blob = await parseAudioBlob(ttsRes);
-          await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false, onStart: onReady });
+          await playAudioBlob(blob, { loop: false, volume: 1, isMusic: false, maxDurationMs: maxNarrationMs, onStart: onReady });
           return;
         } else {
           try {
@@ -816,7 +827,7 @@ async function requestAgentNarration(
       }
 
       if (stopRequested) return;
-      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja", onReady);
+      await playLocalNarration(narrationText, sanitizedRequest.locale || "ja", onReady, maxNarrationMs);
     },
   };
 }
@@ -947,7 +958,7 @@ async function prepareInitialAssets(
   };
 }
 
-async function playLocalNarration(text: string, locale = "ja", onStart?: () => void): Promise<void> {
+async function playLocalNarration(text: string, locale = "ja", onStart?: () => void, maxDurationMs?: number): Promise<void> {
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
     if (onStart) onStart();
     return;
@@ -977,14 +988,30 @@ async function playLocalNarration(text: string, locale = "ja", onStart?: () => v
     });
   }, 70);
 
+  let maxDurationTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
   await new Promise<void>((resolve, reject) => {
     utterance.onstart = () => {
       if (onStart) onStart();
+      if (maxDurationMs) {
+        maxDurationTimeoutId = setTimeout(() => {
+          window.speechSynthesis.cancel();
+          logDebug(`Local narration stopped at ${maxDurationMs}ms deadline`);
+          resolve();
+        }, maxDurationMs);
+      }
     };
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error("LOCAL_TTS_FAILED"));
+    utterance.onend = () => {
+      if (maxDurationTimeoutId) clearTimeout(maxDurationTimeoutId);
+      resolve();
+    };
+    utterance.onerror = () => {
+      if (maxDurationTimeoutId) clearTimeout(maxDurationTimeoutId);
+      reject(new Error("LOCAL_TTS_FAILED"));
+    };
     window.speechSynthesis.speak(utterance);
   }).finally(() => {
+    if (maxDurationTimeoutId) clearTimeout(maxDurationTimeoutId);
     if (speechMeterIntervalId) {
       clearInterval(speechMeterIntervalId);
       speechMeterIntervalId = null;
