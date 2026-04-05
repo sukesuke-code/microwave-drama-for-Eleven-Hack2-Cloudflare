@@ -607,15 +607,26 @@ async function playAudioBlob(
     
     await audio.play();
     if (onStart) onStart();
-  } catch (err) {
-    const isAbort = err instanceof Error && (err.name === "AbortError" || err.message.includes("Empty src attribute") || err.message.includes("src attribute is empty"));
-    if (!isAbort) {
-      console.warn("Audio play failed:", err);
-    } else {
+  } catch (err: unknown) {
+    const errorMsg = (err instanceof Error) ? err.message : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message) : String(err);
+    const errorCode = (typeof err === 'object' && err !== null && 'code' in err) ? (err as { code: unknown }).code : undefined;
+    const isMediaError = (typeof err === 'object' && err !== null && err.constructor && err.constructor.name === 'MediaError');
+    
+    // Check for AbortError, Empty src (code 4), or intentional stopRequests
+    const isAbort = (err instanceof Error && err.name === "AbortError") || 
+                     isMediaError ||
+                     errorMsg.includes("Empty src attribute") || 
+                     errorMsg.includes("src attribute is empty") || 
+                     errorMsg.includes("EMPTY_SRC") ||
+                     errorCode === 4;
+    
+    if (isAbort || stopRequested) {
       logDebug("Audio play interrupted or empty src (expected during rapid transitions)");
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      return; // Silent return for intentional aborts
     }
     
-    // Revoke URL but with a small delay to avoid ERR_FILE_NOT_FOUND
+    console.warn("Audio play failed:", err);
     setTimeout(() => URL.revokeObjectURL(url), 100);
     throw err;
   }
