@@ -126,6 +126,13 @@ export default function SettingsPage({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync voiceLanguage state when initialVoiceLanguage prop changes (e.g. on returning from countdown)
+  useEffect(() => {
+    if (initialVoiceLanguage !== undefined) {
+      setVoiceLanguage(initialVoiceLanguage);
+    }
+  }, [initialVoiceLanguage]);
+
   const t = UI_TEXT[locale];
   const isLight = themeMode === 'light';
 
