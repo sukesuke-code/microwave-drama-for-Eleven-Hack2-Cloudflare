@@ -278,6 +278,7 @@ export default function SettingsPage({
           <div className="space-y-0.5">
             <input
               type="range"
+              aria-label={locale === 'ja' ? '加熱時間（秒）' : 'Heating duration in seconds'}
               min={1}
               max={600}
               step={1}
@@ -299,6 +300,7 @@ export default function SettingsPage({
             </p>
             <input
               type="text"
+              aria-label={locale === 'ja' ? '料理名' : 'Dish name'}
               value={dishName}
               onChange={(e) => setDishName(e.target.value)}
               maxLength={100}
