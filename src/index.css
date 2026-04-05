@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 @layer base {
   * {
@@ -87,6 +87,52 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  .hero-bg-glow {
+    background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(249,115,22,0.08) 0%, transparent 70%);
+  }
+
+  .hero-circle-600 {
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    border: 1px solid rgba(249,115,22,0.06);
+    box-shadow: 0 0 80px rgba(249,115,22,0.04);
+  }
+
+  .hero-circle-400 {
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    border: 1px solid rgba(249,115,22,0.08);
+  }
+
+  .hero-title-main {
+    background: linear-gradient(135deg, #ff6b35 0%, #f97316 40%, #fbbf24 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 14px rgba(249,115,22,0.45);
+    filter: drop-shadow(0 0 16px rgba(249,115,22,0.45));
+  }
+
+  .hero-divider {
+    background: linear-gradient(90deg, transparent, #f97316, transparent);
+  }
+
+  .hero-start-btn-dark {
+    background: linear-gradient(135deg, #ea580c, #f97316, #fb923c);
+    box-shadow: 0 0 30px rgba(249,115,22,0.5), 0 0 60px rgba(249,115,22,0.2);
+  }
+
+  .hero-start-btn-light {
+    background: linear-gradient(135deg, #fb923c, #f97316, #facc15);
+    box-shadow: 0 0 30px rgba(251,146,60,0.45), 0 0 60px rgba(250,204,21,0.18);
+  }
+
+  .hero-start-btn-hover {
+    background: linear-gradient(135deg, #c2410c, #ea580c, #f97316);
+  }
 }
 
 
@@ -125,9 +171,88 @@
   animation: narrationFadeIn 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-@keyframes timerPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+.app-page-transition {
+  transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: var(--page-opacity, 1);
+}
+
+.timer-dynamic-container {
+  width: var(--timer-size, 240px);
+  height: var(--timer-size, 240px);
+}
+
+.timer-aura-dynamic {
+  border-radius: 9999px;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  width: calc(var(--timer-size, 240px) + 36px);
+  height: calc(var(--timer-size, 240px) + 36px);
+  background: radial-gradient(circle, var(--timer-glow) 0%, transparent 68%);
+  filter: var(--timer-blur, blur(8px));
+  opacity: var(--timer-opacity, 0.6);
+}
+
+.timer-progress-circle {
+  transition: stroke-dashoffset 0.8s ease-in-out, stroke 0.3s ease;
+  stroke-dashoffset: var(--timer-dashoffset, 0);
+  filter: var(--timer-stroke-shadow, none);
+}
+
+.timer-text-finished {
+  font-size: var(--timer-label-size, 48px);
+  color: var(--timer-stroke, #ffffff);
+  text-shadow: 0 0 18px var(--timer-glow), 0 0 42px var(--timer-glow);
+  filter: drop-shadow(0 0 14px var(--timer-glow));
+}
+
+.timer-text-counting {
+  font-size: var(--timer-font-size, 64px);
+  color: var(--timer-font-color, #ffffff);
+  text-shadow: var(--timer-text-shadow, none);
+}
+
+.timer-label-secondary {
+  color: var(--timer-label-color, #94a3b8);
+}
+
+.dynamic-font-size {
+  font-size: var(--dynamic-font-size, 16px);
+}
+
+.wave-bar-dynamic {
+  background-color: var(--wave-color, #ffffff);
+  height: var(--wave-height, 50%);
+  animation: var(--wave-animation, none);
+  animation-delay: var(--wave-delay, 0s);
+}
+
+.countdown-vignette {
+  background: radial-gradient(ellipse at center, transparent 40%, var(--accent-color-15) 100%);
+  animation: vignettePulse 0.5s ease-in-out infinite;
+}
+
+.accent-text-dynamic {
+  color: var(--accent-color);
+}
+
+.progress-bar-dynamic {
+  width: var(--progress-percent, 0%);
+  background: linear-gradient(90deg, var(--accent-color-80), var(--accent-color));
+  box-shadow: 0 0 8px var(--accent-color-60);
+}
+
+.danger-pulse-dynamic {
+  animation: dangerPulse 0.5s ease-in-out infinite;
+  text-shadow: 0 0 15px var(--accent-color);
+}
+
+.start-button-gradient {
+  background: linear-gradient(135deg, #ea580c, #dc2626);
+  box-shadow: 0 0 24px rgba(234, 88, 12, 0.45);
+}
+
+.animate-glow-pulse {
+  animation: buttonGlowPulse 1.6s ease-in-out infinite;
 }
 
 .timer-pulse {

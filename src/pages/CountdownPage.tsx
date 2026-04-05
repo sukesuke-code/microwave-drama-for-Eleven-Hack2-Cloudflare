@@ -534,11 +534,7 @@ export default function CountdownPage({
 
       {isDanger && !isFinished && (
         <div
-          className="absolute inset-0 pointer-events-none z-10"
-          style={{
-            background: `radial-gradient(ellipse at center, transparent 40%, ${styleConfig.accentColor}15 100%)`,
-            animation: 'vignettePulse 0.5s ease-in-out infinite',
-          }}
+          className={`absolute inset-0 pointer-events-none z-10 countdown-vignette [--accent-color-15:${styleConfig.accentColor}15]`}
         />
       )}
 
@@ -556,8 +552,7 @@ export default function CountdownPage({
               {styleConfig.emoji} {styleConfig.label}
             </span>
             <span
-              className="text-sm font-bold mt-0.5"
-              style={{ color: styleConfig.accentColor }}
+              className={`text-sm font-bold mt-0.5 accent-text-dynamic [--accent-color:${styleConfig.accentColor}]`}
             >
               {dishName}
             </span>
@@ -618,12 +613,7 @@ export default function CountdownPage({
             <div className="w-full max-w-xs mt-3">
               <div className={`h-1 w-full rounded-full overflow-hidden ${isLight ? 'bg-slate-300/80' : 'bg-white/5'}`}>
                 <div
-                  className="h-full rounded-full transition-all duration-1000"
-                  style={{
-                    width: `${progressPercent}%`,
-                    background: `linear-gradient(90deg, ${styleConfig.accentColor}80, ${styleConfig.accentColor})`,
-                    boxShadow: `0 0 8px ${styleConfig.accentColor}60`,
-                  }}
+                  className={`h-full rounded-full transition-all duration-1000 progress-bar-dynamic [--progress-percent:${progressPercent}%] [--accent-color:${styleConfig.accentColor}] [--accent-color-80:${styleConfig.accentColor}80] [--accent-color-60:${styleConfig.accentColor}60]`}
                 />
               </div>
             </div>
@@ -649,11 +639,7 @@ export default function CountdownPage({
 
           {isDanger && !isFinished && (
             <div
-              className={`mt-2 translate-y-8 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass}`}
-              style={{
-                animation: 'dangerPulse 0.5s ease-in-out infinite',
-                textShadow: `0 0 15px ${styleConfig.accentColor}`,
-              }}
+              className={`mt-2 translate-y-8 text-center font-display text-base font-bold tracking-widest uppercase sm:text-lg ${styleConfig.textShadowClass} danger-pulse-dynamic [--accent-color:${styleConfig.accentColor}]`}
             >
               {t.almostDone}
             </div>

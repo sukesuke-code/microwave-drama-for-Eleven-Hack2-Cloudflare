@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type ConfettiShape = 'circle' | 'square' | 'triangle';
 
@@ -46,26 +46,10 @@ export default function Confetti() {
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" aria-hidden="true">
       {pieces.map((p) => {
-        const baseStyle: CSSProperties = {
-          left: `${p.x}%`,
-          top: '-8vh',
-          width: `${p.size}px`,
-          height: `${p.size}px`,
-          backgroundColor: p.color,
-          transform: `translate3d(0, 0, 0) rotate(0deg)`,
-          animation: `confettiFall ${p.duration}s ease-in ${p.delay}s forwards`,
-          ['--confetti-drift' as string]: `${p.drift}px`,
-        };
+        const shapeClass = p.shape === 'circle' ? 'rounded-full' : (p.shape === 'square' ? 'rounded-sm' : '[clip-path:polygon(50%_0%,_0%_100%,_100%_100%)]');
+        const confettiClass = `[left:${p.x}%] [top:-8vh] [width:${p.size}px] [height:${p.size}px] [background-color:${p.color}] [transform:translate3d(0,0,0)_rotate(0deg)] [animation:confettiFall_${p.duration}s_ease-in_${p.delay}s_forwards] [--confetti-drift:${p.drift}px]`;
 
-        if (p.shape === 'circle') {
-          baseStyle.borderRadius = '9999px';
-        } else if (p.shape === 'square') {
-          baseStyle.borderRadius = '3px';
-        } else {
-          baseStyle.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
-        }
-
-        return <div key={p.id} className="absolute" style={baseStyle} />;
+        return <div key={p.id} className={`absolute ${shapeClass} ${confettiClass}`} />;
       })}
     </div>
   );

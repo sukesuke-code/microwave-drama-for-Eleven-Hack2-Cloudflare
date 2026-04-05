@@ -109,8 +109,7 @@ function FloatingSpheres() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 pointer-events-none overflow-hidden"
-      style={{ zIndex: 1 }}
+      className="absolute inset-0 pointer-events-none overflow-hidden z-[1]"
     >
       {spheres.map((sphere) => {
         const repelDistance = 150;
@@ -127,24 +126,7 @@ function FloatingSpheres() {
         return (
           <div
             key={sphere.id}
-            style={{
-              position: 'absolute',
-              left: `${sphere.x}%`,
-              top: `${sphere.y}%`,
-              width: `${sphere.size}px`,
-              height: `${sphere.size}px`,
-              borderRadius: '50%',
-              backgroundColor: sphere.color,
-              willChange: 'transform',
-              pointerEvents: 'none',
-              filter: `blur(${sphere.size * 0.1}px)`,
-              boxShadow: `0 0 ${sphere.size * 0.5}px ${sphere.color.slice(0, -1)}, 0.15)`,
-              animation: `floatSphere${sphere.id % 4} ${sphere.duration}s ease-in-out ${sphere.delay}s infinite`,
-              transform: shouldRepel
-                ? `translate(${repelX}px, ${repelY}px)`
-                : 'translate(0, 0)',
-              transition: shouldRepel ? 'transform 0.2s ease-out' : 'none',
-            }}
+            className={`absolute rounded-full pointer-events-none [left:${sphere.x}%] [top:${sphere.y}%] [width:${sphere.size}px] [height:${sphere.size}px] [background-color:${sphere.color.replace(/ /g, '_')}] [will-change:transform] [filter:blur(${sphere.size * 0.1}px)] [box-shadow:0_0_${sphere.size * 0.5}px_${sphere.color.slice(0, -1).replace(/ /g, '_')},_0.15)] [animation:floatSphere${sphere.id % 4}_${sphere.duration}s_ease-in-out_${sphere.delay}s_infinite] ${shouldRepel ? `[transform:translate(${repelX}px,_${repelY}px)] transition-transform duration-200 ease-out` : '[transform:translate(0,0)] transition-none'}`}
           />
         );
       })}

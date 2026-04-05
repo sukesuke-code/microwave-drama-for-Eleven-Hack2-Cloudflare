@@ -50,14 +50,7 @@ export default function WaveAnimation({ style, active, narrationText, beat }: Wa
         return (
           <div
             key={`${i}-${seed}-${beat}`}
-            className="w-1 rounded-full"
-            style={{
-              backgroundColor: color,
-              height: `${heightPercent}%`,
-              animation: `wave ${duration}s ease-in-out infinite`,
-              animationDelay: `${(i % 6) * 0.08}s`,
-              opacity: 0.85,
-            }}
+            className={`w-1 rounded-full opacity-85 wave-bar-dynamic [--wave-color:${color}] [--wave-height:${heightPercent}%] [--wave-animation:wave_${duration}s_ease-in-out_infinite] [--wave-delay:${(i % 6) * 0.08}s]`}
           />
         );
       })}

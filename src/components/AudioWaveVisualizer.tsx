@@ -1,4 +1,4 @@
-import { CSSProperties, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface AudioWaveVisualizerProps {
   color?: string;
@@ -184,14 +184,13 @@ export default function AudioWaveVisualizer({
     );
   }
 
+  const containerTransformClass = isDynamicProfile
+    ? `[transform:translate3d(${swayX.toFixed(2)}px,_${swayY.toFixed(2)}px,_0)_skewX(${tilt.toFixed(2)}deg)_scaleY(${shellScaleY.toFixed(3)})]`
+    : '';
+
   return (
     <div
-      className={`flex justify-center gap-1 h-12 px-2 ${isDynamicProfile ? 'transition-transform duration-75' : ''} ${inverted ? 'items-start' : 'items-end'}`}
-      style={isDynamicProfile
-        ? {
-          transform: `translate3d(${swayX.toFixed(2)}px, ${swayY.toFixed(2)}px, 0) skewX(${tilt.toFixed(2)}deg) scaleY(${shellScaleY.toFixed(3)})`,
-        }
-        : undefined}
+      className={`flex justify-center gap-1 h-12 px-2 ${isDynamicProfile ? 'transition-transform duration-75' : ''} ${inverted ? 'items-start' : 'items-end'} ${containerTransformClass}`}
     >
       {bars.map((_, i) => {
         const randomUnit = typeof syncSeed === 'number' ? seededUnit(syncSeed + i * 17) : Math.random();
@@ -224,34 +223,20 @@ export default function AudioWaveVisualizer({
           : 0.34 + activeLevel * 1.85 + Math.sin((syncSeed ?? 0) * 0.16 + i * 0.95 + motionTick * 0.22) * 0.18;
         const jitterX = Math.sin((syncSeed ?? 0) * 0.07 + i * 1.17 + motionTick * 0.52) * (0.08 + activeLevel * 0.32);
         const rotate = Math.sin((syncSeed ?? 0) * 0.05 + i * 0.41 + motionTick * 0.4) * (2 + activeLevel * 5.5);
-        const barStyle: CSSProperties & Record<string, string | number> = {
-          backgroundColor: color,
-          animationDelay: addBaseMotion ? `-${(i * delayMultiplier).toFixed(3)}s` : `${i * delayMultiplier}s`,
-          boxShadow: isDynamicProfile ? `0 0 ${4 + activeLevel * 9}px ${color}66` : `0 0 4px ${color}40`,
-          animationName: pattern.keyframe,
-          animationDuration: `${randomDuration}s`,
-          animationTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1.0)',
-          animationIterationCount: 'infinite',
-          animationDirection: 'alternate',
-          '--eq-min-height': `${pattern.minHeight}px`,
-          '--eq-max-height': `${pattern.maxHeight}px`,
-          '--eq-opacity-min': pattern.opacityMin,
-          '--eq-opacity-max': pattern.opacityMax,
-          ...(isAudioReactive && (isDynamicProfile || !addBaseMotion)
-            ? {
-              transform: isDynamicProfile
-                ? `translateX(${jitterX.toFixed(2)}px) rotate(${rotate.toFixed(2)}deg) scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})`
-                : `scaleY(${Math.max(0.2, dynamicScale).toFixed(3)})`,
-              willChange: 'transform, opacity',
-              opacity: isDynamicProfile
-                ? Math.min(1, 0.42 + activeLevel * 1.08)
-                : Math.min(1, 0.35 + activeLevel * 0.95),
-            }
-            : {}),
-        };
 
-        return <div key={i} className="w-1 rounded-full" style={barStyle} />;
+        const shadowVal = isDynamicProfile ? `0_0_${4 + activeLevel * 9}px_${color}66` : `0_0_4px_${color}40`;
+        const animDelay = addBaseMotion ? `-${(i * delayMultiplier).toFixed(3)}s` : `${i * delayMultiplier}s`;
+        const transformPart = isAudioReactive && (isDynamicProfile || !addBaseMotion)
+          ? (isDynamicProfile
+              ? `[transform:translateX(${jitterX.toFixed(2)}px)_rotate(${rotate.toFixed(2)}deg)_scaleY(${Math.max(0.28, dynamicScale).toFixed(3)})] [will-change:transform,_opacity] [opacity:${(isDynamicProfile ? Math.min(1, 0.42 + activeLevel * 1.08) : Math.min(1, 0.35 + activeLevel * 0.95)).toFixed(3)}]`
+              : `[transform:scaleY(${Math.max(0.2, dynamicScale).toFixed(3)})] [will-change:transform,_opacity] [opacity:${Math.min(1, 0.35 + activeLevel * 0.95).toFixed(3)}]`)
+          : '';
+
+        const barArbitraryClass = `[background-color:${color}] [animation-delay:${animDelay}] [box-shadow:${shadowVal}] [animation-name:${pattern.keyframe}] [animation-duration:${randomDuration}s] [animation-timing-function:cubic-bezier(0.4,_0.0,_0.2,_1.0)] [animation-iteration-count:infinite] [animation-direction:alternate] [--eq-min-height:${pattern.minHeight}px] [--eq-max-height:${pattern.maxHeight}px] [--eq-opacity-min:${pattern.opacityMin}] [--eq-opacity-max:${pattern.opacityMax}] ${transformPart}`;
+
+        return <div key={i} className={`w-1 rounded-full ${barArbitraryClass}`} />;
       })}
     </div>
   );
 }
+

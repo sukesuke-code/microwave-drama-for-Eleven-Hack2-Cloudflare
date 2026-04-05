@@ -95,8 +95,7 @@ export default function BackgroundEffect({ style, isDanger, themeMode }: Backgro
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0"
-      style={{ opacity: themeMode === 'light' ? 1 : 0.6 }}
+      className={`fixed inset-0 pointer-events-none z-0 ${themeMode === 'light' ? 'opacity-100' : 'opacity-60'}`}
     />
   );
 }

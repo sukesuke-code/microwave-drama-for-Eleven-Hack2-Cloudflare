@@ -254,6 +254,7 @@ export default function SettingsPage({
                   max={9}
                   value={minutes}
                   onChange={(e) => updateMinutes(e.target.value)}
+                  aria-label={t.minutes}
                   className={`w-full bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
@@ -269,6 +270,7 @@ export default function SettingsPage({
                   max={59}
                   value={String(seconds).padStart(2, '0')}
                   onChange={(e) => updateSeconds(e.target.value)}
+                  aria-label={t.seconds}
                   className={`w-full bg-transparent text-center text-2xl font-black sm:text-3xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isLight ? 'text-gray-900' : 'text-white'}`}
                 />
               </div>
@@ -383,11 +385,7 @@ export default function SettingsPage({
               type="button"
               onClick={handleStart}
               disabled={duration < 1 || isLoading}
-              className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, #ea580c, #dc2626)',
-                boxShadow: '0 0 24px rgba(234, 88, 12, 0.45)',
-              }}
+              className="w-full rounded-xl py-2.5 text-xs sm:text-sm font-black tracking-widest text-white transition-opacity disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0 start-button-gradient"
             >
               <PlayCircle size={14} />
               {isLoading ? t.loading : t.startNarration}

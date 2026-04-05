@@ -164,11 +164,7 @@ export default function App() {
   return (
     <div className="font-sans">
       <div
-        style={{
-          opacity: pageOpacity,
-          transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-        className={pageTransitionClass}
+        className={`${pageTransitionClass} app-page-transition [--page-opacity:${pageOpacity}]`}
       >
         {screen === 'top' && (
           <TopPage

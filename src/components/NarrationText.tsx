@@ -90,8 +90,7 @@ export default function NarrationText({ text, style, themeMode }: NarrationTextP
     >
       <p
         ref={textRef}
-        className={`w-full max-h-full overflow-hidden text-center text-base leading-relaxed font-medium break-words ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
-        style={{ fontSize: `${fontPx}px`, whiteSpace: 'pre-wrap' }}
+        className={`w-full max-h-full overflow-hidden text-center text-base leading-relaxed font-medium break-words whitespace-pre-wrap dynamic-font-size [--dynamic-font-size:${fontPx}px] ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
       >
         {displayedText}
         <span className="animate-pulse opacity-70">▌</span>

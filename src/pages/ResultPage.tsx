@@ -65,8 +65,7 @@ function AutoFitSingleLineText({
   return (
     <span
       ref={spanRef}
-      className={`block w-full whitespace-nowrap overflow-hidden ${className}`}
-      style={{ fontSize: `${fontPx}px` }}
+      className={`block w-full whitespace-nowrap overflow-hidden [font-size:${fontPx}px] ${className}`}
       title={text}
     >
       {text}
@@ -101,8 +100,7 @@ function AutoFitSubtitleHighlight({
   return (
     <p
       ref={textRef}
-      className={`w-full whitespace-nowrap overflow-hidden text-center ${className}`}
-      style={{ fontSize: `${fontPx}px` }}
+      className={`w-full whitespace-nowrap overflow-hidden text-center [font-size:${fontPx}px] ${className}`}
       title={`${dishName}${suffixText}`}
     >
       <span className="font-black text-orange-400">{dishName}</span>
@@ -203,28 +201,17 @@ export default function ResultPage({
         <img src={microwaveShowIcon} alt="Microwave Show icon" className="h-7 w-7" />
       </button>
       <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `radial-gradient(ellipse 60% 50% at 50% 40%, ${styleConfig.accentColor}10 0%, transparent 70%)`,
-        }}
+        className={`absolute inset-0 pointer-events-none [background:radial-gradient(ellipse_60%_50%_at_50%_40%,_${styleConfig.accentColor}10_0%,_transparent_70%)]`}
       />
 
       <div className="relative z-10 flex h-full w-full max-w-md flex-col items-center justify-between px-4 pb-3 pt-14 text-center hero-rise-in sm:px-6 sm:pb-6 sm:pt-16">
         <div
-          className="result-complete-orb h-16 w-16 rounded-full flex items-center justify-center mb-2 sm:h-24 sm:w-24 sm:mb-6"
-          style={{
-            border: `2px solid ${styleConfig.accentColor}40`,
-            boxShadow: `0 0 24px ${styleConfig.accentColor}40, inset 0 0 16px ${styleConfig.accentColor}25`,
-          }}
+          className={`result-complete-orb h-16 w-16 rounded-full flex items-center justify-center mb-2 sm:h-24 sm:w-24 sm:mb-6 [border:2px_solid_${styleConfig.accentColor}40] [box-shadow:0_0_24px_${styleConfig.accentColor}40,_inset_0_0_16px_${styleConfig.accentColor}25]`}
         >
           <span
             role="img"
             aria-label="celebration"
-            className="text-3xl leading-none select-none sm:text-4xl"
-            style={{
-              filter: `drop-shadow(0 0 12px ${styleConfig.accentColor}99) drop-shadow(0 0 20px ${styleConfig.accentColor}66)`,
-              transform: 'translateY(-1px)',
-            }}
+            className={`text-3xl leading-none select-none sm:text-4xl [filter:drop-shadow(0_0_12px_${styleConfig.accentColor}99)_drop-shadow(0_0_20px_${styleConfig.accentColor}66)] [transform:translateY(-1px)]`}
           >
             🎉
           </span>
@@ -235,15 +222,10 @@ export default function ResultPage({
         </h1>
 
         <div
-          className="my-2 sm:my-6 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border w-full"
-          style={{
-            borderColor: `${styleConfig.accentColor}30`,
-            background: `${styleConfig.accentColor}08`,
-          }}
+          className={`my-2 sm:my-6 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border w-full [border-color:${styleConfig.accentColor}30] [background:${styleConfig.accentColor}08]`}
         >
           <p
-            className="text-base font-medium italic leading-relaxed"
-            style={{ color: `${styleConfig.accentColor}cc` }}
+            className={`text-base font-medium italic leading-relaxed [color:${styleConfig.accentColor}cc]`}
           >
             「{randomMessage}」
           </p>
@@ -292,12 +274,7 @@ export default function ResultPage({
         <div className="flex flex-col gap-2 sm:gap-3 w-full">
           <button
             onClick={onReplay}
-            className="replay-gradient-button flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95"
-            style={{
-              background: `linear-gradient(120deg, ${styleConfig.accentColor}e0, ${styleConfig.accentColor}, #f97316, ${styleConfig.accentColor})`,
-              backgroundSize: '220% 220%',
-              boxShadow: `0 0 20px ${styleConfig.accentColor}40`,
-            }}
+            className={`replay-gradient-button flex items-center justify-center gap-3 w-full py-3 sm:py-4 rounded-2xl font-bold text-white text-base sm:text-lg transition-all active:scale-95 [background:linear-gradient(120deg,_${styleConfig.accentColor}e0,_${styleConfig.accentColor},_#f97316,_${styleConfig.accentColor})] [background-size:220%_220%] [box-shadow:0_0_20px_${styleConfig.accentColor}40]`}
           >
             <RotateCcw size={20} />
             {t.replay}
