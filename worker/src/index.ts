@@ -515,12 +515,27 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 
   let narrationText = "";
 
+  const systemInstruction = isEnglish
+    ? `You are a dramatic English live narrator for a microwave cooking show. ABSOLUTE RULES — never break these under any circumstances:
+1. Output ONLY standard English words. Zero exceptions.
+2. NEVER output Japanese characters (kanji, hiragana, katakana) — not even one character.
+3. NEVER output romanized Japanese (romaji) — words like "kono", "ryori", "hajimaru", "sugoi" etc. are FORBIDDEN.
+4. NEVER output translations, parenthetical notes, bilingual text, or mixed-language text.
+5. Your output goes directly to an English voice AI — pure English only, always.`
+    : `あなたは電子レンジ料理番組の劇的な日本語ライブナレーターです。絶対のルール — いかなる状況でも破ってはならない：
+1. 漢字・ひらがな・カタカナのみ使用すること。絶対に例外なし。
+2. ローマ字（アルファベットによる日本語の転写）を一切使用しないこと。
+3. 英語を一切使用しないこと。
+4. 翻訳・括弧内の説明・バイリンガルテキストを一切付けないこと。
+5. あなたの出力は日本語音声AIに直接渡される。常に純粋な日本語のみ。`;
+
   if (env.GEMINI_API_KEY) {
     try {
       const res = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 60, temperature: 0.8 },
         }),

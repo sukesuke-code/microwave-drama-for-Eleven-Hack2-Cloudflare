@@ -883,13 +883,21 @@ function stripRomajiIfNeeded(
     if (!hasJapanese) return getLocalFallbackNarration(dishName, style, phase, remainingTime, locale);
     return stripped;
   }
-  // English mode: detect macrons or uniquely-Japanese romaji words
-  const hasMacrons = ROMAJI_MACRONS.test(text);
-  const romajiCount = (text.match(ROMAJI_WORDS_RE) ?? []).length;
-  if (hasMacrons || romajiCount >= 1) {
+  // English mode: strip CJK characters first, then validate
+  let cleaned = text
+    .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+/g, " ")  // strip CJK/Japanese
+    .replace(/[(（][^)）]*[)）]?/g, " ")                              // strip parenthetical translations
+    .replace(/\s+/g, " ").trim();
+
+  // If Japanese chars were present (cleaned differs significantly) or nothing useful remains → fallback
+  const hasEnglishWords = /[a-zA-Z]{2,}/.test(cleaned);
+  const hasMacrons = ROMAJI_MACRONS.test(cleaned);
+  const romajiCount = (cleaned.match(new RegExp(ROMAJI_WORDS_RE.source, "gi")) ?? []).length;
+
+  if (!hasEnglishWords || hasMacrons || romajiCount >= 1) {
     return getLocalFallbackNarration(dishName, style, phase, remainingTime, locale);
   }
-  return text;
+  return cleaned;
 }
 
 /** Returns a ready-to-speak local fallback narration line in the configured language. */
