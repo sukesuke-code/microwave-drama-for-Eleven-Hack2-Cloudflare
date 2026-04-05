@@ -496,7 +496,9 @@ Maximum narration duration: ${maxDurationSeconds} seconds.
 ${memoryContext}
 ${historyContext}
 
-IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses. Do NOT use romanized Japanese (romaji) words such as "no", "ga", "wa", "desu", "nani", "sugoi" etc. Use standard English vocabulary only.
+IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only. Do NOT add translations or explanations in parentheses.
+❌ WRONG (do NOT output): "Kono ryōri no shunkan!" or "Kessen no hi ga kita!" or any romanized Japanese.
+✅ RIGHT: "The moment of truth has arrived for this dish!" — real English words only.
 Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
     : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。括弧内に翻訳や説明を追加しないでください。
 
@@ -565,10 +567,23 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
     // Remove any remaining Japanese/CJK characters
     narrationText = narrationText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+/g, " ");
     narrationText = narrationText.replace(/\s+/g, " ").trim();
-    // If no meaningful English words remain (e.g. all romaji was stripped), use fallback
+
+    // Detect romaji: macron vowels only appear in romanized Japanese, never in native English
+    const hasMacrons = /[āīūēōĀĪŪĒŌ]/.test(narrationText);
+    // Detect romaji word clusters: ≥2 high-frequency Japanese romaji words = likely romaji output
+    const ROMAJI_WORDS = /\b(kono|sono|ano|kore|sore|are|nani|naze|doko|dare|ittai|yosh|ikuze|ikuyo|sugoi|yabai|kawaii|suki|desu|masu|dayo|nda|kedo|wa|ga|wo|ni|de|to|ka|mo)\b/gi;
+    const romajiCount = (narrationText.match(ROMAJI_WORDS) ?? []).length;
     const hasEnglishWords = /[a-zA-Z]{2,}/.test(narrationText);
-    if (!hasEnglishWords) {
-      narrationText = `${dishName} is cooking! Only ${remainingTime} seconds left!`;
+
+    if (hasMacrons || romajiCount >= 2 || !hasEnglishWords) {
+      const enFallbacks: Record<string, string> = {
+        opening: `${dishName} is in the microwave — the countdown has BEGUN!`,
+        quarter:  `Quarter down! The heat inside is rising fast for ${dishName}!`,
+        middle:   `Halfway through! ${dishName} is transforming beautifully in there!`,
+        final:    `FINAL ${remainingTime} SECONDS! ${dishName} is SO close to perfection!`,
+        done:     `DING! ${dishName} is DONE! An absolute masterpiece achieved!`,
+      };
+      narrationText = enFallbacks[phase] ?? `${dishName} — ${remainingTime} seconds of pure drama!`;
     }
   } else {
     // Remove any remaining Latin/English word sequences (including romaji)
@@ -577,7 +592,14 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
     // If no Japanese characters remain after filtering (e.g. output was entirely romaji), use fallback
     const hasJapaneseChars = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(narrationText);
     if (!hasJapaneseChars) {
-      narrationText = `${dishName}の調理が続く！残り${remainingTime}秒だ！`;
+      const jaFallbacks: Record<string, string> = {
+        opening: `${dishName}が電子レンジに投入された！さあ、戦いの幕が上がるぞ！`,
+        quarter:  `${dishName}、まだまだこれからだ！`,
+        middle:   `折り返し地点！${dishName}の調理が白熱してきたぞ！`,
+        final:    `残り${remainingTime}秒！${dishName}、もうすぐ完成だー！`,
+        done:     `チーン！${dishName}の完成だー！素晴らしい！`,
+      };
+      narrationText = jaFallbacks[phase] ?? `${dishName}の調理が続く！残り${remainingTime}秒だ！`;
     }
   }
 
