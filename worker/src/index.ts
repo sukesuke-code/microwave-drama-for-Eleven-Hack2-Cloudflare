@@ -56,10 +56,6 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
   const maxDurationSeconds = totalTime - 1;
   const isEnglish = locale === 'en';
 
-  const languageNote = isEnglish
-    ? "Generate the narration ONLY in English."
-    : "Generate the narration ONLY in Japanese.";
-
   const styleDescriptions: Record<string, { en: string; ja: string }> = {
     sports: { en: 'sports commentator', ja: 'スポーツ実況者' },
     movie: { en: 'movie trailer announcer', ja: '映画予告編アナウンサー' },
@@ -72,7 +68,7 @@ async function handleAgentNarration(request: Request, env: Env): Promise<Respons
   const styleDesc = styleDescriptions[style]?.[isEnglish ? 'en' : 'ja'] || style;
 
   const prompt = isEnglish
-    ? `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show narrated by a ${styleDesc}. No greeting, no explanation. Just one sentence.
+    ? `Create EXACTLY ONE short dramatic live narration line for a microwave cooking show narrated by a ${styleDesc}. No greeting, no explanation. Just one sentence. Do NOT include any Japanese text, translations, or text in any language other than English.
 
 CRITICAL: The narration MUST be short enough to be spoken in ${maxDurationSeconds} seconds or less when read aloud at normal speaking pace (approximately ${Math.floor(maxDurationSeconds * 2.5)} words maximum).
 
@@ -82,9 +78,9 @@ Phase: ${phase}
 Remaining Time: ${remainingTime}/${totalTime} seconds.
 Maximum narration duration: ${maxDurationSeconds} seconds.
 
-${languageNote}
+IMPORTANT: Output ONLY English text. No translations. No alternative languages. Pure English only.
 Keep it punchy and concise - the AI voice must finish speaking within ${maxDurationSeconds} seconds!`
-    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。
+    : `マイクロウェーブ調理番組の${styleDesc}による短い劇的なライブナレーション行を1つ作成してください。挨拶なし、説明なし。1文だけです。英語やその他の言語のテキストは含めないでください。翻訳も含めないでください。
 
 重要：ナレーションは通常の話すペース（約${Math.floor(maxDurationSeconds * 2.5)}語の最大値）で朗読する場合、${maxDurationSeconds}秒以内の長さである必要があります。
 
@@ -94,7 +90,7 @@ Keep it punchy and concise - the AI voice must finish speaking within ${maxDurat
 残り時間: ${remainingTime}/${totalTime}秒
 最大ナレーション時間: ${maxDurationSeconds}秒
 
-${languageNote}
+重要：日本語のテキストのみを出力してください。翻訳なし。代替言語なし。純粋に日本語のみです。
 簡潔にしてください - AI音声は${maxDurationSeconds}秒以内に話し終わる必要があります！`;
 
   let narrationText = "";
@@ -131,10 +127,25 @@ ${languageNote}
   }
 
   if (!narrationText) {
-    narrationText = `おおっと！${dishName}の調理が白熱しているぞ！残り${remainingTime}秒だー！`;
+    narrationText = isEnglish
+      ? `Intense cooking action happening! ${dishName} is approaching perfection with just ${remainingTime} seconds left!`
+      : `おおっと！${dishName}の調理が白熱しているぞ！残り${remainingTime}秒だー！`;
   }
 
   narrationText = narrationText.replace(/[\r\n]+/g, " ").replace(/"/g, "").trim();
+
+  // Remove any parenthetical translations or dual language content
+  if (isEnglish) {
+    // Remove Japanese text in parentheses or brackets
+    narrationText = narrationText.replace(/[\(（][^)）]*[）\)]/g, " ");
+    narrationText = narrationText.replace(/[\[［][^)\]]*[\]］]/g, " ");
+  } else {
+    // Remove English text in parentheses or brackets
+    narrationText = narrationText.replace(/[\(（][^)）]*[）\)]/g, " ");
+    narrationText = narrationText.replace(/[\[［][^)\]]*[\]］]/g, " ");
+  }
+
+  narrationText = narrationText.replace(/\s+/g, " ").trim();
 
   return new Response(JSON.stringify({ ok: true, text: narrationText }), {
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
